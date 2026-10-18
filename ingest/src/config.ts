@@ -69,6 +69,11 @@ export const config = {
 
   // Deterministic editorial gate, before any model call. Per-run narrow-source diversity cap.
   reportCard: {
+    enabled: true,
+    scoreMaxRecentCards: 30,
+    scoreMaxTokens: 900,
+    scoreMinIntervalMs: 20_500,
+    scoreMax429Retries: 8,
     narrowSourceMaxPerRun: 2,
     narrowSources: ['faa_airworthiness_directive'] as readonly string[],
     denyTitlePatterns: [
