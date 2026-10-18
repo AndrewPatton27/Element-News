@@ -62,6 +62,8 @@ export interface Summarizer {
   dailyCap?: number;
   /** min gap between two calls to this provider, in ms (its requests-per-minute limit) */
   minIntervalMs?: number;
+  /** Optional compact JSON scoring call for editorial report-card providers. */
+  generate?(prompt: string): Promise<string>;
   summarize(input: SummarizeInput): Promise<SummaryDraft>;
 }
 

@@ -25,7 +25,7 @@ import { createChainState, summarizeWithChain, type ChainState, type UsageCounte
 import type { RawItem, Summarizer } from './types.ts';
 import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState } from './topicFilter.ts';
-import { scoreCardWithCodex } from './reportCard.ts';
+import { scoreCard, type CardScore } from './reportCard.ts';
 
 export type SourceName = 'macro' | 'fed' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'fed', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
@@ -56,6 +56,12 @@ export interface RunStats {
   template: number;
   macro: number;
   data_cards: number;
+  report_pass: number;
+  report_revise: number;
+  report_abandon: number;
+  report_duplicate: number;
+  report_provider_gemini: number;
+  report_provider_groq: number;
 }
 
 /** Per-run state passed to each source's runner (shared budget, dedupe guard and provider cooldowns). */
@@ -74,7 +80,7 @@ let topicFilterState: TopicFilterState = createTopicFilterState();
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
-  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0 };
+  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_provider_groq: 0 };
   const ctx: RunCtx = {
     stats,
     budget: { left: opts.limit ?? 20 },
@@ -92,6 +98,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
+  deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
 
@@ -442,29 +449,40 @@ async function processItems(
       let payload = buildPublishPayload(it, draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
       let v = validatePublish(payload);
       if (!v.ok) throw new Error(v.errors.join('; '));
-      let cardScore: Awaited<ReturnType<typeof scoreCardWithCodex>> | null = null;
-      if (process.env.INGEST_WRITER === 'codex' || process.env.INGEST_FORMAT_CHECK === '1') {
-        const recent = await deps.publisher.auditCards?.().catch(() => []) ?? [];
-        const candidate = { ...payload, id: row.id } as any;
-        cardScore = await scoreCardWithCodex(candidate, recent.slice(0, 30));
+      let cardScore: CardScore | null = null;
+      // Injected legacy fixture providers may not expose a scoring transport; real providers built
+      // by buildProviders include Groq when configured. Keep those fixture runs deterministic.
+      if (config.reportCard.enabled && r.ai_generated && deps.providers.some(p => p.name === 'groq' && typeof p.generate === 'function')) {
+        const scorer = deps.providers.find(p => p.name === 'groq' && typeof (p as any).generate === 'function');
+        if (!scorer) throw new Error('report-card scorer unavailable');
+        const scoreClient = { generate: (prompt: string) => (scorer as any).generate(prompt) };
+        const recentAll = await deps.publisher.auditCards?.().catch(() => []) ?? [];
+        const recent = recentAll.filter(c => Date.parse(c.as_of) >= deps.now.getTime() - config.reportCard.recentCardDays * 86_400_000).slice(0, config.reportCard.scoreMaxRecentCards);
+        const candidate = { id: row.id, headline: payload.headline, body: payload.body, category: payload.category, as_of: payload.as_of, ai_generated: payload.ai_generated, sources: it ? [{ name: it.source_name, url: it.url }] : [] } as any;
+        cardScore = await scoreCard(scoreClient, candidate, recent);
+        stats.report_provider_groq++;
         if (cardScore.decision === 'REVISE') {
-          const writer = deps.providers.find(p => p.name === 'codex');
-          if (writer) {
-            try {
-              draft = await writer.summarize({ item: it, text, retryErrors: cardScore.recommendations });
-              payload = buildPublishPayload(it, draft, { itemId: row.id, aiGenerated: true, model: 'codex-cli' });
-              v = validatePublish(payload);
-              if (v.ok) cardScore = await scoreCardWithCodex({ ...payload, id: row.id } as any, recent.slice(0, 30));
-              else cardScore.decision = 'REVISE';
-            } catch { cardScore.decision = 'REVISE'; }
-          }
+          const writer = deps.providers.find(p => p.name === r.provider);
+          try {
+            if (!writer) throw new Error('writer unavailable');
+            draft = await writer.summarize({ item: it, text, retryErrors: cardScore.recommendations });
+            payload = buildPublishPayload(it, draft, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
+            v = validatePublish(payload);
+            if (!v.ok) throw new Error(v.errors.join('; '));
+            cardScore = await scoreCard(scoreClient, { ...candidate, headline: payload.headline, body: payload.body, category: payload.category }, recent);
+            stats.report_provider_groq++;
+          } catch { cardScore.decision = 'REVISE'; }
         }
         if (cardScore.decision !== 'PASS') {
+          if (cardScore.decision === 'ABANDON') stats.report_abandon++;
+          if (cardScore.relation === 'DUPLICATE') stats.report_duplicate++;
+          stats.report_revise++;
           const code = cardScore.relation === 'DUPLICATE' ? 'duplicate_story' : cardScore.decision === 'ABANDON' ? 'report_card_abandon' : 'report_card_revise_failed';
           stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
           await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
           continue;
         }
+        stats.report_pass++;
       }
       const res = await deps.publisher.publishBlurb(payload);
       stats[res.status === 'published' ? 'published' : res.status]++;

@@ -89,7 +89,7 @@ export interface FetchAllowedOptions {
  * fetch() that refuses any URL (and any redirect target) outside the allowlist.
  * Redirects are followed manually so each hop is checked. Returns the body text.
  */
-export async function fetchAllowed(url: string, opts: FetchAllowedOptions): Promise<{ status: number; text: string; url: string }> {
+export async function fetchAllowed(url: string, opts: FetchAllowedOptions): Promise<{ status: number; text: string; url: string; retryAfterMs?: number }> {
   const fetchImpl = opts.fetchImpl ?? ((u: string, i: RequestInit) => fetch(u, i));
   const method = opts.method ?? 'GET';
   assertAllowed(url, opts.kind, opts.extraHosts);
@@ -132,7 +132,9 @@ export async function fetchAllowed(url: string, opts: FetchAllowedOptions): Prom
       await mkdir(opts.cacheDir ?? config.cacheDir, { recursive: true });
       await writeFile(cacheFile, text, 'utf8');
     }
-    return { status: res.status, text, url: current };
+    const hint = res.headers.get('retry-after');
+    const retryAfterMs = hint ? (Number.isFinite(Number(hint)) ? Math.max(0, Number(hint) * 1000) : Math.max(0, Date.parse(hint) - Date.now())) : undefined;
+    return { status: res.status, text, url: current, retryAfterMs };
   }
   throw new AllowlistError(`too many redirects starting at ${new URL(url).hostname}`);
 }

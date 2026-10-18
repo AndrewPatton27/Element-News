@@ -80,6 +80,7 @@ export function createGroqSummarizer(opts: {
   dailyCap?: number;
 }): Summarizer {
   const model = opts.model ?? config.groq.model;
+  let lastScoreCall = 0;
 
   async function call(prompt: string, format: ResponseFormat) {
     const body: Record<string, unknown> = {
@@ -107,6 +108,25 @@ export function createGroqSummarizer(opts: {
     model,
     dailyCap: opts.dailyCap ?? groqDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? groqMinIntervalMs(),
+    async generate(prompt: string): Promise<string> {
+      for (let attempt = 0; ; attempt++) {
+        const wait = lastScoreCall + config.reportCard.scoreMinIntervalMs - Date.now();
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        lastScoreCall = Date.now();
+        const res = await fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
+          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1,
+            max_completion_tokens: config.reportCard.scoreMaxTokens, response_format: { type: 'json_object' } }) });
+        if (res.status === 429 && attempt < config.reportCard.scoreMax429Retries) {
+          await new Promise(r => setTimeout(r, res.retryAfterMs ?? config.reportCard.scoreMinIntervalMs));
+          continue;
+        }
+        if (res.status === 429) throw new RateLimitedError('groq');
+        if (res.status < 200 || res.status >= 300) throw new ProviderError(`groq scorer HTTP ${res.status}`);
+        try { const x = JSON.parse(res.text)?.choices?.[0]?.message?.content; if (typeof x !== 'string') throw 0; return x; }
+        catch { throw new ProviderError('groq scorer returned invalid JSON envelope'); }
+      }
+    },
     async summarize(input): Promise<SummaryDraft> {
       // Tokens per minute are Groq's binding limit: send a shorter slice of the (already licensed) text.
       const prompt = buildPrompt({ ...input, text: input.text.slice(0, config.groq.sourceTextMaxChars) });
