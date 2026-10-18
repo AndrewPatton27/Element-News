@@ -93,7 +93,7 @@ export function finishForYou(cards: BlurbCard[], trendingTopIds: ReadonlySet<str
   let rest = capTopics(cards.slice(keep), FY.topicCapWindow, FY.topicCap);
   rest = spreadFromTrending(rest, trendingTopIds, FY.overlapWindow, FY.overlapMax);
   if (keep === 0 && trendingFirstId && rest.length > 1 && rest[0].id === trendingFirstId) rest = [rest[1], rest[0], ...rest.slice(2)];
-  return [...cards.slice(0, keep), ...diversifyFeed(rest)];
+  return [...cards.slice(0, keep), ...diversifyFeed(capTopics(diversifyFeed(rest)))];
 }
 
 export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet<string>, trendingFirstId: string | null, trendingTopIds: ReadonlySet<string> = new Set(), now: number = Date.now()): BlurbCard[] {
