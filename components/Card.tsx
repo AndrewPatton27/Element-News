@@ -56,14 +56,15 @@ const shareCard = shareStory;
 function badgeFor(card: BlurbCard, p: Palette): { text: string; bg: string; fg: string; Icon: BadgeIcon | null } {
   if (card.kind === 'data') return { text: 'New data', bg: p.dataSoft, fg: p.dataInk, Icon: NumbersIcon };
   if (card.kind === 'link_out') return { text: 'From the publisher', bg: LINK_OUT_BADGE.bg, fg: LINK_OUT_BADGE.fg, Icon: ExternalIcon };
-  if (card.ai.generated) return { text: 'Summary', bg: p.accentSoft, fg: p.accentInk, Icon: SparkleIcon };
+  // Drew: no "Summary" tag on AI-written cards (the AI label in the footer already says so).
+  if (card.ai.generated) return { text: '', bg: p.accentSoft, fg: p.accentInk, Icon: null };
   return { text: 'From the source', bg: p.surfaceMuted, fg: p.inkSoft, Icon: null };
 }
 
 // The badge wording, shared with the top-stories list.
 export function badgeLabel(card: BlurbCard): string {
   if (card.kind === 'data') return 'New data';
-  return card.ai.generated ? 'Summary' : 'From the source';
+  return card.ai.generated ? '' : 'From the source';
 }
 
 // Summary cards: Agency / Type / Published, only the ones we have.
@@ -233,10 +234,14 @@ export function Card(props: Props) {
         style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, compact && styles.cardCompact, roomy && styles.cardRoomy, { backgroundColor: p.surface, borderColor: p.border }]}
       >
         <View style={styles.meta}>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            {badge.Icon ? <badge.Icon color={badge.fg} size={14} /> : null}
-            <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.text}</Text>
-          </View>
+          {badge.text ? (
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+              {badge.Icon ? <badge.Icon color={badge.fg} size={14} /> : null}
+              <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.text}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
           <View style={styles.metaRight}>
             {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
             <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories)}</Text>

@@ -44,7 +44,7 @@ export function SearchResultCard({ card, config, categories, reason, onOpen, onS
       <View style={styles.topRow}>
         <View style={styles.badge}>
           <View style={[styles.dot, { backgroundColor: dot }]} />
-          <Text style={[styles.badgeText, { color: isData ? p.dataInk : p.accentInk }]}>{badgeLabel(card)}</Text>
+          {badgeLabel(card) ? <Text style={[styles.badgeText, { color: isData ? p.dataInk : p.accentInk }]}>{badgeLabel(card)}</Text> : null}
         </View>
         <Text style={[styles.topic, { color: p.muted }]} numberOfLines={1}>
           {categoryName(card.category, categories)} · {cardTime(card)}

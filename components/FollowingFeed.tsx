@@ -22,7 +22,7 @@ export function FollowingFeed({ items, state, config, categories, reasonFor, onO
   return <View style={{gap:14}}><View style={[s.grid,wide&&s.gridWide]}>{items.map(c=>{
     const labels=cardLabels(c,config), reason=reasonFor(c);
     return <View key={c.id} style={[s.card,wide?s.wide:s.narrow,wide?s.cardWide:s.cardNarrow,{backgroundColor:p.surface,borderColor:p.border}]}>
-      <View style={s.top}><Text style={[s.badge,{color:p.accentInk}]}>Ã¢â€”Â {badgeLabel(c)}</Text><Text style={[s.meta,{color:p.muted}]}>{categoryName(c.category,categories)} Ã‚Â· {cardTime(c)}</Text></View>
+      <View style={s.top}>{badgeLabel(c) ? <Text style={[s.badge,{color:p.accentInk}]}>{badgeLabel(c)}</Text> : <View />}<Text style={[s.meta,{color:p.muted}]}>{categoryName(c.category,categories)} · {cardTime(c)}</Text></View>
       <Pressable onPress={()=>onOpen(c)} accessibilityRole="button" accessibilityLabel={`Open details: ${c.headline}`}><Text style={[s.title,wide&&s.titleWide,{color:p.ink}]}>{clampHeadline(c.headline)}</Text></Pressable>
       {c.story_link?.related_headline ? <Text style={[s.related,{color:p.muted}]}>{c.story_link.kind==='update'?'Update to:':'Related to:'} {c.story_link.related_headline}</Text>:null}
       {c.body?<Text style={[s.body,{color:p.inkBody}]} numberOfLines={4}>{c.body}</Text>:null}

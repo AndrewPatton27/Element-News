@@ -89,7 +89,7 @@ function TopStories({ stories, categories, onOpen }: { stories: BlurbCard[]; cat
           <Text style={[styles.rank, { color: p.accent }]}>{i + 1}</Text>
           <View style={styles.storyText}>
             <Text style={[styles.meta, { color: p.muted }]}>
-              {badgeLabel(c)} · {categoryName(c.category, categories)} · {cardTime(c)}
+              {[badgeLabel(c), categoryName(c.category, categories), cardTime(c)].filter(Boolean).join(' · ')}
             </Text>
             <Text style={[styles.storyTitle, { color: p.ink }]}>{c.headline}</Text>
             <CardActionRow card={c} compact />
