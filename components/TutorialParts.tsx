@@ -81,6 +81,8 @@ export function PracticeCard(props: {
   const disliked = reaction === 'dislike';
   // Practice only: the Follow button toggles its look and saves nothing.
   const [followed, setFollowed] = useState(false);
+  // Practice only: clicking the card (or More detail) opens sample key points, like a real card.
+  const [detailOpen, setDetailOpen] = useState(false);
   return (
     <Animated.View
       style={[
@@ -96,11 +98,29 @@ export function PracticeCard(props: {
       <ExampleHead p={p} caption={props.caption} sparkle />
       <View>
         <Badge n={1} p={p} style={styles.badgeTopRight} />
-        <Text role="heading" aria-level={1} style={[web ? styles.h1Web : styles.h1, { color: p.ink }]}>
+        <Text role="heading" aria-level={1} onPress={() => setDetailOpen((v) => !v)} style={[web ? styles.h1Web : styles.h1, { color: p.ink }]}>
           {props.title}
         </Text>
         {props.lead ? <Text style={[web ? styles.leadWeb : styles.lead, { color: p.inkSoft }]}>{props.lead}</Text> : null}
       </View>
+      <Pressable
+        onPress={() => setDetailOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel="Practice more detail. On real cards this opens the full story."
+        accessibilityState={{ expanded: detailOpen }}
+        {...tip('More detail')}
+        style={({ pressed }: { pressed: boolean }) => ({ opacity: pressed ? 0.7 : 1, alignSelf: 'flex-start', paddingVertical: 6 })}
+      >
+        <Text style={{ color: p.accentInk, fontFamily: fonts.sansSemi, fontSize: web ? 16 : 15 }}>{detailOpen ? 'Hide detail ‹' : 'More detail ›'}</Text>
+      </Pressable>
+      {detailOpen ? (
+        <View style={{ gap: 6, padding: 12, borderRadius: 12, backgroundColor: p.accentSoft }}>
+          <Text style={{ color: p.accentInk, fontFamily: fonts.sansSemi, fontSize: 14 }}>Key points</Text>
+          <Text style={{ color: p.ink, fontFamily: fonts.sans, fontSize: 15 }}>{'•'} The summary is the short version: 2 to 3 plain sentences.</Text>
+          <Text style={{ color: p.ink, fontFamily: fonts.sans, fontSize: 15 }}>{'•'} More detail adds the key facts and links to every source.</Text>
+          <Text style={{ color: p.ink, fontFamily: fonts.sans, fontSize: 15 }}>{'•'} Practice story: on real cards this opens the full story.</Text>
+        </View>
+      ) : null}
       <View>
         <Badge n={2} p={p} style={[styles.badgeTopRight, { zIndex: 1 }]} />
         <Pressable

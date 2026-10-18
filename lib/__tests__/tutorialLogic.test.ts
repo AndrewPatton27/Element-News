@@ -114,11 +114,11 @@ for (const variant of ['mobile', 'web'] as const) {
   });
 }
 
-test('mobile teaches swipes; web teaches thumbs buttons and j/↓ (no ←/→ like keys)', () => {
+test('mobile teaches swipes; web teaches thumbs buttons and the arrow keys (no j key)', () => {
   const mobile = JSON.stringify(getTutorialSteps('mobile'));
   const web = JSON.stringify(getTutorialSteps('web'));
   assert.ok(mobile.includes('Swipe right') && mobile.includes('Swipe left') && mobile.includes('Swipe up'));
-  assert.ok(web.includes('thumbs-up') && web.includes('thumbs-down') && web.includes('Press ↓ or j'));
+  assert.ok(web.includes('thumbs-up') && web.includes('thumbs-down') && web.includes('Press ↓') && !web.includes(' or j'));
   assert.ok(!web.includes('Swipe'));
   assert.ok(!web.includes('← to dislike'));
 });

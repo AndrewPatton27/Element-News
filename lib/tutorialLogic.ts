@@ -56,11 +56,9 @@ export function keyToAction(key: string, step: number, count: number): TutorialA
   switch (key) {
     case 'ArrowDown':
     case 'ArrowRight':
-    case 'PageDown':
       return isLastStep(step, count) ? null : 'next';
     case 'ArrowUp':
     case 'ArrowLeft':
-    case 'PageUp':
       return step > 0 ? 'back' : null;
     case 'Escape':
       return 'skip';
