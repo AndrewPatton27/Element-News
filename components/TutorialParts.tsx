@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   padX: { paddingHorizontal: 18 },
   strip: { height: 44, borderTopWidth: 1, borderBottomWidth: 1, overflow: 'hidden', justifyContent: 'center', paddingLeft: 16 },
   stripTrack: { flexDirection: 'row', flexShrink: 0, alignSelf: 'flex-start', ...(Platform.OS === 'web' ? { width: 'max-content' } : null) } as object,
-  stripLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 0.4, flexShrink: 0, ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : null) } as object,
+  stripLabel: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 0.4, flexShrink: 0, ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : null) } as object,
   stripValue: { fontFamily: fonts.serif, fontSize: 16, letterSpacing: 0 },
   chips: { flexDirection: 'row', gap: 8, overflow: 'hidden' },
   chip: { flexShrink: 0, height: 44, lineHeight: 42, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1, fontFamily: fonts.sansMedium, fontSize: 14, overflow: 'hidden' },

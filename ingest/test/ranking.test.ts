@@ -78,3 +78,9 @@ test('contract fixtures are in ranked order with matching importance and cursor'
   const last = p1.items[p1.items.length - 1];
   assert.equal(p1.next_cursor, `${rankScore(last).toFixed(6)}|${last.id}`);
 });
+
+test("'latest' sorts by published_at, not by a bumped sort_at; ties id desc", () => {
+  const mk = (id: string, pub: string, sort: string): RankInput => ({ id, kind: 'summary', event_type: 'deal', sort_at: sort, published_at: pub, sources: [] });
+  const out = sortLatest([mk('a', '2026-10-17T00:00:00Z', '2026-10-20T00:00:00Z'), mk('b', '2026-10-18T00:00:00Z', '2026-10-18T00:00:00Z'), mk('c', '2026-10-18T00:00:00Z', '2026-10-18T00:00:00Z')]);
+  assert.deepEqual(out.map((c) => c.id), ['c', 'b', 'a']);
+});

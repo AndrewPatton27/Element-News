@@ -14,6 +14,7 @@ import { CloseIcon } from './Icons';
 import { AiLabel, Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceList } from './SourceList';
 import { DataFacts } from './DataCard';
+import { DetailActions } from './DetailActions';
 
 interface Props {
   card: BlurbCard | null;
@@ -96,6 +97,7 @@ export function DetailSheet({ card, config, categories, onClose }: Props) {
               <Disclaimer text={labels.disclaimer} />
             </View>
           </ScrollView>
+          <DetailActions card={card} />
         </View>
       </View>
     </Modal>

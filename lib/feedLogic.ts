@@ -3,6 +3,7 @@
 import type { BlurbCard, CategorySlug, FeedMode, FeedPage } from '../contract/types.ts';
 import { isBlurbCard } from './types.ts';
 import { diversifyFeed } from './diversify.ts';
+import { pulledAt } from './feedOrder.ts';
 
 // The feed tabs. 'for_you' is the signed-in personal feed (api.feed_for_you).
 export type FeedTab = FeedMode | 'for_you';
@@ -184,7 +185,9 @@ function byDescThenId(score: (c: BlurbCard) => number) {
 export function mockFeedPage(all: BlurbCard[], p: MockFeedParams): FeedPage {
   const limit = clampLimit(p.limit);
   const filtered = all.filter((c) => p.category === null || c.category === p.category);
-  const sorted = filtered.slice().sort(p.mode === 'latest' ? byDescThenId((c) => Date.parse(c.sort_at)) : byDescThenId(mockRankScore));
+  const sorted = filtered.slice().sort(p.mode === 'latest'
+    ? (a, b) => pulledAt(b) - pulledAt(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
+    : byDescThenId(mockRankScore));
   const offset = p.cursor ? Math.max(0, parseInt(p.cursor, 10) || 0) : 0;
   const items = sorted.slice(offset, offset + limit);
   const end = offset + items.length;

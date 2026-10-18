@@ -22,3 +22,9 @@ export function scrollToIndexFallbackOffset(info: ScrollToIndexFailedInfo, itemH
 export function nextRevealCount(position: number, revealed: number, total: number, size = 5): number {
   return position >= revealed - 2 ? Math.min(total, revealed + size) : revealed;
 }
+
+export function shouldHandleFeedKey(input: { active: boolean; key: string; tagName?: string | null; contentEditable?: boolean }): boolean {
+  if (!input.active || !['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'PageDown', 'PageUp', 'j', 'k'].includes(input.key)) return false;
+  if (input.contentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes((input.tagName ?? '').toUpperCase())) return false;
+  return true;
+}

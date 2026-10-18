@@ -3,11 +3,16 @@
 // Paging looks at the list the reader can SEE (hidden topics and sources removed): a page
 // that filters down to nothing keeps fetching, a bounded number of times (lib/feedLogic).
 
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { Api } from './api.ts';
 import type { AccountApi } from './account.ts';
 import { rerankQueue, shouldFetchAhead } from './queueLogic.ts';
 import type { LocalPrefs } from './localPrefs.ts';
+import { readLocal } from './localPrefs.ts';
+import { defaultStore } from './storage.ts';
+import { readSeen } from './forYouGate.ts';
+import { finishForYou, mergePool, rankForYou } from './forYouRank.ts';
+import { assignFirstCards, dedupeCards, sortLatest, trendingOrder } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
   feedKey,
@@ -29,6 +34,32 @@ export interface UseFeed {
 }
 
 const SHOW_ALL: CardFilter = (cards) => cards;
+
+/** First-page heads that keep the three tabs distinct. `refresh` changes on every tab switch,
+ *  so the heads are pulled again each time; the last heads stay in use while the new ones load. */
+export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: string | null, category: FeedQuery['category'], filter: CardFilter, focused: boolean, refresh: string | number = 0) {
+  const [heads, setHeads] = useState<Record<string, { latest: string | null; top: string | null; for_you: string | null }>>({});
+  const key = `${category ?? 'all'}|${userId ?? ''}`;
+  // One pull per (category, user, tab switch): api/account/filter may change identity on every render.
+  const pulled = useRef('');
+  const pullKey = `${key}|${refresh}`;
+  useEffect(() => {
+    if (!focused || pulled.current === pullKey) return;
+    pulled.current = pullKey;
+    void Promise.all([
+      api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
+      api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
+      userId && account ? account.feedForYou(null, 10) : Promise.resolve(null),
+    ]).then(([top, latest, personal]) => {
+      const store = defaultStore();
+      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id)));
+      if (category) fy = fy.filter((c) => c.category === category);
+      const orders = assignFirstCards(filter(sortLatest(latest.items)), filter(trendingOrder(top.items)), filter(fy));
+      setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
+    }).catch(() => undefined);
+  }, [api, account, userId, category, filter, focused, key, refresh, pullKey]);
+  return heads[key] ?? null;
+}
 
 // `filter` removes what the reader hid (its identity may change on every render).
 // `rankPage`: signed out, For you is the public Trending feed re-ordered page by page on this
@@ -63,12 +94,31 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
           known: cursor === null ? [] : stateRef.current.items,
           filter: (cards) => filterRef.current(cards),
           fetchPage: async (c) => {
-            if (query.mode === 'for_you' && query.user && account) return account.feedForYou(c, 10);
-            // Signed out: the same public call Trending makes; ranking happens here on the device.
-            const mode = query.mode === 'for_you' ? 'top' : query.mode;
-            const page = await api.feed({ mode, category: query.category, cursor: c, limit: 10 });
-            const rank = rankRef.current;
-            return query.mode === 'for_you' && rank ? { ...page, items: rank(page.items) } : page;
+            if (query.mode === 'for_you' && query.user && account) {
+              // Server order stays; each page gets the shared post-step (spread from Trending's top stories,
+              // diversify last). Trending's top ids are only needed on page 1.
+              const [page, top] = await Promise.all([account.feedForYou(c, 10), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
+              const topItems = trendingOrder(top?.items ?? []);
+              return { ...page, items: finishForYou(page.items, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null) };
+            }
+            if (query.mode === 'for_you') {
+              // Signed out: candidates are Trending (20: its page 1 plus the next 10) plus the Latest page, ranked on this
+              // device (lib/forYouRank.ts). The cursor holds both modes' cursors.
+              const cur = c ? (JSON.parse(c) as { t: string | null; l: string | null }) : { t: null, l: null };
+              const [top, latest] = await Promise.all([
+                c && cur.t === null ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: cur.t, limit: 20 }),
+                c && cur.l === null ? Promise.resolve(null) : api.feed({ mode: 'latest', category: null, cursor: cur.l, limit: 10 }),
+              ]);
+              const store = defaultStore();
+              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : trendingOrder((top?.items ?? []).slice(0, 10))[0]?.id ?? null, c ? new Set() : new Set(trendingOrder((top?.items ?? []).slice(0, 10)).map((x) => x.id)));
+              const t = top ? top.next_cursor : null, l = latest ? latest.next_cursor : null;
+              return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
+            }
+            const page = await api.feed({ mode: query.mode, category: query.category, cursor: c, limit: 10 });
+            // Re-order only this fetched page (the server's cursor does not depend on item order); pages
+            // already shown are never touched. Latest = published_at desc; Trending = lib/feedOrder.ts trendingOrder.
+            const items = query.mode === 'latest' ? sortLatest(dedupeCards(page.items)) : query.mode === 'top' ? trendingOrder(dedupeCards(page.items)) : page.items;
+            return { ...page, items };
           },
           onRequest: () => dispatch({ type: 'request', key: k }),
           onPage: (page) => dispatch({ type: 'page', key: k, page }),
@@ -97,6 +147,9 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
   );
 
   useEffect(() => {
+    // A prior request for this key may still be settling after a quick tab round-trip.
+    // Give the newly selected tab its own request instead of letting stale work suppress it.
+    busy.current = null;
     dispatch({ type: 'reset', key });
     void load(key, null);
   }, [key, load]);
@@ -126,8 +179,9 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
   }, [key, load]);
 
   const rerank = useCallback((signals: LocalPrefs, seenCount: number, signedIn = false) => {
+    if (query.mode === 'latest') return;
     dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn) });
-  }, [key]);
+  }, [key, query.mode]);
 
   // Keep the unseen queue filled while there is still a cursor. One chain at a time;
   // load() owns in-flight suppression and existing cursor/error handling.

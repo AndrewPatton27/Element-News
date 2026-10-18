@@ -15,6 +15,7 @@ import { usePalette } from '../lib/useTheme';
 import { fonts } from '../lib/theme';
 import { pickTopStories } from '../lib/diversify.ts';
 import { badgeLabel } from './Card';
+import { CardActionRow } from './CardActionRow';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 import { BASELINE, CHART_H, CHART_W, chartShape, stepIndex, storiesToShow, trendColors } from './trendChart';
 
@@ -88,9 +89,10 @@ function TopStories({ stories, categories, onOpen }: { stories: BlurbCard[]; cat
           <Text style={[styles.rank, { color: p.accent }]}>{i + 1}</Text>
           <View style={styles.storyText}>
             <Text style={[styles.meta, { color: p.muted }]}>
-              {badgeLabel(c)} · {categoryName(c.category, categories)} · {cardTime(c)}
+              {[badgeLabel(c), categoryName(c.category, categories), cardTime(c)].filter(Boolean).join(' · ')}
             </Text>
             <Text style={[styles.storyTitle, { color: p.ink }]}>{c.headline}</Text>
+            <CardActionRow card={c} compact />
           </View>
         </Pressable>
       ))}

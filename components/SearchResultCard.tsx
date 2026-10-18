@@ -16,6 +16,7 @@ import { PulseIcon } from './Icons';
 import { ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
 import { footerLabels } from './cardFooter';
+import { CardActionRow } from './CardActionRow';
 
 export interface SearchResultCardProps {
   card: BlurbCard;
@@ -43,7 +44,7 @@ export function SearchResultCard({ card, config, categories, reason, onOpen, onS
       <View style={styles.topRow}>
         <View style={styles.badge}>
           <View style={[styles.dot, { backgroundColor: dot }]} />
-          <Text style={[styles.badgeText, { color: isData ? p.dataInk : p.accentInk }]}>{badgeLabel(card)}</Text>
+          {badgeLabel(card) ? <Text style={[styles.badgeText, { color: isData ? p.dataInk : p.accentInk }]}>{badgeLabel(card)}</Text> : null}
         </View>
         <Text style={[styles.topic, { color: p.muted }]} numberOfLines={1}>
           {categoryName(card.category, categories)} · {cardTime(card)}
@@ -84,6 +85,8 @@ export function SearchResultCard({ card, config, categories, reason, onOpen, onS
           <Text style={[styles.moreText, wide && styles.moreTextWide, { color: p.accent }]}>More detail ›</Text>
         </Pressable>
       </View>
+
+      <CardActionRow card={card} compact />
 
       <View style={styles.small}>
         {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}

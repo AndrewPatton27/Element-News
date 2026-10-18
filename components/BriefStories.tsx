@@ -14,6 +14,7 @@ import { fonts } from '../lib/theme';
 import { badgeLabel } from './Card';
 import { LinkIcon } from './Icons';
 import { ShareAlikeLine } from './Labels';
+import { CardActionRow } from './CardActionRow';
 
 export function BriefLabel({ text, right, onRight, rightA11y }: { text: string; right?: string; onRight?: () => void; rightA11y?: string }) {
   const p = usePalette();
@@ -82,6 +83,7 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
                 {line ? <Text style={[styles.line, wide && styles.lineWide, { color: p.inkSoft }]}>{line}</Text> : null}
               </Pressable>
               <RowLabels card={c} config={config} />
+              <CardActionRow card={c} compact />
             </View>
           </View>
         );

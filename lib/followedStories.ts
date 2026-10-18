@@ -3,6 +3,7 @@
 // here; the React hook is lib/useFollowedStories.ts.
 
 import type { BlurbCard } from '../contract/types.ts';
+import type { Api } from './api';
 import { primarySource } from './labels.ts';
 import { relativeTime } from './format.ts';
 
@@ -16,6 +17,21 @@ export interface FollowedStory {
 
 export const FOLLOWED_STORIES_KEY = 'element.followedStories';
 export const MAX_FOLLOWED_STORIES = 50;
+export const STORY_UPDATES_TTL_MS = 120_000;
+const storyUpdatesCache = new Map<string, { at: number; list: BlurbCard[] }>();
+
+export function clearStoryUpdatesCache(): void { storyUpdatesCache.clear(); }
+
+export async function loadStoryUpdates(api: Pick<Api, 'relatedCards'>, story: FollowedStory, now = Date.now()): Promise<BlurbCard[]> {
+  if (!story.card) return [];
+  const hit = storyUpdatesCache.get(story.id);
+  if (hit && now - hit.at < STORY_UPDATES_TTL_MS) return hit.list;
+  let cards: BlurbCard[];
+  try { cards = await api.relatedCards(story.id, 5); } catch { return []; }
+  const list = updatesFor(story.card, cards);
+  storyUpdatesCache.set(story.id, { at: now, list });
+  return list;
+}
 
 export function parseFollowedStories(raw: string | null): FollowedStory[] {
   if (!raw) return [];
@@ -25,7 +41,9 @@ export function parseFollowedStories(raw: string | null): FollowedStory[] {
     const out: FollowedStory[] = [];
     for (const v of x) {
       const r = v as Partial<FollowedStory> | null;
-      if (r && typeof r.id === 'string' && r.id !== '' && typeof r.at === 'number' && !out.some((o) => o.id === r.id)) out.push({ id: r.id, at: r.at, ...(r.card && typeof r.card === 'object' && typeof (r.card as BlurbCard).headline === 'string' ? { card: r.card } : {}) });
+      const card = r?.card;
+      const validCard = card && typeof card === 'object' && typeof (card as BlurbCard).id === 'string' && typeof (card as BlurbCard).headline === 'string' && typeof (card as BlurbCard).published_at === 'string';
+      if (r && typeof r.id === 'string' && r.id !== '' && typeof r.at === 'number' && Number.isFinite(r.at) && !out.some((o) => o.id === r.id)) out.push({ id: r.id, at: r.at, ...(validCard ? { card: card as BlurbCard } : {}) });
     }
     return out.slice(0, MAX_FOLLOWED_STORIES);
   } catch {

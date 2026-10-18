@@ -176,12 +176,12 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
       {api.sample ? <SampleBanner /> : null}
       {content}
       <TabBar active={active} signedIn={signedIn} />
-      {active !== 'about' && active !== 'feed' && !noFab ? (
+      {active !== 'about' && !noFab ? (
         <Pressable
           onPress={() => go('/about')}
           accessibilityRole="link"
           accessibilityLabel="About Element"
-          style={[styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
+          style={[active === 'feed' ? styles.aboutFabFeed : styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
         >
           <InfoIcon color={p.inkSoft} size={24} />
         </Pressable>
@@ -249,6 +249,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 5,
     ...fabShadow,
+  },
+  // Feed (phones): floats at the bottom left in the strip between the card and the tab bar, so it
+  // never covers the card footer or the AI label.
+  aboutFabFeed: {
+    position: 'absolute',
+    left: 10,
+    bottom: 70,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
   },
   aboutFabNarrow: {
     position: 'absolute',

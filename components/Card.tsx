@@ -7,10 +7,10 @@
 // own layout from the Feed-LinkOut draft. Swiping to react lives in FeedPager.
 
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, Share, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { router } from 'expo-router';
 import type { AppConfig, BlurbCard, Category } from '../contract/types.ts';
-import { cardTime, categoryName, clampHeadline, eventLabel } from '../lib/format';
+import { addedLabel, cardTime, categoryName, clampHeadline, eventLabel } from '../lib/format';
 import { cardLabels, disclaimerText, primarySource, shareAlikeCredit } from '../lib/labels';
 import { OPEN_DETAIL_HINT, cardDetail } from '../lib/detail';
 import { openUrl } from '../lib/openUrl';
@@ -22,13 +22,14 @@ import { ExternalIcon, InfoIcon, NumbersIcon, PulseIcon, ShareIcon, SparkleIcon,
 import type { Feedback } from '../lib/accountLogic';
 import { Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
-import { FollowPill } from './FollowPill';
 import { useFollowedStories } from '../lib/useFollowedStories';
 import { footerLabels, linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
+import { shareStory } from '../lib/useCardActions';
 import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } from '../lib/swipeLogic';
 
 interface Props {
   card: BlurbCard;
+  timeLabel?: 'added'; // Latest tab: show "Added X ago" (published_at) instead of the event time
   config: AppConfig | null;
   categories: Category[];
   onShowSources: (card: BlurbCard) => void;
@@ -51,49 +52,20 @@ const LINK_OUT_BADGE = { bg: '#E9ECF3', fg: '#2D3A5C' };
 
 // Share the card's /b/<id> page: the Web Share sheet where the browser has one, else
 // copy the link. Returns the toast text, or null when the system sheet handled it.
-async function shareCard(card: BlurbCard): Promise<string | null> {
-  const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : null;
-  const url = shareUrl(card.share_path, origin);
-  if (!url) return 'No link to share for this card.';
-  if (Platform.OS !== 'web') {
-    try {
-      await Share.share({ message: url, url, title: card.headline });
-      return null;
-    } catch {
-      return 'Could not open sharing.';
-    }
-  }
-  const nav = (globalThis as { navigator?: Navigator }).navigator;
-  if (nav && typeof nav.share === 'function') {
-    try {
-      await nav.share({ title: card.headline, url });
-      return null;
-    } catch (e) {
-      if ((e as { name?: string } | null)?.name === 'AbortError') return null; // the reader closed the sheet
-    }
-  }
-  if (nav?.clipboard && typeof nav.clipboard.writeText === 'function') {
-    try {
-      await nav.clipboard.writeText(url);
-      return 'Link copied';
-    } catch {
-      // blocked: fall through
-    }
-  }
-  return 'Could not copy the link.';
-}
+const shareCard = shareStory;
 
 function badgeFor(card: BlurbCard, p: Palette): { text: string; bg: string; fg: string; Icon: BadgeIcon | null } {
   if (card.kind === 'data') return { text: 'New data', bg: p.dataSoft, fg: p.dataInk, Icon: NumbersIcon };
   if (card.kind === 'link_out') return { text: 'From the publisher', bg: LINK_OUT_BADGE.bg, fg: LINK_OUT_BADGE.fg, Icon: ExternalIcon };
-  if (card.ai.generated) return { text: 'Summary', bg: p.accentSoft, fg: p.accentInk, Icon: SparkleIcon };
+  // Drew: no "Summary" tag on AI-written cards (the AI label in the footer already says so).
+  if (card.ai.generated) return { text: '', bg: p.accentSoft, fg: p.accentInk, Icon: null };
   return { text: 'From the source', bg: p.surfaceMuted, fg: p.inkSoft, Icon: null };
 }
 
 // The badge wording, shared with the top-stories list.
 export function badgeLabel(card: BlurbCard): string {
   if (card.kind === 'data') return 'New data';
-  return card.ai.generated ? 'Summary' : 'From the source';
+  return card.ai.generated ? '' : 'From the source';
 }
 
 // Summary cards: Agency / Type / Published, only the ones we have.
@@ -110,19 +82,19 @@ function factsFor(card: BlurbCard): { label: string; value: string }[] {
 }
 
 // "World Â· 2 h ago", or "Recalls & Safety Â· Recall Â· 2 h ago" when the event adds something.
-function metaLine(card: BlurbCard, categories: Category[]): string {
+function metaLine(card: BlurbCard, categories: Category[], timeLabel?: 'added'): string {
   const category = categoryName(card.category, categories);
   if (card.kind === 'link_out') return [category, linkOutDelay(card.freshness?.delayed_hours)].filter(Boolean).join(' · ');
   const event = eventLabel(card.event_type);
   const parts = [category];
   if (event && !category.toLowerCase().includes(event.toLowerCase())) parts.push(event);
   // Same label the detail sheet shows (lib/format cardTime), so the two never disagree.
-  parts.push(cardTime(card));
+  parts.push(timeLabel === 'added' ? addedLabel(card) || cardTime(card) : cardTime(card));
   return parts.join(' · ');
 }
 
 export function Card(props: Props) {
-  const { card, config, categories, onShowSources, onOpenDetail, onNext, wide, compact, peek, reaction, onReact, onMore, followedTopic, onToggleTopicFollow } = props;
+  const { card, timeLabel, config, categories, onShowSources, onOpenDetail, onNext, wide, compact, peek, reaction, onReact, onMore, followedTopic, onToggleTopicFollow } = props;
   const p = usePalette();
   const pressStart = useRef<{ point: PointerPoint | null; at: number } | null>(null);
   const recordPressStart = (x?: number, y?: number) => {
@@ -263,22 +235,20 @@ export function Card(props: Props) {
         style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, compact && styles.cardCompact, roomy && styles.cardRoomy, { backgroundColor: p.surface, borderColor: p.border }]}
       >
         <View style={styles.meta}>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            {badge.Icon ? <badge.Icon color={badge.fg} size={14} /> : null}
-            <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.text}</Text>
-          </View>
+          {badge.text ? (
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+              {badge.Icon ? <badge.Icon color={badge.fg} size={14} /> : null}
+              <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.text}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
           <View style={styles.metaRight}>
             {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
-            <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories)}</Text>
-            {onToggleTopicFollow ? <FollowPill topic={categoryName(card.category, categories)} followed={!!followedTopic} onPress={() => onToggleTopicFollow(card)} /> : null}
+            <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories, timeLabel)}</Text>
             {onMore ? (
               <Pressable onPress={() => onMore(card)} accessibilityRole="button" accessibilityLabel="More options for this card" style={styles.moreBtn}>
                 <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>
-              </Pressable>
-            ) : null}
-            {!wide ? (
-              <Pressable onPress={() => router.push('/about' as never)} accessibilityRole="link" accessibilityLabel="About Element" style={styles.aboutBtn}>
-                <InfoIcon color={p.inkSoft} size={22} />
               </Pressable>
             ) : null}
           </View>
@@ -352,7 +322,7 @@ export function Card(props: Props) {
                 </Text>
               ) : null}
 
-              {facts.length > 0 ? (
+              {wide && facts.length > 0 ? (
                 <View style={[styles.facts, wide && styles.factsWide, compact && styles.factsCompact, { borderColor: p.divider }]}>
                   {facts.map((f) => (
                     <View key={f.label} style={styles.fact}>
@@ -452,7 +422,7 @@ const styles = StyleSheet.create({
   stack: { height: 10, marginHorizontal: 28, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   below: { paddingTop: 6, paddingHorizontal: 4 },
   meta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-  metaRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  metaRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' },
   moreBtn: { minWidth: 44, minHeight: 44, marginVertical: -8, marginHorizontal: -6, alignItems: 'center', justifyContent: 'center' },
   moreDots: { fontSize: 20, lineHeight: 22 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 10, borderRadius: 14 },
@@ -467,7 +437,7 @@ const styles = StyleSheet.create({
   facts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 22, rowGap: 8, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1 },
   factsWide: { columnGap: 28, rowGap: 10, paddingVertical: 14 },
   fact: { gap: 2, flexShrink: 1 },
-  factLabel: { fontFamily: fonts.sans, fontSize: 11, letterSpacing: 0.33, textTransform: 'uppercase' },
+  factLabel: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 0.33, textTransform: 'uppercase' },
   factValue: { fontFamily: fonts.sansSemi, fontSize: 15 },
   tickers: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   ticker: { fontFamily: fonts.sansMedium, fontSize: 13, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 },
@@ -482,14 +452,14 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTopWidth: 1, paddingTop: 6, marginHorizontal: -8, paddingLeft: 8, flexShrink: 0 },
   footerWide: { borderTopWidth: 0, paddingTop: 0, gap: 12, marginHorizontal: 0, paddingLeft: 0 },
   footerCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingTop: 4 },
-  footerTextCompact: { flex: 0, width: '100%', fontSize: 11, lineHeight: 14 },
+  footerTextCompact: { flex: 0, width: '100%', fontSize: 12, lineHeight: 15 },
   aboutBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   footerText: { flex: 1, fontFamily: fonts.sans, fontSize: 12, lineHeight: 16 },
   linkOutCredit: { flex: 0, lineHeight: 17 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { width: 44, height: 44, marginVertical: -2, alignItems: 'center', justifyContent: 'center' },
   react: { flexDirection: 'row', width: 44, height: 44, marginVertical: -2, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  reactCheck: { fontFamily: fonts.sansSemi, fontSize: 11 },
+  reactCheck: { fontFamily: fonts.sansSemi, fontSize: 12 },
   next: { minHeight: 44, marginVertical: -2, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   nextText: { fontFamily: fonts.sansMedium, fontSize: 13 },
   toastDock: { position: 'absolute', left: 0, right: 0, bottom: 72, alignItems: 'center', paddingHorizontal: 24 },

@@ -22,6 +22,7 @@ export interface RankInput {
   kind: string;
   event_type: string | null;
   sort_at: string;               // ISO
+  published_at?: string;         // ISO; when we published/pulled the card. Latest sorts by this (falls back to sort_at)
   sources: { name: string; kind: string }[];
   title?: string | null;         // title of the source document (optional); "Airworthiness Directives; ..." lowers importance
 }
@@ -55,9 +56,10 @@ export function sortTop<T extends RankInput>(cards: T[], p = RANK_DEFAULTS): T[]
   return [...cards].sort((a, b) => rankScore(b, p) - rankScore(a, p) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }
 
-/** 'latest' order: sort_at desc, then id desc. */
+/** 'latest' order: published_at desc (sort_at when absent), then id desc. The app's Latest tab uses published_at. */
 export function sortLatest<T extends RankInput>(cards: T[]): T[] {
-  return [...cards].sort((a, b) => Date.parse(b.sort_at) - Date.parse(a.sort_at) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+  const t = (c: RankInput) => Date.parse(c.published_at ?? c.sort_at);
+  return [...cards].sort((a, b) => t(b) - t(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }
 
 /**

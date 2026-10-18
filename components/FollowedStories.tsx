@@ -7,17 +7,16 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Api } from '../lib/api';
 import type { BlurbCard, Category } from '../contract/types.ts';
 import { categoryName } from '../lib/format';
-import { sortStories, storyBadge, updateMeta, updatesFor, type FollowedStory, type StoryRow } from '../lib/followedStories';
+import { clearStoryUpdatesCache, loadStoryUpdates, sortStories, storyBadge, updateMeta, type FollowedStory, type StoryRow } from '../lib/followedStories';
 import { usePalette, useWide } from '../lib/useTheme';
 import { fonts } from '../lib/theme';
 import { PulseIcon } from './Icons';
+import { CardActionRow } from './CardActionRow';
 
-const updatesCache = new Map<string, { at: number; list: BlurbCard[] }>();
-const UPDATES_TTL_MS = 120_000;
 const updateListeners = new Set<() => void>();
 
 export function clearStoryUpdates(): void {
-  updatesCache.clear();
+  clearStoryUpdatesCache();
   updateListeners.forEach((listener) => listener());
 }
 
@@ -36,12 +35,8 @@ export function useStoryRows(api: Api, stories: FollowedStory[]): { rows: StoryR
     setLoading(true);
     Promise.all(
       stories.map(async (s) => {
-        if (!s.card) return [s.id, []] as const;
         try {
-          const hit = updatesCache.get(s.id);
-          if (hit && Date.now() - hit.at < UPDATES_TTL_MS) return [s.id, hit.list] as const;
-          const list = updatesFor(s.card, await api.relatedCards(s.id, 5));
-          updatesCache.set(s.id, { at: Date.now(), list });
+          const list = await loadStoryUpdates(api, s);
           return [s.id, list] as const;
         } catch {
           return [s.id, []] as const;
@@ -90,7 +85,13 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
             </Pressable>
             <View accessibilityLabel="Updates" style={styles.list}>
               {timeline.map(({ c, fresh }, i) => (
-                <View key={c.id} style={[styles.li, wide && { minHeight: 48 }]}>
+                <Pressable
+                  key={c.id}
+                  onPress={() => onOpen(c)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open article: ${c.headline}`}
+                  style={({ pressed }) => [styles.li, wide && { minHeight: 48 }, pressed && { opacity: 0.7 }]}
+                >
                   <View style={styles.rail}>
                     <View style={[styles.node, { backgroundColor: fresh ? p.accent : p.surface, borderColor: fresh ? p.accent : p.borderStrong }]} />
                     <View style={[styles.line, { backgroundColor: p.border, opacity: i === timeline.length - 1 ? 0 : 1 }]} />
@@ -99,7 +100,7 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                     <Text style={[styles.upText, wide && { fontSize: 16 }, { color: p.ink, fontFamily: fresh ? fonts.sansSemi : fonts.sansMedium }]}>{c.headline}</Text>
                     <Text style={[styles.upMeta, wide && { fontSize: 13 }, { color: p.muted }]}>{updateMeta(c)}</Text>
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
             <View style={[styles.foot, { borderTopColor: p.divider }]}>
@@ -111,6 +112,7 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                 <Text style={[styles.openText, wide && { fontSize: 15 }, { color: p.accent }]}>Following</Text>
               </Pressable>
             </View>
+            <CardActionRow card={latest} />
           </View>
         );
       })}
