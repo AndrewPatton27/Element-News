@@ -1,5 +1,6 @@
 // Duplicate and burst guards, run before any AI call.
 // The database enforces the same rules again in api.publish_blurb.
+// Inputs: candidate items (URL, tickers, time). Outputs: ok / duplicate_url / ticker_cap decisions.
 
 import { config } from './config.ts';
 
@@ -34,7 +35,7 @@ export type Decision =
  * - same URL seen before -> duplicate
  * - any ticker already has `cap` cards within +-`windowHours` of this item's time -> ticker_cap
  */
-export function checkCandidate(
+function checkCandidate(
   c: Candidate,
   seenUrls: Set<string>,
   published: PublishedRef[],
@@ -52,7 +53,7 @@ export function checkCandidate(
   return { ok: true };
 }
 
-/** Small stateful helper for one ingest run. */
+/** Small stateful helper for one ingest run: `check` a candidate, then `record` it once published. */
 export function createGuard(cap: number = config.tickerCapPer24h, windowHours: number = config.tickerCapWindowHours) {
   const seen = new Set<string>();
   const published: PublishedRef[] = [];

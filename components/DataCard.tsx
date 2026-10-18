@@ -5,15 +5,16 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard, MacroFact } from '../contract/types.ts';
 import { changeText, factA11yLabel, shortDate } from '../lib/format';
 import { cardNotices } from '../lib/labels';
+import { changeToneColor, withToneLabel } from '../lib/numberTone';
 import { usePalette } from '../lib/useTheme';
 import type { Palette } from '../lib/theme';
 import { fonts } from '../lib/theme';
 import { openUrl } from './SourceChip';
 
-export function changeColor(p: Palette, direction: MacroFact['direction']): string {
-  if (direction === 'up') return p.up;
-  if (direction === 'down') return p.down;
-  return p.flat;
+// Green = generally good for households, red = generally bad, gray = no change
+// or neither (see lib/numberTone.ts). The glyph and word carry the direction.
+export function changeColor(p: Palette, f: Pick<MacroFact, 'series_id' | 'direction'>): string {
+  return changeToneColor(p, f.series_id, f.direction);
 }
 
 export function DataFacts({ card, config, compact }: { card: BlurbCard; config: AppConfig | null; compact?: boolean }) {
@@ -31,12 +32,12 @@ export function DataFacts({ card, config, compact }: { card: BlurbCard; config: 
             key={f.series_id}
             style={[styles.fact, multi && styles.factMulti, multi && i > 0 && { borderLeftWidth: 1, borderLeftColor: p.border, paddingLeft: 14 }]}
             accessible
-            accessibilityLabel={factA11yLabel(f)}
+            accessibilityLabel={withToneLabel(factA11yLabel(f), f.series_id, f.direction)}
           >
             <Text style={[styles.label, { color: p.dataInk }]}>{f.label}</Text>
             <View style={[styles.valueRow, multi && styles.valueCol]}>
-              <Text style={[styles.value, { color: p.ink, fontSize: valueSize, lineHeight: valueSize * 1.05 }]}>{f.value}</Text>
-              {changeText(f) ? <Text style={[styles.change, { color: changeColor(p, f.direction) }]}>{changeText(f)}</Text> : null}
+              <Text style={[styles.value, { color: p.ink, fontSize: valueSize, lineHeight: Math.round(valueSize * 1.05), letterSpacing: -valueSize * 0.02 }]}>{f.value}</Text>
+              {changeText(f) ? <Text style={[styles.change, { color: changeColor(p, f) }]}>{changeText(f)}</Text> : null}
             </View>
             <Text style={[styles.cite, multi && styles.citeMulti, { color: p.inkSoft }]}>
               {f.period ? f.period : `As of ${shortDate(f.as_of)}`} · {f.source_short}
@@ -60,16 +61,17 @@ export function DataFacts({ card, config, compact }: { card: BlurbCard; config: 
 
 const styles = StyleSheet.create({
   wrap: { gap: 8 },
-  panel: { borderRadius: 18, paddingVertical: 16, paddingHorizontal: 20, gap: 10 },
-  panelMulti: { flexDirection: 'row', gap: 14, paddingHorizontal: 16 },
-  fact: { gap: 4 },
+  // Feed-Data draft: cream panel, 18/20 padding, uppercase label, 64 px serif number.
+  panel: { borderRadius: 18, paddingVertical: 18, paddingHorizontal: 20, gap: 10 },
+  panelMulti: { flexDirection: 'row', gap: 14, paddingHorizontal: 16, paddingVertical: 16 },
+  fact: { gap: 6 },
   factMulti: { flex: 1, minWidth: 0 },
   valueCol: { flexDirection: 'column', alignItems: 'flex-start' },
   citeMulti: { fontSize: 13 },
   label: { fontFamily: fonts.sansSemi, fontSize: 13, letterSpacing: 0.26, textTransform: 'uppercase' },
   valueRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 12 },
-  value: { fontFamily: fonts.serif, letterSpacing: -1 },
+  value: { fontFamily: fonts.serif },
   change: { fontFamily: fonts.sansSemi, fontSize: 15 },
-  cite: { fontFamily: fonts.sans, fontSize: 14 },
+  cite: { fontFamily: fonts.sans, fontSize: 15 },
   notice: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 16, fontStyle: 'italic' },
 });

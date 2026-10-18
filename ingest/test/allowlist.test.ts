@@ -40,6 +40,14 @@ test('API allowlist accepts FRED, Treasury, Gemini and the Supabase host only', 
   assert.throws(() => assertAllowedApi('https://www.sec.gov/'), AllowlistError);
 });
 
+test('Groq API host is a data-API host only, never a page host', () => {
+  assert.doesNotThrow(() => assertAllowedApi('https://api.groq.com/openai/v1/chat/completions'));
+  assert.throws(() => assertAllowedPage('https://api.groq.com/openai/v1/chat/completions'), AllowlistError);
+  assert.throws(() => assertAllowedApi('https://groq.com/'), AllowlistError);              // only the exact API host
+  assert.throws(() => assertAllowedApi('https://api.groq.com.evil.com/x'), AllowlistError);
+  assert.throws(() => assertAllowedApi('http://api.groq.com/openai/v1/models'), AllowlistError);
+});
+
 function recorder(responses: Record<string, { status: number; location?: string; body?: string }>) {
   const calls: string[] = [];
   const impl: FetchLike = async (url) => {

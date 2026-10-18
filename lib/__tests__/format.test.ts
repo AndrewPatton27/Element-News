@@ -36,7 +36,15 @@ test('a11y label names value, change and source', () => {
 });
 
 test('category and event labels', () => {
-  assert.equal(categoryName('personal-finance', null), 'Personal Finance');
+  assert.equal(categoryName('personal-finance', null), 'Money');
+  assert.equal(categoryName('policy', null), 'Government');
+  assert.equal(categoryName('markets', null), 'Business');
+  assert.equal(categoryName('science', null), 'Science & Space');
+  assert.equal(categoryName('brand-new', null), 'Brand New');
+  assert.equal(categoryName('markets', [{ slug: 'markets', name: 'Markets (API)', sort_order: 1 }]), 'Markets (API)');
+  assert.equal(eventLabel('world_event'), 'World');
+  assert.equal(eventLabel('recall'), 'Recall');
+  assert.equal(eventLabel('science'), 'Science');
   assert.equal(categoryName('tech', [{ slug: 'tech', name: 'Tech & AI', sort_order: 1 }]), 'Tech & AI');
   assert.equal(eventLabel('exec_change'), 'Leadership change');
   assert.equal(eventLabel('something_new'), null);

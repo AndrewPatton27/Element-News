@@ -45,7 +45,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/92bec19f-f15a-5730-bd1e-db60b71befbf",
-      "importance": 2.0
+      "importance": 2,
+      "detail": null
     },
     {
       "id": "0f8512ef-8ba6-57eb-aa46-6520ac186bc5",
@@ -99,7 +100,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/0f8512ef-8ba6-57eb-aa46-6520ac186bc5",
-      "importance": 10.0
+      "importance": 10,
+      "detail": null
     },
     {
       "id": "98394d0f-ac55-5455-b642-bc80a044aa42",
@@ -146,7 +148,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/98394d0f-ac55-5455-b642-bc80a044aa42",
-      "importance": 2.0
+      "importance": 2,
+      "detail": null
     },
     {
       "id": "7feceb74-facf-5234-8a58-e72bbf2cec3c",
@@ -193,7 +196,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/7feceb74-facf-5234-8a58-e72bbf2cec3c",
-      "importance": 3.0
+      "importance": 3,
+      "detail": null
     },
     {
       "id": "383fbdd7-f8a5-5353-b04d-6a132d4c55a8",
@@ -240,7 +244,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/383fbdd7-f8a5-5353-b04d-6a132d4c55a8",
-      "importance": 5.0
+      "importance": 5,
+      "detail": null
     },
     {
       "id": "053ca88b-bb5a-5aef-9fca-77709936d6f1",
@@ -287,7 +292,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/053ca88b-bb5a-5aef-9fca-77709936d6f1",
-      "importance": 2.0
+      "importance": 2,
+      "detail": null
     },
     {
       "id": "a327baee-b4b7-55ae-955a-9900106400ed",
@@ -334,7 +340,154 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/a327baee-b4b7-55ae-955a-9900106400ed",
-      "importance": 3.0
+      "importance": 3,
+      "detail": null
+    },
+    {
+      "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
+      "kind": "summary",
+      "headline": "[SAMPLE] Contoso recalls desk heaters after reports of fires",
+      "body": "Contoso is recalling about 12,000 desk heaters because they can overheat and start a fire. Stop using them and contact the company for a free refund.",
+      "category": "safety",
+      "event_type": "recall",
+      "tickers": [],
+      "macro": [],
+      "sources": [
+        {
+          "name": "U.S. Consumer Product Safety Commission",
+          "kind": "government",
+          "doc_label": "Recall",
+          "url": "https://www.cpsc.gov/Recalls/2027/Contoso-Recalls-Desk-Heaters",
+          "published_at": "2026-10-15T16:00:00Z",
+          "license_class": "public_domain",
+          "attribution": "Source: U.S. Consumer Product Safety Commission",
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-15T16:00:00Z",
+      "published_at": "2026-10-15T16:00:00Z",
+      "sort_at": "2026-10-15T16:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": "Source: U.S. Consumer Product Safety Commission",
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
+      "importance": 6.25,
+      "detail": {
+        "paragraphs": [
+          "Contoso is recalling about 12,000 desk heaters. They can overheat and start a fire.",
+          "A recall means the company asks people to stop using a product and offers a fix or refund. Here, Contoso offers a free refund.",
+          "The recall was announced with the U.S. Consumer Product Safety Commission, the agency that watches over product safety."
+        ],
+        "key_points": [
+          "About 12,000 Contoso desk heaters recalled",
+          "Risk: overheating and fire",
+          "Stop using them; free refund from the company"
+        ]
+      }
+    },
+    {
+      "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e01",
+      "kind": "summary",
+      "headline": "[SAMPLE] Voters on Northwind Island pick a new president",
+      "body": "Voters on the fictional Northwind Island chose a new president in a runoff election. The new leader takes office next month, the island's election board said.",
+      "category": "world",
+      "event_type": "world_event",
+      "tickers": [],
+      "macro": [],
+      "sources": [
+        {
+          "name": "Wikipedia",
+          "kind": "news",
+          "doc_label": "In the news",
+          "url": "https://en.wikipedia.org/wiki/Northwind_Island",
+          "published_at": "2026-10-15T19:00:00Z",
+          "license_class": "cc_by_sa",
+          "attribution": "Adapted from Wikipedia (\"Northwind Island\") · CC BY-SA 4.0",
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-15T19:00:00Z",
+      "published_at": "2026-10-15T19:00:00Z",
+      "sort_at": "2026-10-15T19:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": "Adapted from Wikipedia (\"Northwind Island\") · CC BY-SA 4.0",
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e01",
+      "importance": 4.8,
+      "detail": null
+    },
+    {
+      "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e03",
+      "kind": "summary",
+      "headline": "[SAMPLE] M 6.1 - 40 km SW of Northwind Island",
+      "body": "A magnitude 6.1 earthquake struck 40 km SW of Northwind Island at 16:00 UTC on Oct 15. USGS alert level: green.",
+      "category": "science",
+      "event_type": "science",
+      "tickers": [],
+      "macro": [],
+      "sources": [
+        {
+          "name": "U.S. Geological Survey",
+          "kind": "government",
+          "doc_label": "Earthquake",
+          "url": "https://earthquake.usgs.gov/earthquakes/eventpage/xx00000000",
+          "published_at": "2026-10-15T16:00:00Z",
+          "license_class": "public_domain",
+          "attribution": "Credit: U.S. Geological Survey",
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-15T16:00:00Z",
+      "published_at": "2026-10-15T16:00:00Z",
+      "sort_at": "2026-10-15T16:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": false,
+        "label": null
+      },
+      "attribution": "Credit: U.S. Geological Survey",
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e03",
+      "importance": 3.75,
+      "detail": {
+        "paragraphs": [
+          "A magnitude 6.1 earthquake struck 40 km SW of Northwind Island at 16:00 UTC on Oct 15.",
+          "Magnitude measures how much energy an earthquake releases. The USGS alert level was green, the lowest level on its scale for expected damage.",
+          "The data comes from the U.S. Geological Survey."
+        ],
+        "key_points": [
+          "Magnitude 6.1 earthquake",
+          "Location: 40 km SW of Northwind Island",
+          "Time: 16:00 UTC on Oct 15",
+          "USGS alert level: green"
+        ]
+      }
     }
   ],
   "next_cursor": null

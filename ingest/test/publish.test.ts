@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPublishPayload, createSupabasePublisher, SupabaseError } from '../src/publish.ts';
 import { validatePublish } from '../src/validate.ts';
+import { config } from '../src/config.ts';
 import type { FetchLike } from '../src/allowlist.ts';
 import type { RawItem } from '../src/types.ts';
 
@@ -10,7 +11,7 @@ const item: RawItem = {
   url: 'https://www.sec.gov/Archives/edgar/data/1500435/000150043526000064/0001500435-26-000064-index.htm',
   title: 'GoPro, Inc. 8-K', published_at: '2026-10-16T21:30:16.000Z', license_class: 'company_filing',
   category: 'earnings', event_type: 'earnings', tickers: [{ symbol: 'GPRO', name: 'GoPro, Inc.', exchange: 'Nasdaq' }],
-  source_name: 'SEC', source_kind: 'filing', doc_label: 'Form 8-K', company: 'GoPro, Inc.', items: [], summary_text: '',
+  source_name: 'SEC', source_kind: 'filing', doc_label: 'Form 8-K', company: 'GoPro, Inc.', items: [{ number: '2.02', title: 'Results of Operations and Financial Condition' }], summary_text: '',
 };
 
 function recorder(reply: { status: number; body: unknown }) {
@@ -27,13 +28,13 @@ test('payload: one primary source with URL, AI flag, prompt version, ticker deta
   assert.equal(p.dedupe_key, item.url);
   assert.equal(p.headline, 'H');
   assert.deepEqual(p.tickers, item.tickers);
-  assert.equal(p.prompt_version, 'sum-v1');
+  assert.equal(p.prompt_version, config.promptVersion);
   assert.equal(p.sources.length, 1);
   assert.equal(p.sources[0].is_primary, true);
   assert.deepEqual(validatePublish(p).errors, []);
   const t = buildPublishPayload(item, { headline: 'H', body: null, category: 'earnings', event_type: null, tickers: [] }, { aiGenerated: false, model: null });
-  assert.equal(t.prompt_version, null);
-  assert.equal(t.event_type, 'earnings', 'falls back to the item event type');
+  assert.equal(t.prompt_version, config.templateVersion, 'template cards carry the template version');
+  assert.equal(t.event_type, 'earnings', 'Item 2.02 decides the event type');
 });
 
 test('publish_blurb goes to the api schema with the secret key in apikey only', async () => {

@@ -2,7 +2,7 @@
 // contract/types.ts and are imported type-only; this file adds only guards.
 // Bad rows are skipped, never allowed to crash the feed.
 
-import type { AppConfig, BlurbCard, Category, FeedPage, MacroFact, RequiredNotice, Source } from '../contract/types.ts';
+import type { AppConfig, BlurbCard, BriefMarkets, BriefSubscribeResult, BriefSubscriptionInput, BriefSummary, BriefTokenResult, Category, FeedPage, MacroFact, NumberTrend, RequiredNotice, Source } from '../contract/types.ts';
 import { isRenderableKind } from './labels.ts';
 
 type Obj = Record<string, unknown>;
@@ -14,8 +14,11 @@ const isStr = (x: unknown): x is string => typeof x === 'string';
 const isStrOrNull = (x: unknown): x is string | null => x === null || typeof x === 'string';
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
+// Only https:// is accepted — this matches the database CHECK
+// (blurb_sources.url like 'https://%') and the "every card links to its source"
+// rule, so a non-https (cleartext) link can never reach Linking.openURL.
 export function isHttpUrl(x: unknown): x is string {
-  return isStr(x) && /^https?:\/\/[^\s]+$/i.test(x);
+  return isStr(x) && /^https:\/\/[^\s]+$/i.test(x);
 }
 
 export function isSource(x: unknown): x is Source {
@@ -46,8 +49,9 @@ export function isBlurbCard(x: unknown): x is BlurbCard {
   if (!isStr(x.category) || !isStr(x.as_of) || !isStr(x.sort_at)) return false;
   if (!Array.isArray(x.sources) || x.sources.length === 0 || !x.sources.every(isSource)) return false;
   if (!isNum(x.source_count)) return false;
-  if (!Array.isArray(x.tickers) || !Array.isArray(x.macro)) return false;
+  if (!Array.isArray(x.tickers) || !x.tickers.every((ticker) => isObj(ticker) && isStr(ticker.symbol) && ticker.symbol.trim() !== '') || !Array.isArray(x.macro)) return false;
   if (!isObj(x.ai) || typeof x.ai.generated !== 'boolean') return false;
+  if (x.story_link !== undefined && !(isObj(x.story_link) && ['update','angle','related'].includes(String(x.story_link.kind)) && isStr(x.story_link.related_id) && isStr(x.story_link.related_headline))) return false;
   if (x.kind === 'data' && (x.macro.length === 0 || !x.macro.every(isMacroFact))) return false;
   return true;
 }
@@ -87,4 +91,59 @@ export function parseAppConfig(x: unknown): AppConfig {
     quotes_enabled: row.quotes_enabled === true,
     linkout_cards: row.linkout_cards === true,
   };
+}
+
+export function isNumberTrend(x: unknown): x is NumberTrend {
+  return (
+    isObj(x) &&
+    isStr(x.key) &&
+    isStr(x.name) &&
+    isStr(x.value) &&
+    isStr(x.change) &&
+    (x.direction === 'up' || x.direction === 'down' || x.direction === 'flat') &&
+    isStr(x.source) &&
+    Array.isArray(x.points) &&
+    x.points.every((p) => typeof p === 'number' && Number.isFinite(p))
+  );
+}
+
+/** Bad rows are skipped; points are cut to the last 12. */
+export function parseNumberTrends(x: unknown): NumberTrend[] {
+  if (!Array.isArray(x)) throw new Error('number_trends response is not a list.');
+  return x.filter(isNumberTrend).map((t) => ({ ...t, points: t.points.slice(-12) }));
+}
+
+/** Brief summary from the server; anything malformed or empty becomes null (the box is hidden). */
+export function parseBriefSummary(x: unknown): BriefSummary | null {
+  if (!isObj(x) || !isStr(x.text) || x.text.trim() === '') return null;
+  return { text: x.text, generated_at: isStr(x.generated_at) ? x.generated_at : '', model: isStr(x.model) ? x.model : '' };
+}
+
+/** Markets section; bad cards/numbers are skipped. Missing = empty (the section is hidden). */
+export function parseBriefMarkets(x: unknown): BriefMarkets {
+  if (!isObj(x)) return { cards: [], numbers: [], total: 0 };
+  const cards = Array.isArray(x.cards) ? x.cards.filter(isBlurbCard).slice(0, 6) : [];
+  const numbers = Array.isArray(x.numbers) ? x.numbers.filter(isMacroFact) : [];
+  return { cards, numbers, total: isNum(x.total) ? Math.max(x.total, cards.length) : cards.length };
+}
+
+// Same checks as api.subscribe_brief: <= 254 chars, simple a@b.c pattern, lowercased.
+export function normalizeBriefEmail(email: unknown): string | null {
+  if (!isStr(email)) return null;
+  const e = email.trim().toLowerCase();
+  return e.length >= 3 && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
+}
+
+export function isValidBriefInput(i: unknown): i is BriefSubscriptionInput {
+  return isObj(i) && (i.kind === 'daily' || i.kind === 'weekly' || i.kind === 'both') && Number.isInteger(i.hour) && (i.hour as number) >= 0 && (i.hour as number) <= 23 && isStr(i.tz) && i.tz.length > 0 && i.tz.length <= 64;
+}
+
+const SUBSCRIBE_STATUSES = new Set(['pending', 'invalid', 'limited', 'unavailable']);
+export function parseSubscribeResult(x: unknown): BriefSubscribeResult {
+  if (!isObj(x) || !isStr(x.status) || !SUBSCRIBE_STATUSES.has(x.status)) return { ok: false, status: 'unavailable' };
+  return { ok: x.ok === true && x.status === 'pending', status: x.status as BriefSubscribeResult['status'] };
+}
+
+export function parseTokenResult(x: unknown): BriefTokenResult {
+  return isObj(x) && x.ok === true ? { ok: true } : { ok: false };
 }

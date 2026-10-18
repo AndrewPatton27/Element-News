@@ -1,0 +1,18 @@
+{
+  "_comment": "SYNTHETIC: Federal Register documents API shape. Modeled on a correction observed live on 2026-10-17 (document C1-2026-20019, abstract null); title shortened, URL path illustrative. Used only to test the null-abstract skip.",
+  "count": 1,
+  "results": [
+    {
+      "title": "Fisheries of the Exclusive Economic Zone Off Alaska; Groundfish Reserves; Correction",
+      "type": "Rule",
+      "abstract": null,
+      "html_url": "https://www.federalregister.gov/documents/2026/10/09/C1-2026-20019/fisheries-of-the-exclusive-economic-zone-off-alaska-correction",
+      "publication_date": "2026-10-09",
+      "agencies": [
+        { "raw_name": "DEPARTMENT OF COMMERCE", "name": "Commerce Department", "id": 54, "parent_id": null, "slug": "commerce-department" },
+        { "raw_name": "National Oceanic and Atmospheric Administration", "name": "National Oceanic and Atmospheric Administration", "id": 361, "parent_id": 54, "slug": "national-oceanic-and-atmospheric-administration" }
+      ],
+      "document_number": "C1-2026-20019"
+    }
+  ]
+}

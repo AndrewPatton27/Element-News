@@ -1,5 +1,6 @@
 // Tiny HTML/XML helpers (no dependencies). Good enough for SEC/Fed pages and feeds;
 // not a general parser.
+// Inputs: HTML/XML strings. Outputs: plain text, tag blocks, tag text and attribute values.
 
 const NAMED: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–',
@@ -7,6 +8,7 @@ const NAMED: Record<string, string> = {
   copy: '©', sect: '§', middot: '·', bull: '•',
 };
 
+/** Decodes numeric (&#39; &#x27;) and common named HTML entities; unknown ones are left as is. */
 export function decodeEntities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {

@@ -1,12 +1,16 @@
 // Outbound request guard. Full pages are only ever downloaded from the hosts in
 // config.pageHosts; data APIs only from config.apiHosts (+ the Supabase host).
 // Every request goes through fetchAllowed, which re-checks each redirect hop.
+// Inputs: a URL, its host kind ('page' | 'api') and fetch options (headers, cache TTL, fake fetch).
+// Outputs: { status, text, url } of the final response, or an AllowlistError for a refused URL.
+// Side effects: spaces requests (rate limit) and keeps an optional on-disk GET cache (config.cacheDir).
 
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { config } from './config.ts';
 
+/** Thrown when a URL (or a redirect hop) is outside the allowlist or malformed. */
 export class AllowlistError extends Error {
   constructor(message: string) {
     super(message);
@@ -48,6 +52,7 @@ export function assertAllowedApi(url: string, extraHosts: readonly string[] = []
   return u;
 }
 
+/** Throws unless `url` is allowed for its kind: page hosts for 'page', API hosts (+ extraHosts) for 'api'. */
 export function assertAllowed(url: string, kind: HostKind, extraHosts: readonly string[] = []): URL {
   return kind === 'page' ? assertAllowedPage(url) : assertAllowedApi(url, extraHosts);
 }

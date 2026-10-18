@@ -1,4 +1,6 @@
 // Federal Reserve press-release RSS -> RawItem, plus press-release page text.
+// The RSS parser and merge helper are shared with bea.ts (and rewrite.ts).
+// Inputs: RSS XML and press-release HTML. Outputs: RssItems, RawItems (policy) and plain text.
 
 import { config } from '../config.ts';
 import { blocks, htmlToText, tagText } from '../html.ts';
@@ -13,6 +15,7 @@ export interface RssItem {
   guid: string;
 }
 
+/** Parses RSS <item>s (title, link, description, category, pubDate as ISO, guid); items without title or link are dropped. */
 export function parseRss(xml: string): RssItem[] {
   return blocks(xml, 'item').map((it) => {
     const link = tagText(it, 'link') ?? '';
@@ -27,6 +30,7 @@ export function parseRss(xml: string): RssItem[] {
   }).filter((i) => i.title && i.link);
 }
 
+/** Fed feed item -> RawItem; monetary-policy releases get event_type 'fed', others null. */
 export function fedItemToItem(i: RssItem): RawItem {
   const monetary = /monetary/i.test(i.category ?? '') || /\/monetary\d/.test(i.link);
   return {

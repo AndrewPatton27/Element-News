@@ -110,7 +110,7 @@ test('FRED JSON: "." dropped, oldest first; DGS10 observation formatted', () => 
   const pts = parseFredObservations(fx('fred-DGS10-observations.json'));
   assert.deepEqual(pts.map((p) => p.date), ['2026-10-14', '2026-10-15', '2026-10-16']);
   const o = buildObservation('DGS10', pts)!;
-  assert.deepEqual(o, { series_id: 'DGS10', obs_date: '2026-10-16', value: 5.09, display_value: '5.09%', change_text: '-0.01 pts', direction: 'down', period_label: null });
+  assert.deepEqual(o, { series_id: 'DGS10', obs_date: '2026-10-16', value: 5.09, display_value: '5.09%', change_text: '-0.01 pts', direction: 'down', period_label: null, move: 0.01 });
   assert.equal(buildDataCard(o), null, 'a 0.01-point move stays in the numbers panel');
 });
 
@@ -123,7 +123,7 @@ test('big daily move -> data card citing the agency, ai_generated false', () => 
   const o = buildObservation('DGS2', [{ date: '2026-10-15', value: 3.4 }, { date: '2026-10-16', value: 3.48 }])!;
   const card = buildDataCard(o)!;
   assert.equal(card.headline, '2-year Treasury yield rises to 3.48%');
-  assert.equal(card.body, 'The 2-year Treasury yield was 3.48% on Oct 16, up 0.08 points from the prior day.');
+  assert.equal(card.body, 'The 2-year Treasury yield, the interest rate the U.S. government pays to borrow for 2 years, was 3.48% on Oct 16, up 0.08 points from the prior day.');
   assert.equal(card.dedupe_key, 'DGS2:2026-10-16');
   assert.equal(card.ai_generated, false);
   assert.equal(card.macro[0].source_name, 'Board of Governors of the Federal Reserve System (US) via FRED');

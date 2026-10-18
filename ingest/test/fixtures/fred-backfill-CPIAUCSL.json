@@ -1,0 +1,162 @@
+{
+ "_comment": "SYNTHETIC: hand-made in the documented FRED series/observations JSON shape for offline tests. Not a real FRED response.",
+ "file_type": "json",
+ "observations": [
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2024-08-01",
+   "value": "300.000"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2024-09-01",
+   "value": "300.750"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2024-10-01",
+   "value": "301.502"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2024-11-01",
+   "value": "302.256"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2024-12-01",
+   "value": "303.011"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-01-01",
+   "value": "303.769"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-02-01",
+   "value": "304.528"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-03-01",
+   "value": "305.290"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-04-01",
+   "value": "306.053"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-05-01",
+   "value": "306.818"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-06-01",
+   "value": "307.585"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-07-01",
+   "value": "308.354"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-08-01",
+   "value": "309.125"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-09-01",
+   "value": "309.898"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-10-01",
+   "value": "310.672"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-11-01",
+   "value": "311.449"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2025-12-01",
+   "value": "312.228"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-01-01",
+   "value": "313.008"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-02-01",
+   "value": "313.791"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-03-01",
+   "value": "314.575"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-04-01",
+   "value": "315.362"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-05-01",
+   "value": "316.150"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-06-01",
+   "value": "316.940"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-07-01",
+   "value": "317.733"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-08-01",
+   "value": "318.527"
+  },
+  {
+   "realtime_start": "2026-10-18",
+   "realtime_end": "2026-10-18",
+   "date": "2026-09-01",
+   "value": "319.323"
+  }
+ ]
+}

@@ -34,7 +34,11 @@ test(
     }
     assert.ok(kinds.has('summary') && kinds.has('data'));
     const cats = parseCategories(read('categories.json'));
-    assert.equal(cats.length, 9);
+    assert.ok(cats.length >= 9, 'at least the original 9 categories');
+    assert.ok(
+      cats.some((c) => c.slug === ('world' as string)),
+      'broad topics present',
+    );
     assert.equal(parseMacroFacts(read('numbers_to_know.json')).length, 6);
   },
 );

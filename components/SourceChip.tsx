@@ -1,16 +1,14 @@
 // The source row on a card: primary outlet and document. Tapping it opens the
 // sources sheet, which links to every original page.
 
-import { Linking, Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import type { BlurbCard } from '../contract/types.ts';
 import { primarySource, sourcesText } from '../lib/labels';
 import { usePalette } from '../lib/useTheme';
 import { fonts } from '../lib/theme';
 import { LinkIcon } from './Icons';
 
-export function openUrl(url: string) {
-  Linking.openURL(url).catch(() => undefined);
-}
+export { openUrl } from '../lib/openUrl';
 
 export function SourceRow({ card, onShowAll, wide }: { card: BlurbCard; onShowAll: () => void; wide?: boolean }) {
   const p = usePalette();

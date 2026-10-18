@@ -1,0 +1,429 @@
+{
+ "_comment": "RECONSTRUCTED: en.wikipedia.org/api/rest_v1/feed/featured/2026/10/17 fetched 2026-10-17 22:31 UTC. The news array is verbatim (including thumbnails, which the code must ignore); the other keys (tfa, image, onthisday, dyk) were dropped to keep the file small. Text: Wikipedia, CC BY-SA 4.0.",
+ "news": [
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "October_2026_Houthi_attacks_on_Saudi_Arabian_airports",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">October 2026 Houthi attacks on Saudi Arabian airports</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q141695384",
+     "titles": {
+      "canonical": "October_2026_Houthi_attacks_on_Saudi_Arabian_airports",
+      "normalized": "October 2026 Houthi attacks on Saudi Arabian airports",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">October 2026 Houthi attacks on Saudi Arabian airports</span></span>"
+     },
+     "pageid": 84468783,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/CCTV_vision_of_Houthi_attacks_on_Saudi_airport.webm/330px--CCTV_vision_of_Houthi_attacks_on_Saudi_airport.webm.jpg",
+      "width": 330,
+      "height": 186
+     },
+     "originalimage": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/CCTV_vision_of_Houthi_attacks_on_Saudi_airport.webm/1280px--CCTV_vision_of_Houthi_attacks_on_Saudi_airport.webm.jpg",
+      "width": 1280,
+      "height": 720
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380727817",
+     "tid": "a7a4d0d2-ca31-11f1-8d1a-ea8809947489",
+     "timestamp": "2026-10-17T13:50:04Z",
+     "description": "Missile and drone attacks by the Houthis",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports",
+       "revisions": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports?action=history",
+       "edit": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:October_2026_Houthi_attacks_on_Saudi_Arabian_airports"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/October_2026_Houthi_attacks_on_Saudi_Arabian_airports",
+       "edit": "https://en.wikipedia.org/wiki/October_2026_Houthi_attacks_on_Saudi_Arabian_airports?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:October_2026_Houthi_attacks_on_Saudi_Arabian_airports"
+      }
+     },
+     "extract": "From 6 to 12 October 2026, the Houthis in Yemen launched a series of ballistic missile and drone attacks on three airports in Saudi Arabia, killing at least 20 people and injuring more than 370 others. It is the deadliest series of attacks in the country since the Qatif and Dammam mosque bombings in May 2015, and is the deadliest of the attacks on the Gulf Arab states since the beginning of the 2026 Iran war.",
+     "extract_html": "<p>From 6 to 12 October 2026, the Houthis in Yemen launched a series of ballistic missile and drone attacks on three airports in Saudi Arabia, killing at least 20 people and injuring more than 370 others. It is the deadliest series of attacks in the country since the Qatif and Dammam mosque bombings in May 2015, and is the deadliest of the attacks on the Gulf Arab states since the beginning of the 2026 Iran war.</p>",
+     "normalizedtitle": "October 2026 Houthi attacks on Saudi Arabian airports"
+    },
+    {
+     "type": "standard",
+     "title": "Houthis",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Houthis</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q3042087",
+     "titles": {
+      "canonical": "Houthis",
+      "normalized": "Houthis",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Houthis</span></span>"
+     },
+     "pageid": 17240332,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Ansar_Allah_Logo.svg/330px-Ansar_Allah_Logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 264
+     },
+     "originalimage": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Ansar_Allah_Logo.svg/330px-Ansar_Allah_Logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 300,
+      "height": 240
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380767747",
+     "tid": "4cd69cd7-ca60-11f1-923e-7f804044d7a3",
+     "timestamp": "2026-10-17T19:23:58Z",
+     "description": "Shia Islamist organization in Yemen",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/Houthis",
+       "revisions": "https://en.wikipedia.org/wiki/Houthis?action=history",
+       "edit": "https://en.wikipedia.org/wiki/Houthis?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Houthis"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/Houthis",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/Houthis",
+       "edit": "https://en.wikipedia.org/wiki/Houthis?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Houthis"
+      }
+     },
+     "extract": "The Houthis, officially known as Ansar Allah or Ansarullah, are a Zaydi revivalist and Shia Islamist political and paramilitary organization that emerged from Yemen in the 1990s. It is predominantly made up of Zaydis, whose namesake leadership is drawn largely from the al-Houthi family. The Houthis are backed by Iran, and they are widely considered part of the Iranian-led Axis of Resistance. The group has been a central player in Yemen's civil war, drawing widespread international condemnation for its human rights abuses, including targeting civilians and using child soldiers. The movement is designated as a terrorist organization by some countries.",
+     "extract_html": "<p>The <b>Houthis</b>, officially known as <b>Ansar Allah</b> or <b>Ansarullah</b>, are a Zaydi revivalist and Shia Islamist political and paramilitary organization that emerged from Yemen in the 1990s. It is predominantly made up of Zaydis, whose namesake leadership is drawn largely from the al-Houthi family. The Houthis are backed by Iran, and they are widely considered part of the Iranian-led Axis of Resistance. The group has been a central player in Yemen's civil war, drawing widespread international condemnation for its human rights abuses, including targeting civilians and using child soldiers. The movement is designated as a terrorist organization by some countries.</p>",
+     "normalizedtitle": "Houthis"
+    },
+    {
+     "type": "standard",
+     "title": "King_Khalid_International_Airport",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">King Khalid International Airport</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q47157",
+     "titles": {
+      "canonical": "King_Khalid_International_Airport",
+      "normalized": "King Khalid International Airport",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">King Khalid International Airport</span></span>"
+     },
+     "pageid": 471186,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Riyadh-airport.jpg/330px-Riyadh-airport.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 237
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/1/18/Riyadh-airport.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 967,
+      "height": 695
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380615648",
+     "tid": "4d5f2c05-c9a7-11f1-b881-49b0568c8ce6",
+     "timestamp": "2026-10-16T21:19:42Z",
+     "description": "International airport serving Riyadh, Saudi Arabia",
+     "description_source": "local",
+     "coordinates": {
+      "lat": 24.95777778,
+      "lon": 46.69888889
+     },
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/King_Khalid_International_Airport",
+       "revisions": "https://en.wikipedia.org/wiki/King_Khalid_International_Airport?action=history",
+       "edit": "https://en.wikipedia.org/wiki/King_Khalid_International_Airport?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:King_Khalid_International_Airport"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/King_Khalid_International_Airport",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/King_Khalid_International_Airport",
+       "edit": "https://en.wikipedia.org/wiki/King_Khalid_International_Airport?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:King_Khalid_International_Airport"
+      }
+     },
+     "extract": "King Khalid International Airport is an international airport located about 35 kilometres (22 mi) north of Riyadh, Saudi Arabia. This airport consists of four passenger terminals with eight aero-bridges each, a mosque, and parking facilities for 11,600 vehicles. It includes a \"Royal Terminal\" designated for use by government officials, state guests, and the Saudi royal family. The airport has one of the world's tallest air traffic control towers, and two parallel runways, each 4,260 metres (13,980 ft) in length. It is one of the busiest airports in the Middle East. The airport is owned and operated by the state-owned Riyadh Airports Company.",
+     "extract_html": "<p><b>King Khalid International Airport</b> is an international airport located about 35 kilometres (22 mi) north of Riyadh, Saudi Arabia. This airport consists of four passenger terminals with eight aero-bridges each, a mosque, and parking facilities for 11,600 vehicles. It includes a \"Royal Terminal\" designated for use by government officials, state guests, and the Saudi royal family. The airport has one of the world's tallest air traffic control towers, and two parallel runways, each 4,260 metres (13,980 ft) in length. It is one of the busiest airports in the Middle East. The airport is owned and operated by the state-owned Riyadh Airports Company.</p>",
+     "normalizedtitle": "King Khalid International Airport"
+    }
+   ],
+   "story": "<!--Oct 11-->The <a rel=\"mw:WikiLink\" href=\"./Houthis\" title=\"Houthis\" id=\"mwBg\">Houthis</a> launch <b id=\"mwBw\"><a rel=\"mw:WikiLink\" href=\"./October_2026_Houthi_attacks_on_Saudi_Arabian_airports\" title=\"October 2026 Houthi attacks on Saudi Arabian airports\" id=\"mwCA\">a series of attacks on Saudi Arabian airports</a></b>, including <a rel=\"mw:WikiLink\" href=\"./King_Khalid_International_Airport\" title=\"King Khalid International Airport\" id=\"mwCQ\">King Khalid International Airport</a> <i id=\"mwCg\">(satellite image shown)</i>, killing at least 20 people and injuring more than 370 others."
+  },
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "Navi_Pillay",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Navi Pillay</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q242078",
+     "titles": {
+      "canonical": "Navi_Pillay",
+      "normalized": "Navi Pillay",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Navi Pillay</span></span>"
+     },
+     "pageid": 6041935,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Navi_Pillay_June_2014.jpg/330px-Navi_Pillay_June_2014.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 425
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/2/24/Navi_Pillay_June_2014.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 730,
+      "height": 940
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380780878",
+     "tid": "86160ab8-ca6e-11f1-8015-eb578e65a87e",
+     "timestamp": "2026-10-17T21:05:47Z",
+     "description": "South African lawyer and judge (born 1941)",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/Navi_Pillay",
+       "revisions": "https://en.wikipedia.org/wiki/Navi_Pillay?action=history",
+       "edit": "https://en.wikipedia.org/wiki/Navi_Pillay?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Navi_Pillay"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/Navi_Pillay",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/Navi_Pillay",
+       "edit": "https://en.wikipedia.org/wiki/Navi_Pillay?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Navi_Pillay"
+      }
+     },
+     "extract": "Navanetham Pillay is a South African jurist who served as the high commissioner for human rights of the United Nations from 2008 to 2014. A South African of Tamil origin, Pillay was the first non-white female judge of the High Court of South Africa. She has also served as a judge of the International Criminal Court and president of the International Criminal Tribunal for Rwanda. She is to be awarded the 2026 Nobel Peace Prize for her efforts to promote peace and international law.",
+     "extract_html": "<p><b>Navanetham Pillay</b> is a South African jurist who served as the high commissioner for human rights of the United Nations from 2008 to 2014. A South African of Tamil origin, Pillay was the first non-white female judge of the High Court of South Africa. She has also served as a judge of the International Criminal Court and president of the International Criminal Tribunal for Rwanda. She is to be awarded the 2026 Nobel Peace Prize for her efforts to promote peace and international law.</p>",
+     "normalizedtitle": "Navi Pillay"
+    },
+    {
+     "type": "standard",
+     "title": "2026_Nobel_Peace_Prize",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">2026 Nobel Peace Prize</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q136468555",
+     "titles": {
+      "canonical": "2026_Nobel_Peace_Prize",
+      "normalized": "2026 Nobel Peace Prize",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">2026 Nobel Peace Prize</span></span>"
+     },
+     "pageid": 80581107,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Navi_Pillay_June_2014.jpg/330px-Navi_Pillay_June_2014.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 425
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/2/24/Navi_Pillay_June_2014.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 730,
+      "height": 940
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380629359",
+     "tid": "b39f7a65-c9b6-11f1-8ddf-53924045dd06",
+     "timestamp": "2026-10-16T23:09:56Z",
+     "description": "Award",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/2026_Nobel_Peace_Prize",
+       "revisions": "https://en.wikipedia.org/wiki/2026_Nobel_Peace_Prize?action=history",
+       "edit": "https://en.wikipedia.org/wiki/2026_Nobel_Peace_Prize?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:2026_Nobel_Peace_Prize"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/2026_Nobel_Peace_Prize",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/2026_Nobel_Peace_Prize",
+       "edit": "https://en.wikipedia.org/wiki/2026_Nobel_Peace_Prize?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:2026_Nobel_Peace_Prize"
+      }
+     },
+     "extract": "The 2026 Nobel Peace Prize is to be awarded to South African jurist Navi Pillay. This international peace prize was established according to Alfred Nobel's will that was announced on 9 October 2026 by the Norwegian Nobel Committee, and will be awarded on 10 December 2026 in Oslo, Norway.",
+     "extract_html": "<p>The <b>2026 Nobel Peace Prize</b> is to be awarded to South African jurist Navi Pillay. This international peace prize was established according to Alfred Nobel's will that was announced on 9 October 2026 by the Norwegian Nobel Committee, and will be awarded on 10 December 2026 in Oslo, Norway.</p>",
+     "normalizedtitle": "2026 Nobel Peace Prize"
+    }
+   ],
+   "story": "<!--Oct 09-->South African jurist <b id=\"mwDA\"><a rel=\"mw:WikiLink\" href=\"./Navi_Pillay\" title=\"Navi Pillay\" id=\"mwDQ\">Navi Pillay</a></b> is awarded <a rel=\"mw:WikiLink\" href=\"./2026_Nobel_Peace_Prize\" title=\"2026 Nobel Peace Prize\" id=\"mwDg\">the Nobel Peace Prize</a>."
+  },
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "Anne_Carson",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Anne Carson</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q2633699",
+     "titles": {
+      "canonical": "Anne_Carson",
+      "normalized": "Anne Carson",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Anne Carson</span></span>"
+     },
+     "pageid": 84639,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg/330px-Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 412
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 2666,
+      "height": 3332
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380779628",
+     "tid": "37b43a5b-ca6d-11f1-88ef-b59b23896384",
+     "timestamp": "2026-10-17T20:56:26Z",
+     "description": "Canadian poet and academic",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/Anne_Carson",
+       "revisions": "https://en.wikipedia.org/wiki/Anne_Carson?action=history",
+       "edit": "https://en.wikipedia.org/wiki/Anne_Carson?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Anne_Carson"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/Anne_Carson",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/Anne_Carson",
+       "edit": "https://en.wikipedia.org/wiki/Anne_Carson?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Anne_Carson"
+      }
+     },
+     "extract": "Anne Patricia Carson is a Canadian academic and author. Born in Toronto, she graduated from the University of Toronto and became a professor and lecturer at several universities since 1979. Throughout her career she has taught classics, comparative literature, and creative writing. She has taught at the University of Calgary, Princeton University, McGill University, University of Michigan, and New York University. Carson has written more than twenty books, including collections of essays and poetry, as well as translations of ancient Greek tragedies.",
+     "extract_html": "<p><b>Anne Patricia Carson</b> is a Canadian academic and author. Born in Toronto, she graduated from the University of Toronto and became a professor and lecturer at several universities since 1979. Throughout her career she has taught classics, comparative literature, and creative writing. She has taught at the University of Calgary, Princeton University, McGill University, University of Michigan, and New York University. Carson has written more than twenty books, including collections of essays and poetry, as well as translations of ancient Greek tragedies.</p>",
+     "normalizedtitle": "Anne Carson"
+    },
+    {
+     "type": "standard",
+     "title": "2026_Nobel_Prize_in_Literature",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">2026 Nobel Prize in Literature</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q137760462",
+     "titles": {
+      "canonical": "2026_Nobel_Prize_in_Literature",
+      "normalized": "2026 Nobel Prize in Literature",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">2026 Nobel Prize in Literature</span></span>"
+     },
+     "pageid": 82044517,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg/330px-Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 412
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Anne_Carson%2C_poet%2C_at_the_2024_National_Book_Awards.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 2666,
+      "height": 3332
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1379604815",
+     "tid": "02549d2a-c4ff-11f1-90aa-e48acd3e4e5c",
+     "timestamp": "2026-10-10T23:04:56Z",
+     "description": "Award",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/2026_Nobel_Prize_in_Literature",
+       "revisions": "https://en.wikipedia.org/wiki/2026_Nobel_Prize_in_Literature?action=history",
+       "edit": "https://en.wikipedia.org/wiki/2026_Nobel_Prize_in_Literature?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:2026_Nobel_Prize_in_Literature"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/2026_Nobel_Prize_in_Literature",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/2026_Nobel_Prize_in_Literature",
+       "edit": "https://en.wikipedia.org/wiki/2026_Nobel_Prize_in_Literature?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:2026_Nobel_Prize_in_Literature"
+      }
+     },
+     "extract": "The 2026 Nobel Prize in Literature has been awarded to Canadian poet Anne Carson \"for her bold and inventive oeuvre that, in playful dialogue with the classical tradition, has created new forms for contemporary literature.\"",
+     "extract_html": "<p>The <b>2026 Nobel Prize in Literature</b> has been awarded to Canadian poet Anne Carson \"for her bold and inventive oeuvre that, in playful dialogue with the classical tradition, has created new forms for contemporary literature.\"</p>",
+     "normalizedtitle": "2026 Nobel Prize in Literature"
+    }
+   ],
+   "story": "<!--Oct 08-->Canadian poet <b id=\"mwEA\"><a rel=\"mw:WikiLink\" href=\"./Anne_Carson\" title=\"Anne Carson\" id=\"mwEQ\">Anne Carson</a></b> is awarded <a rel=\"mw:WikiLink\" href=\"./2026_Nobel_Prize_in_Literature\" title=\"2026 Nobel Prize in Literature\" id=\"mwEg\">the Nobel Prize in Literature</a>."
+  },
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "Margaret_Hamilton_(software_engineer)",
+     "displaytitle": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Margaret Hamilton (software engineer)</span></span>",
+     "namespace": {
+      "id": 0,
+      "text": ""
+     },
+     "wikibase_item": "Q11628",
+     "titles": {
+      "canonical": "Margaret_Hamilton_(software_engineer)",
+      "normalized": "Margaret Hamilton (software engineer)",
+      "display": "<span lang=\"en\" dir=\"ltr\"><span class=\"mw-page-title-main\">Margaret Hamilton (software engineer)</span></span>"
+     },
+     "pageid": 28196618,
+     "thumbnail": {
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/Margaret_Hamilton_1995.jpg/330px-Margaret_Hamilton_1995.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      "width": 330,
+      "height": 440
+     },
+     "originalimage": {
+      "source": "https://upload.wikimedia.org/wikipedia/commons/6/68/Margaret_Hamilton_1995.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+      "width": 1117,
+      "height": 1488
+     },
+     "lang": "en",
+     "dir": "ltr",
+     "revision": "1380627603",
+     "tid": "805bed75-c9b4-11f1-8c35-1682519e6194",
+     "timestamp": "2026-10-16T22:54:11Z",
+     "description": "American software engineer (1936–2026)",
+     "description_source": "local",
+     "content_urls": {
+      "desktop": {
+       "page": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)",
+       "revisions": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)?action=history",
+       "edit": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Margaret_Hamilton_(software_engineer)"
+      },
+      "mobile": {
+       "page": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)",
+       "revisions": "https://en.wikipedia.org/wiki/Special:History/Margaret_Hamilton_(software_engineer)",
+       "edit": "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)?action=edit",
+       "talk": "https://en.wikipedia.org/wiki/Talk:Margaret_Hamilton_(software_engineer)"
+      }
+     },
+     "extract": "Margaret Elaine Hamilton was an American computer scientist. She directed the Software Engineering Division at the MIT Instrumentation Laboratory, where she led the development of the on-board flight software for NASA's Apollo Guidance Computer for the Apollo program. She later founded the software companies Higher Order Software in 1976 and Hamilton Technologies in 1986 — both in Cambridge, Massachusetts.",
+     "extract_html": "<p><b>Margaret Elaine Hamilton</b> was an American computer scientist. She directed the Software Engineering Division at the MIT Instrumentation Laboratory, where she led the development of the on-board flight software for NASA's Apollo Guidance Computer for the Apollo program. She later founded the software companies Higher Order Software in 1976 and Hamilton Technologies in 1986 — both in Cambridge, Massachusetts.</p>",
+     "normalizedtitle": "Margaret Hamilton (software engineer)"
+    }
+   ],
+   "story": "<!--Oct 07-->American software engineer <b id=\"mwFA\"><a rel=\"mw:WikiLink\" href=\"./Margaret_Hamilton_(software_engineer)\" title=\"Margaret Hamilton (software engineer)\" id=\"mwFQ\">Margaret Hamilton</a></b> dies at the <span class=\"nowrap\" about=\"#mwt3\" typeof=\"mw:Transclusion\" id=\"mwFg\" data-mw=\"{&quot;parts&quot;:[{&quot;template&quot;:{&quot;target&quot;:{&quot;wt&quot;:&quot;nowrap&quot;,&quot;href&quot;:&quot;./Template:Nowrap&quot;},&quot;params&quot;:{&quot;1&quot;:{&quot;wt&quot;:&quot;age of 90&quot;}},&quot;i&quot;:0}}]}\">age of 90</span>."
+  }
+ ]
+}

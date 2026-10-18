@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- RECONSTRUCTED: https://www.nasa.gov/news-release/feed/ fetched 2026-10-17 22:31 UTC; channel header and 3 of 10 items kept verbatim (an APOD item, the one news release, an image article). -->
+<rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	xmlns:media="http://search.yahoo.com/mrss/" >
+
+<channel>
+	<title>NASA</title>
+	<atom:link href="https://www.nasa.gov/news-release/feed/" rel="self" type="application/rss+xml" />
+	<link>https://www.nasa.gov</link>
+	<description>Official National Aeronautics and Space Administration Website</description>
+	<lastBuildDate>Sat, 17 Oct 2026 04:05:00 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=7.0.7</generator>
+	<item>
+		<title>APOD: 2026 October 17 – 3D 67P</title>
+		<link>https://science.nasa.gov/image-article/apod-2026-october-17-3d-67p/</link>
+		
+		<dc:creator><![CDATA[]]></dc:creator>
+		<pubDate>Sat, 17 Oct 2026 04:05:00 +0000</pubDate>
+				<category><![CDATA[APOD]]></category>
+		<guid isPermaLink="false">https://science.nasa.gov/image-article/apod-2026-october-17-3d-67p/</guid>
+
+					<description><![CDATA[APOD Science APOD APOD: 2026 October 17… Today’s APOD Archive Submissions Index Search Calendar RSS Education About Discuss   APOD Astronomy Picture of the Day Discover the cosmos! Each day a different image or photograph of our fascinating universe is featured, along with a brief explanation written by a professional astronomer. 3D 67P Explanation: Put [&#8230;]]]></description>
+										<content:encoded><![CDATA[<div id="" class="hds-module hds-module-full alignfull wp-block-nasa-blocks-secondary-navigation">
+<div class="hds-secondary-navigation-wrapper z-top width-100 padding-0">
+<div id="" class="hds-secondary-navigation width-full border-bottom-1px text-center hds-color-mode-dark hds-module hds-module-full alignfull wp-block-nasa-blocks-hdsnav"><button type="button" class="hds-secondary-nav-mobile-button display-flex tablet:display-flex desktop:display-none width-full flex-align-center bg-carbon-90 border-color-carbon-80 color-spacesuit-white" aria-expanded="false" aria-controls="hds-secondary-nav-track"><span>APOD</span><svg width="16" height="16" alt="" enable-background="new 0 0 400 400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><path d="m4.2 122.2 195.1 195.1 196.5-196.6-37.9-38-157.8 157.8-156.8-156.8z" /></svg></button></p>
+<div class="hds-secondary-nav-track grid-container grid-container-extrawide padding-0 tablet:padding-x-3 desktop:padding-x-2 hds-secondary-navigation-has-breadcrumbs">
+<div class="hds-secondary-navigation-breadcrumbs display-none tablet:display-none desktop:display-flex flex-align-center">
+<nav class="usa-breadcrumb" aria-label="Breadcrumbs">
+<ol class="usa-breadcrumb__list">
+<li class="usa-breadcrumb__list-item"><a href="https://science.nasa.gov/" class="usa-breadcrumb__link" rel="noopener"><span>Science</span></a></li>
+<li class="usa-breadcrumb__list-item"><a href="https://science.nasa.gov/apod/apod-index/" class="usa-breadcrumb__link" rel="noopener"><span>APOD</span></a></li>
+<li class="usa-breadcrumb__list-item usa-current" aria-current="page"><span>APOD: 2026 October 17…</span></li>
+</ol>
+</nav>
+</div>
+<div class="hds-secondary-navigation-menu-items">
+<nav>
+<ul class="usa-nav__primary usa-accordion flex-justify-center margin-0">
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/" rel="noopener">Today’s APOD</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/archive/" rel="noopener">Archive</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/submit/" rel="noopener">Submissions</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/apod-index/" rel="noopener">Index</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/apod-search/" rel="noopener">Search</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/apod-calendar/" rel="noopener">Calendar</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/feed/apod-basic/" rel="noopener">RSS</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/apod-education/" rel="noopener">Education</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://science.nasa.gov/apod/apod-about/" rel="noopener">About</a></li>
+<li class="usa-nav__primary-item "><a class="usa-nav__link" href="https://asterisk.apod.com/discuss_apod.php?date=261017" rel="noopener">Discuss</a></li>
+</ul>
+</nav>
+</div>
+<div class="hds-secondary-navigation-menu-spacer"> </div>
+</div>
+</div>
+</div>
+</div>
+<div id="" class="hds-media-detail-hero nasa-gb-align-wide width-full maxw-full margin-y-5 desktop:margin-y-7 padding-x-3 media-detail-hero--suppress-inner-media-caption hds-module alignwide wp-block-nasa-blocks-media-detail-hero">
+<div class="grid-container grid-container-block padding-x-0">
+<p class="label margin-bottom-1">APOD</p>
+<p class="heading-22 margin-top-0 margin-bottom-2">Astronomy Picture of the Day</p>
+<p class="p-md margin-top-0 margin-bottom-3 media-detail-hero__subtext">
+				<a href="/apod/archive/">Discover the cosmos!</a> Each day a different image or photograph of our fascinating universe is featured, along with a brief explanation written by a professional astronomer.			</p>
+<div class="media-detail-hero__media margin-bottom-6">
+<div id="" class="hds-media hds-module wp-block-image">
+<div class="margin-left-auto margin-right-auto nasa-block-align-full">
+<div class="hds-media-wrapper margin-left-auto margin-right-auto">
+<figure class="hds-media-inner hds-cover-wrapper hds-media-ratio-fit "><a href="https://assets.science.nasa.gov/content/dam/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg" target="_blank" rel="noopener noreferrer" aria-label="Red/blue stereo anaglyph of comet 67P. (opens in a new tab)"><img decoding="async" sizes="auto, (max-width: 85rem) calc(100vw - 3rem), 85rem" srcset="https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=1280&#038;h=1280&#038;fit=crop&#038;crop=faces%2Cfocalpoint 1280w, https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=319&#038;h=319&#038;fit=crop&#038;crop=faces%2Cfocalpoint 319w, https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=300&#038;h=300&#038;fit=crop&#038;crop=faces%2Cfocalpoint 300w, https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=400&#038;h=400&#038;fit=crop&#038;crop=faces%2Cfocalpoint 400w, https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=600&#038;h=600&#038;fit=crop&#038;crop=faces%2Cfocalpoint 600w" width="2048" height="1884" src="https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/anaglyph-NAC_2015-07-25T06.28.48.742Z_lamy.jpg?w=2048&#038;h=1884&#038;fit=clip&#038;crop=faces%2Cfocalpoint" class="attachment-2048x1884 size-2048x1884" alt="Red/blue stereo anaglyph of comet 67P." style="transform: scale(1); transform-origin: 50% 50%; object-position: 50% 50%; object-fit: cover;" block_context="nasa-block" loading="lazy" /></a></figure>
+</div>
+</div>
+</div></div>
+<h1 class="display-48 margin-top-0 margin-bottom-3">3D 67P</h1>
+<div class="grid-row media-detail-hero__content-row">
+<div class="grid-col-12 desktop:grid-col-6">
+<p class="p-md margin-0 media-detail-hero__description">
+							<strong>Explanation:</strong> <a href="https://science.nasa.gov/resource/build-your-own-3d-glasses/" target="_blank" rel="noopener">Put on your red/blue glasses</a> and float next to the jagged and double-lobed nucleus of Churyumov-Gerasimenko, also known as <a href="https://en.wikipedia.org/wiki/67P/ Churyumov%E2%80%93Gerasimenko" target="_blank" rel="noopener">Comet 67P</a> . The stereo anaglyph was created by combining two images from the <a href="https://science.nasa.gov/apod/?date=141016" rel="noopener">Rosetta spacecraft’s</a> narrow angle OSIRIS camera <a href="https://rosetta-3dcomet.cnes.fr/?q=en/content/ anag-nac2015-07-25t062848742zid301397549500f22nac2015-07-25t063846772zid301397549400f22p1s63" target="_blank" rel="noopener">taken on July 25, 2015</a> from a distance of 184 kilometers. Numerous jets are emanating from the small solar system world’s active surface near its closest approach to the Sun. The larger lobe is around 4 kilometers in diameter, joined to a smaller, 2.5 kilometer diameter lobe by a narrow neck. Rosetta’s mission to the comet ended in September 2016 when the spacecraft was commanded to a controlled impact with the comet’s surface . Keep those 3D glasses on though. You can check out a <a href="https://arxiv.org/abs/1903.02324" target="_blank" rel="noopener"> catalog</a> of nearly 1400 stereo anaglyphs created from <a href="https://rosetta-3dcomet.cnes.fr/?q=en" target="_blank" rel="noopener">Rosetta image data on this website.</a></p>
+<p><strong>Tomorrow’s picture:</strong> open space						</p>
+</p></div>
+<div class="display-none desktop:display-block desktop:grid-col-1" aria-hidden="true"></div>
+<div class="grid-col-12 desktop:grid-col-5 margin-top-3 desktop:margin-top-0">
+<table class="media-detail-hero__meta-table width-full">
+<tbody>
+<tr class="media-detail-hero__meta-row">
+<th scope="row" class="label padding-y-1">Date</th>
+<td class="p-sm padding-y-1">
+												October 17, 2026											</td>
+</tr>
+<tr class="media-detail-hero__meta-row">
+<th scope="row" class="label padding-y-1">Credit:</th>
+<td class="p-sm padding-y-1">
+												<a href="http://www.esa.int/" target="_blank" rel="noopener">ESA</a> , <a href="http://rosetta.esa.int/" target="_blank" rel="noopener">Rosetta</a> , <a href="http://www.mps.mpg.de/en" target="_blank" rel="noopener">MPS</a> , OSIRIS – Stereo Anaglyph: <a href="https://rosetta-3dcomet.cnes.fr/?q=en/theteam" target="_blank" rel="noopener">Philippe Lamy and The Team</a>											</td>
+</tr>
+<tr class="media-detail-hero__meta-row">
+<th scope="row" class="label padding-y-1">Authors &#038; editors:</th>
+<td class="p-sm padding-y-1">
+												Jerry Bonnell, Cecilia Chirenti, Robert Nemiroff, Keighley Rockcliffe											</td>
+</tr>
+<tr class="media-detail-hero__meta-row">
+<th scope="row" class="label padding-y-1">A service of:</th>
+<td class="p-sm padding-y-1">
+												<a href="https://science.gsfc.nasa.gov/astrophysics/" target="_blank" rel="noopener">ASD</a> at <a href="https://www.nasa.gov/" target="_blank" rel="noopener">NASA</a> / <a href="https://www.nasa.gov/centers/goddard/" target="_blank" rel="noopener">GSFC</a>,<br /><a href="https://science.nasa.gov/learn/about-science-activation/" target="_blank" rel="noopener">NASA Science Activation</a> &#038; <a href="https://www.mtu.edu/" target="_blank" rel="noopener">Michigan Tech. U.</a>											</td>
+</tr>
+</tbody>
+</table></div>
+</p></div>
+</p></div>
+</p></div>
+<div id="" class="nasa-gb-align-wide nasa-button-link padding-y-1 padding-x-0 hds-module alignwide wp-block-nasa-blocks-related-link">
+			<a href="https://science.nasa.gov/apod/random-apod/" target="_self" class="button-primary button-primary-md link-external-false" aria-label="Random APOD Generator" rel="noopener"><br />
+			<span class="line-height-alt-1">Random APOD Generator</span><br />
+			<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle class="button-primary-circle" cx="16" cy="16" r="16"></circle><path d="M8 16.956h12.604l-3.844 4.106 1.252 1.338L24 16l-5.988-6.4-1.252 1.338 3.844 4.106H8v1.912z" class="color-spacesuit-white"></path></svg><br />
+		</a></p></div>
+<div style="height:1px" aria-hidden="true" class="wp-block-spacer"></div>
+<div id="" class="hds-module alignwide wp-block-smd-block-next-prev">
+<div class="smd-next-prev-buttons-titles">
+            <a class="smd-next-prev__prev" href="https://science.nasa.gov/image-article/apod-2026-october-16-chasing-the-international-space-station/" rel="noopener"></p>
+<div class="hds-next-prev-nav-arrow hds-next-prev-arrow-prev">
+                    <svg version="1.1" x="0px" y="0px" width="9px" height="9px" viewBox="0 0 9 9"><path class="st0" d="M3.5,4.5l3.7-3.6L6.3,0L1.8,4.5L6.3,9l0.9-0.9L3.5,4.5z"></path></svg>
+                </div>
+<div class="smd-next-prev-buttons-titles__content">
+<div class="smd-next-prev-buttons-titles__prev-label">
+                        Yesterday&#8217;s Image                    </div>
+<div class="smd-next-prev-buttons-titles__prev">
+                        APOD: 2026 October 16 – Chasing the International Space Station                    </div>
+</p></div>
+<p>            </a><br />
+            <a class="smd-next-prev__next smd-next-prev__disabled" href="#"></p>
+<div class="smd-next-prev-buttons-titles__content">
+<div class="smd-next-prev-buttons-titles__next-label">
+                        Tomorrow&#8217;s Image                    </div>
+<div class="smd-next-prev-buttons-titles__next">
+                                            </div>
+</p></div>
+<div class="hds-next-prev-nav-arrow hds-next-prev-arrow-next">
+                    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="9px" height="9px" viewBox="0 0 9 9"><path class="st0" d="M5.5,4.5L1.8,8.1L2.7,9l4.5-4.5L2.7,0L1.8,0.9L5.5,4.5z"></path></svg>
+                </div>
+<p>            </a>
+        </div>
+</p></div>
+]]></content:encoded>
+					
+		
+		
+			</item>
+<item>
+		<title>NASA Names Stephen Cash Marshall Space Flight Center Director</title>
+		<link>https://www.nasa.gov/news-release/nasa-names-stephen-cash-marshall-space-flight-center-director/</link>
+		
+		<dc:creator><![CDATA[Gerelle Q. Dodson]]></dc:creator>
+		<pubDate>Fri, 16 Oct 2026 20:14:39 +0000</pubDate>
+				<category><![CDATA[Leadership]]></category>
+		<category><![CDATA[Marshall Space Flight Center]]></category>
+		<category><![CDATA[NASA Headquarters]]></category>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=press-release&#038;p=1057238</guid>
+
+					<description><![CDATA[NASA Administrator Jared Isaacman has named Stephen Cash director of the agency’s Marshall Space Flight Center in Huntsville, Alabama, effective Monday, Oct. 19. Cash, a veteran NASA engineer and aerospace executive, returns to lead the center where he began his career more than four decades ago. “Marshall contributions to NASA&#8217;s missions are historic and it&#8217;s [&#8230;]]]></description>
+										<content:encoded><![CDATA[<div id="" class="hds-media hds-module wp-block-image"><div class="margin-left-auto margin-right-auto nasa-block-align-inline"><div class="hds-media-wrapper margin-left-auto margin-right-auto"><figure class="hds-media-inner hds-cover-wrapper hds-media-ratio-fit "><a href="https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg"><img fetchpriority="high" decoding="async" width="1638" height="2048" src="https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?w=1638" class="attachment-2048x2048 size-2048x2048" alt="Stephen Cash" style="transform: scale(1); transform-origin: 50% 50%; object-position: 50% 50%; object-fit: cover;" block_context="nasa-block" loading="eager" srcset="https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg 2400w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=240,300 240w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=768,960 768w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=819,1024 819w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=1229,1536 1229w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=1638,2048 1638w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=320,400 320w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=480,600 480w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=720,900 720w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=960,1200 960w, https://www.nasa.gov/wp-content/uploads/2026/10/steve-cash-photo.jpg?resize=1600,2000 1600w" sizes="auto, (max-width: 1638px) 100vw, 1638px" /></a></figure><figcaption class="hds-caption padding-y-2"><div class="hds-caption-text p-sm margin-0">Photo of Stephen Cash </div></figcaption></div></div></div>
+
+
+<p class="wp-block-paragraph">NASA Administrator Jared Isaacman has named Stephen Cash director of the agency’s Marshall Space Flight Center in Huntsville, Alabama, effective Monday, Oct. 19. Cash, a veteran NASA engineer and aerospace executive, returns to lead the center where he began his career more than four decades ago.</p>
+
+
+
+<p class="wp-block-paragraph">“Marshall contributions to NASA&#8217;s missions are historic and it&#8217;s no question why it&#8217;s the Center of Excellence for propulsion,” said Isaacman. “Steve Cash is a Marshall legend, has spent his career around the hardware, the people and has been in the seat before making the decisions when human spaceflight is on the line. As Marshall continues its critical role in Artemis and takes on new challenges in advanced propulsion, nuclear power, and the systems that will carry us deeper into the solar system, Steve brings the experience, technical judgment, and mission focus needed to lead the center into that next chapter. I am also grateful to Rae Ann Meyer for the leadership she has provided to Marshall during this transition and for her continued service to NASA.”&nbsp;</p>
+
+
+
+<p class="wp-block-paragraph">“Leading a NASA center requires a commitment to its people and to the technical capabilities entrusted to them,” said Amit Kshatriya, NASA associate administrator and chief engineer. “Steve understands that the jewel of Marshall is its workforce and that engineering excellence is sustained by giving talented people the opportunity to design, build, test, and learn through hands-on work. As Marshall continues strengthening the manufacturing, structural loads and dynamics, and propulsion capabilities that underpin NASA’s exploration enterprise, Steve’s leadership will help ensure the workforce has opportunities to develop and apply the expertise needed to deliver the agency’s most ambitious missions.”</p>
+
+
+
+<p class="wp-block-paragraph"> As center director, Cash will lead one of NASA’s largest field centers, overseeing a workforce of more than 5,000 civil service and contractor employees and a broad portfolio of propulsion, space systems, scientific research, and technology development activities.  Marshall plays a critical role in NASA’s Artemis program, including the development of NASA’s SLS (Space Launch System) rocket, management of the Human Landing System Program, as well as other capabilities supporting sustained exploration of the Moon and future missions to Mars. Further, Marshall plays a key role in the advancement of nuclear power and propulsion, an area of focus that is expected to grow as NASA works towards sending the first humans to Mars.  </p>
+
+
+
+<p class="wp-block-paragraph">“It is a profound honor to be back home at the Marshall Space Flight Center,” said Cash. “I am humbled to stand alongside the brilliant minds here as we continue to turn the impossible into everyday history.”</p>
+
+
+
+<p class="wp-block-paragraph">Cash began his NASA career at Marshall in 1982 and spent 34 years with the agency, holding senior engineering and management positions supporting some of the nation’s most significant human spaceflight programs.</p>
+
+
+
+<p class="wp-block-paragraph">During his NASA career, Cash served as manager of Marshall’s Space Shuttle Propulsion Office, overseeing critical propulsion systems supporting shuttle through its final missions. He later served as director of Marshall’s Safety and Mission Assurance Directorate from 2011 until his retirement in 2016, providing leadership in safety, reliability, and quality engineering to support mission success across the center.</p>
+
+
+
+<p class="wp-block-paragraph">Following his retirement from NASA, Cash continued his work in the aerospace industry, including serving as vice president for advanced space systems at Axient, supporting the development and execution of major spaceflight programs. In 2024, he was inducted into the Alabama Engineering Hall of Fame in recognition of his contributions to engineering and the nation&#8217;s space program.</p>
+
+
+
+<p class="wp-block-paragraph">Cash succeeds Rae Ann Meyer, who has served as Marshall’s acting center director since September 2025. Meyer, who previously served as Marshall’s deputy center director and associate director, has provided leadership and continuity across the center’s programs and operations during her tenure as acting director. Meyer will return to her role as Deputy Center Director.</p>
+
+
+
+<p class="wp-block-paragraph">Established in 1960, Marshall has played a central role in American space exploration for more than six decades, from developing the Saturn rockets that carried astronauts to the Moon during Apollo to advancing the propulsion systems, infrastructure, and technologies supporting the next era of human spaceflight.</p>
+
+
+
+<p class="wp-block-paragraph">For more information about NASA’s Marshall Space Flight Center, visit:</p>
+
+
+
+<p class="has-text-align-center wp-block-paragraph"><a href="https://www.nasa.gov/marshall"><strong>https://www.nasa.gov/marshall</strong></a></p>
+
+
+
+<p class="has-text-align-center wp-block-paragraph">-end-</p>
+
+
+
+<p class="wp-block-paragraph">George Alderman / Cheryl Warner<br>Headquarters, Washington<br>202-358-1600<br><a href="mailto:george.a.alderman@nasa.gov">george.a.alderman@nasa.gov</a> / <a href="mailto:cheryl.m.warner@nasa.gov">cheryl.m.warner@nasa.gov</a></p>
+
+
+
+<p class="wp-block-paragraph">Lance Davis<br>Marshall Space Flight Center, Huntsville, Ala.<br>256-544-0034<br><a href="mailto:lance.d.davis@nasa.gov">lance.d.davis@nasa.gov</a></p>
+
+
+<div id="" class="nasa-gb-align-full width-full maxw-full padding-x-3 padding-y-0 article_a hds-module hds-module-full alignfull wp-block-nasa-blocks-credits-and-details">
+<section class="padding-x-0 padding-top-5 padding-bottom-2 desktop:padding-top-7 desktop:padding-bottom-9">
+	<div class="grid-row grid-container maxw-widescreen padding-0">
+		<div class="grid-col-12 desktop:grid-col-2 padding-right-4 margin-bottom-5 desktop:margin-bottom-0">
+			<div class="padding-top-3 border-top-1px border-color-carbon-black">
+				<div class="margin-bottom-2">
+					<h2 class="heading-14">Share</h2>
+				</div>
+				<div class="padding-bottom-2">
+					<ul class="social-icons social-icons-round">
+						<li class="social-icon social-icon-x">
+							<a href="https://x.com/intent/tweet?via=NASA&#038;text=NASA%20Names%20Stephen%20Cash%20Marshall%20Space%20Flight%20Center%20Director&#038;url=https%3A%2F%2Fwww.nasa.gov%2Fnews-release%2Fnasa-names-stephen-cash-marshall-space-flight-center-director%2F" aria-label="Share on X.">
+								<svg width="1200" height="1227" viewBox="0 0 1200 1227" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z" fill="white"/></svg>
+							</a>
+						</li>
+						<li class="social-icon social-icon-facebook">
+							<a href="https://www.facebook.com/sharer.php?u=https%3A%2F%2Fwww.nasa.gov%2Fnews-release%2Fnasa-names-stephen-cash-marshall-space-flight-center-director%2F" aria-label="Share on Facebook.">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
+							</a>
+						</li>
+						<li class="social-icon social-icon-linkedin">
+							<a href="https://www.linkedin.com/shareArticle?mini=true&#038;url=https%3A%2F%2Fwww.nasa.gov%2Fnews-release%2Fnasa-names-stephen-cash-marshall-space-flight-center-director%2F" aria-label="Share on LinkedIn.">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.98 3.5c0 1.381-1.11 2.5-2.48 2.5s-2.48-1.119-2.48-2.5c0-1.38 1.11-2.5 2.48-2.5s2.48 1.12 2.48 2.5zm.02 4.5h-5v16h5v-16zm7.982 0h-4.968v16h4.969v-8.399c0-4.67 6.029-5.052 6.029 0v8.399h4.988v-10.131c0-7.88-8.922-7.593-11.018-3.714v-2.155z"/></svg>
+							</a>
+						</li>
+						<li class="social-icon social-icon-rss">
+							<a href="/feed/" aria-label="Subscribe to RSS feed.">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" aria-hidden="true"><path d="M493 652H392c0-134-111-244-244-244V307c189 0 345 156 345 345zm71 0c0-228-188-416-416-416V132c285 0 520 235 520 520z"/><circle cx="219" cy="581" r="71"/></svg>
+							</a>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<div class="grid-col-12 desktop:grid-col-5 padding-right-4 margin-bottom-5 desktop:margin-bottom-0">
+			<div class="padding-top-3 border-top-1px border-color-carbon-black">
+				<div class="margin-bottom-2">
+					<h2 class="heading-14">Details</h2>
+				</div>
+				<div class="grid-row margin-bottom-3">
+					<div class="grid-col-4">
+						<div class="subheading">Last Updated</div>
+					</div>
+					<div class="grid-col-8">Oct 16, 2026</div>
+				</div>
+			<div class="grid-row"><div class="grid-col-4"><div class="subheading">Location</div></div><div class="grid-col-8"><a class="hds-location-tag-name" href="https://www.nasa.gov/nasa-headquarters/"><span class="hds-meta-heading">NASA Headquarters</span></a></div></div>			</div>
+		</div>
+	<div class="grid-col-12 desktop:grid-col-5 padding-right-4 margin-bottom-5 desktop:margin-bottom-0"><div class="padding-top-3 border-top-1px border-color-carbon-black "><div class="margin-bottom-2"><h2 class="heading-14">Related Terms</h2></div><ul class="article-tags"><li class="article-tag"><a href="https://www.nasa.gov/nasa-leadership/">Leadership</a></li><li class="article-tag"><a href="https://www.nasa.gov/marshall-space-flight-center/">Marshall Space Flight Center</a></li><li class="article-tag"><a href="https://www.nasa.gov/nasa-headquarters/">NASA Headquarters</a></li></ul></div></div>
+	</div>
+</section>
+	</div>]]></content:encoded>
+					
+		
+		
+			</item>
+<item>
+		<title>Artemis II Heat Shield After Splashdown</title>
+		<link>https://www.nasa.gov/image-article/artemis-ii-heat-shield-after-splashdown/</link>
+		
+		<dc:creator><![CDATA[HQ Web Team]]></dc:creator>
+		<pubDate>Fri, 16 Oct 2026 16:28:01 +0000</pubDate>
+				<category><![CDATA[Artemis 2]]></category>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=image-article&#038;p=1057059</guid>
+
+					<description><![CDATA[Shortly after NASA&#8217;s Artemis II mission splashed down on April 10, 2026, U.S. Navy divers captured underwater imagery of the Orion spacecraft’s heat shield. In the months after, the agency measured whether the thermal protection system effectively safeguarded the crew and Orion systems as the spacecraft reentered Earth’s atmosphere. This rigorous analysis confirmed that the [&#8230;]]]></description>
+										<content:encoded><![CDATA[<div id="" class="hds-media hds-module wp-block-image"><div class="margin-left-auto margin-right-auto nasa-block-align-inline"><div class="hds-media-wrapper margin-left-auto margin-right-auto"><figure class="hds-media-inner hds-cover-wrapper hds-media-ratio-none "><a href="https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg"><img decoding="async" width="2048" height="1365" src="https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?w=2048" class="attachment-2048x2048 size-2048x2048" alt="The Orion spacecraft&#039;s heat shield dominates this underwater photo. Due to the water, the heat shield appears to be teal-colored." style="transform: scale(1); transform-origin: 50% 50%; object-position: 50% 50%; object-fit: cover;" block_context="nasa-block" loading="lazy" srcset="https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg 6000w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=300,200 300w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=768,512 768w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=1024,683 1024w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=1536,1024 1536w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=2048,1365 2048w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=400,267 400w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=600,400 600w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=900,600 900w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=1200,800 1200w, https://www.nasa.gov/wp-content/uploads/2026/10/ksc-20260411-navy01-0045orig-rotated.jpg?resize=2000,1333 2000w" sizes="auto, (max-width: 2048px) 100vw, 2048px" /></a></figure><figcaption class="hds-caption padding-y-2"><div class="hds-credits">US Navy</div></figcaption></div></div></div>
+
+
+<p class="wp-block-paragraph">Shortly after NASA&#8217;s Artemis II mission splashed down on April 10, 2026, U.S. Navy divers captured underwater imagery of the <a href="https://www.nasa.gov/reference/orion-spacecraft/#hds-sidebar-nav-3">Orion spacecraft’s</a> heat shield. In the months after, the agency measured whether the thermal protection system effectively safeguarded the crew and Orion systems as the spacecraft reentered Earth’s atmosphere. This rigorous analysis confirmed that the heat shield performed as expected.</p>
+
+
+
+<p class="wp-block-paragraph"><a href="https://www.nasa.gov/missions/artemis/artemis-2/rigorous-analysis-confirms-nasas-artemis-ii-heat-shield-performance/?utm_source=TWITTER&amp;utm_medium=NASAArtemis&amp;utm_campaign=NASASocial&amp;linkId=1021788731">Learn how Orion&#8217;s heat shield was examined.</a></p>
+
+
+
+<p class="wp-block-paragraph"><em>Image credit: US Navy</em></p>
+]]></content:encoded>
+					
+		
+		
+			</item>
+	</channel>
+</rss>

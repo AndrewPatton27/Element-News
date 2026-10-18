@@ -1,0 +1,528 @@
+{
+  "items": [
+    {
+      "id": "b641c7b0-e382-5d80-a431-441775298775",
+      "kind": "summary",
+      "headline": "[SAMPLE] Litware Software posts first profitable quarter as cloud sales grow",
+      "body": "Litware Software reported net income of $38 million for the quarter, its first profit as a public company. Cloud subscription revenue grew 31% and now makes up most of total sales, according to its 8-K filing.",
+      "category": "tech",
+      "event_type": "earnings",
+      "tickers": [
+        {
+          "symbol": "LTWR",
+          "name": "Litware Software Inc",
+          "exchange": "Nasdaq",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990002/000999000226000214/0009990002-26-000214-index.htm",
+          "published_at": "2026-10-17T19:00:00Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T19:00:00Z",
+      "published_at": "2026-10-17T19:10:00Z",
+      "sort_at": "2026-10-17T19:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/b641c7b0-e382-5d80-a431-441775298775",
+      "importance": 5,
+      "my_reaction": null
+    },
+    {
+      "id": "051ea99f-23fe-5e02-b6ce-e0104e8109d5",
+      "kind": "data",
+      "headline": "[SAMPLE] 10-year Treasury yield rises to 4.02%",
+      "body": "The 10-year Treasury yield was 4.02% on Oct 16, up 0.06 points from the prior day.",
+      "category": "markets",
+      "event_type": "macro_release",
+      "tickers": [],
+      "macro": [
+        {
+          "series_id": "DGS10",
+          "label": "10-yr Treasury",
+          "value": "4.02%",
+          "change": "+0.06 pts",
+          "direction": "up",
+          "period": null,
+          "as_of": "2026-10-16",
+          "source_name": "Board of Governors of the Federal Reserve System (US) via FRED",
+          "source_short": "Federal Reserve via FRED",
+          "source_url": "https://fred.stlouisfed.org/series/DGS10",
+          "sort_order": 2
+        },
+        {
+          "series_id": "DGS2",
+          "label": "2-yr Treasury",
+          "value": "3.48%",
+          "change": "+0.03 pts",
+          "direction": "up",
+          "period": null,
+          "as_of": "2026-10-16",
+          "source_name": "Board of Governors of the Federal Reserve System (US) via FRED",
+          "source_short": "Federal Reserve via FRED",
+          "source_url": "https://fred.stlouisfed.org/series/DGS2",
+          "sort_order": 1
+        }
+      ],
+      "sources": [
+        {
+          "name": "Federal Reserve Board",
+          "kind": "government",
+          "doc_label": "H.15 release",
+          "url": "https://www.federalreserve.gov/releases/h15/",
+          "published_at": "2026-10-17T17:00:00Z",
+          "license_class": "public_domain",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T17:00:00Z",
+      "published_at": "2026-10-17T17:10:00Z",
+      "sort_at": "2026-10-17T17:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": false,
+        "label": null
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/051ea99f-23fe-5e02-b6ce-e0104e8109d5",
+      "importance": 10,
+      "my_reaction": null
+    },
+    {
+      "id": "f42df827-3ba8-53dc-a950-689eae128646",
+      "kind": "data",
+      "headline": "[SAMPLE] WTI crude oil falls to $61.40 a barrel",
+      "body": "WTI crude oil was $61.40 a barrel on Oct 13, down 0.8% from the prior reading.",
+      "category": "energy",
+      "event_type": "macro_release",
+      "tickers": [],
+      "macro": [
+        {
+          "series_id": "DCOILWTICO",
+          "label": "WTI crude oil",
+          "value": "$61.40",
+          "change": "-0.8%",
+          "direction": "down",
+          "period": null,
+          "as_of": "2026-10-13",
+          "source_name": "U.S. Energy Information Administration via FRED",
+          "source_short": "EIA via FRED",
+          "source_url": "https://fred.stlouisfed.org/series/DCOILWTICO",
+          "sort_order": 6
+        }
+      ],
+      "sources": [
+        {
+          "name": "U.S. Energy Information Administration",
+          "kind": "government",
+          "doc_label": "Spot prices",
+          "url": "https://www.eia.gov/dnav/pet/hist/RWTCD.htm",
+          "published_at": "2026-10-17T13:00:00Z",
+          "license_class": "public_domain",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T13:00:00Z",
+      "published_at": "2026-10-17T13:10:00Z",
+      "sort_at": "2026-10-17T13:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": false,
+        "label": null
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/f42df827-3ba8-53dc-a950-689eae128646",
+      "importance": 10,
+      "my_reaction": null
+    },
+    {
+      "id": "bbfd4443-8e95-5e56-b250-33a19033be52",
+      "kind": "summary",
+      "headline": "[SAMPLE] Fed holds its benchmark rate steady, signals patience on further cuts",
+      "body": "The Federal Reserve kept its policy rate unchanged after its two-day meeting. Officials said inflation has eased but remains above their 2% goal, and that future moves will depend on incoming data on jobs and prices.",
+      "category": "policy",
+      "event_type": "fed",
+      "tickers": [],
+      "macro": [],
+      "sources": [
+        {
+          "name": "Federal Reserve Board",
+          "kind": "government",
+          "doc_label": "FOMC statement",
+          "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261017a.htm",
+          "published_at": "2026-10-17T15:00:00Z",
+          "license_class": "public_domain",
+          "attribution": null,
+          "is_primary": true
+        },
+        {
+          "name": "Federal Reserve Board",
+          "kind": "government",
+          "doc_label": "Implementation note",
+          "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261017a1.htm",
+          "published_at": "2026-10-17T15:00:00Z",
+          "license_class": "public_domain",
+          "attribution": null,
+          "is_primary": false
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T15:00:00Z",
+      "published_at": "2026-10-17T15:10:00Z",
+      "sort_at": "2026-10-17T15:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/bbfd4443-8e95-5e56-b250-33a19033be52",
+      "importance": 10,
+      "my_reaction": null
+    },
+    {
+      "id": "2ea4e470-38c3-5c99-9619-cbb313e1a311",
+      "kind": "summary",
+      "headline": "[SAMPLE] Contoso Energy to acquire solar developer for $640 million in cash",
+      "body": "Contoso Energy agreed to buy a privately held solar developer for $640 million in cash. The company said the deal adds about 1.2 gigawatts of projects in development and is expected to close in the first quarter.",
+      "category": "energy",
+      "event_type": "deal",
+      "tickers": [
+        {
+          "symbol": "CTSE",
+          "name": "Contoso Energy Corp",
+          "exchange": "NYSE",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990009/000999000926000145/0009990009-26-000145-index.htm",
+          "published_at": "2026-10-17T09:00:00Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T09:00:00Z",
+      "published_at": "2026-10-17T09:10:00Z",
+      "sort_at": "2026-10-17T09:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/2ea4e470-38c3-5c99-9619-cbb313e1a311",
+      "importance": 4,
+      "my_reaction": null
+    },
+    {
+      "id": "28263e51-9fc1-588e-9113-473b10d7a75e",
+      "kind": "summary",
+      "headline": "[SAMPLE] Woodgrove Financial agrees to merge with regional lender Adatum Bank",
+      "body": "Woodgrove Financial signed an agreement to combine with Adatum Bank in an all-stock deal valued at about $2.3 billion. Both boards approved the merger, which still needs shareholder and regulator approval.",
+      "category": "deals",
+      "event_type": "deal",
+      "tickers": [
+        {
+          "symbol": "WGFN",
+          "name": "Woodgrove Financial Corp",
+          "exchange": "NYSE",
+          "quote": null
+        },
+        {
+          "symbol": "ADTB",
+          "name": "Adatum Bank",
+          "exchange": "Nasdaq",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990005/000999000526000330/0009990005-26-000330-index.htm",
+          "published_at": "2026-10-17T16:00:00Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T16:00:00Z",
+      "published_at": "2026-10-17T16:10:00Z",
+      "sort_at": "2026-10-17T16:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/28263e51-9fc1-588e-9113-473b10d7a75e",
+      "importance": 4,
+      "my_reaction": "like"
+    },
+    {
+      "id": "9450a4d2-1873-5e45-9a94-ae9b2953f560",
+      "kind": "summary",
+      "headline": "[SAMPLE] Northwind Corp reports higher quarterly revenue, lifts full-year outlook",
+      "body": "Northwind Corp told the SEC its third-quarter revenue rose 12% from a year earlier to $4.1 billion. The company raised its full-year revenue forecast, citing stronger demand from logistics customers.",
+      "category": "earnings",
+      "event_type": "earnings",
+      "tickers": [
+        {
+          "symbol": "NWND",
+          "name": "Northwind Corp",
+          "exchange": "Nasdaq",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990001/000999000126000101/0009990001-26-000101-index.htm",
+          "published_at": "2026-10-17T20:40:12Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T20:40:12Z",
+      "published_at": "2026-10-17T20:50:12Z",
+      "sort_at": "2026-10-17T20:40:12Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/9450a4d2-1873-5e45-9a94-ae9b2953f560",
+      "importance": 5,
+      "my_reaction": null
+    },
+    {
+      "id": "7f177545-cbe9-534b-96c1-c171ef311f67",
+      "kind": "summary",
+      "headline": "[SAMPLE] Relecloud Energy quarterly output hits record, revenue up 7%",
+      "body": "Relecloud Energy said its power plants produced a record amount of electricity in the third quarter. Revenue rose 7% to $1.9 billion, helped by new wind capacity that came online in July.",
+      "category": "energy",
+      "event_type": "earnings",
+      "tickers": [
+        {
+          "symbol": "RELC",
+          "name": "Relecloud Energy Inc",
+          "exchange": "NYSE",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990012/000999001226000098/0009990012-26-000098-index.htm",
+          "published_at": "2026-10-17T06:00:00Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T06:00:00Z",
+      "published_at": "2026-10-17T06:10:00Z",
+      "sort_at": "2026-10-17T06:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/7f177545-cbe9-534b-96c1-c171ef311f67",
+      "importance": 5,
+      "my_reaction": null
+    },
+    {
+      "id": "d951da74-a98f-5dbd-96ed-f181eee89e5a",
+      "kind": "summary",
+      "headline": "[SAMPLE] Fabrikam Robotics files 8-K: Item 5.02, departure and appointment of officers",
+      "body": "Fabrikam Robotics filed a Form 8-K under Item 5.02, which covers changes in directors or senior officers. Open the filing for names and dates.",
+      "category": "tech",
+      "event_type": "exec_change",
+      "tickers": [
+        {
+          "symbol": "FBRK",
+          "name": "Fabrikam Robotics Inc",
+          "exchange": "NYSE",
+          "quote": null
+        }
+      ],
+      "macro": [],
+      "sources": [
+        {
+          "name": "SEC",
+          "kind": "filing",
+          "doc_label": "Form 8-K",
+          "url": "https://www.sec.gov/Archives/edgar/data/9990003/000999000326000077/0009990003-26-000077-index.htm",
+          "published_at": "2026-10-17T18:00:00Z",
+          "license_class": "company_filing",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-17T18:00:00Z",
+      "published_at": "2026-10-17T18:10:00Z",
+      "sort_at": "2026-10-17T18:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": false,
+        "label": null
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/d951da74-a98f-5dbd-96ed-f181eee89e5a",
+      "importance": 3,
+      "my_reaction": null
+    },
+    {
+      "id": "3494a996-c138-5d38-9233-5231f0cdd268",
+      "kind": "data",
+      "headline": "[SAMPLE] Consumer prices up 2.9% from a year ago in September",
+      "body": "Consumer prices rose 2.9% in the 12 months through September, down 0.1 points from August.",
+      "category": "economy",
+      "event_type": "macro_release",
+      "tickers": [],
+      "macro": [
+        {
+          "series_id": "CPIAUCSL",
+          "label": "CPI inflation (yearly)",
+          "value": "2.9%",
+          "change": "-0.1 pts",
+          "direction": "down",
+          "period": "Sep 2026",
+          "as_of": "2026-10-15",
+          "source_name": "U.S. Bureau of Labor Statistics via FRED",
+          "source_short": "BLS via FRED",
+          "source_url": "https://fred.stlouisfed.org/series/CPIAUCSL",
+          "sort_order": 4
+        }
+      ],
+      "sources": [
+        {
+          "name": "U.S. Bureau of Labor Statistics",
+          "kind": "government",
+          "doc_label": "CPI news release",
+          "url": "https://www.bls.gov/news.release/cpi.nr0.htm",
+          "published_at": "2026-10-16T19:00:00Z",
+          "license_class": "public_domain",
+          "attribution": null,
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-16T19:00:00Z",
+      "published_at": "2026-10-16T19:10:00Z",
+      "sort_at": "2026-10-16T19:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": false,
+        "label": null
+      },
+      "attribution": null,
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/3494a996-c138-5d38-9233-5231f0cdd268",
+      "importance": 10,
+      "my_reaction": null
+    }
+  ],
+  "next_cursor": "497851.212907|3494a996-c138-5d38-9233-5231f0cdd268"
+}

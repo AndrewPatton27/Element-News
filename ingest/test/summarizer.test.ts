@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { summarizeWithChain, memoryCounter, fileCounter } from '../src/summarizer/chain.ts';
@@ -38,16 +38,21 @@ function fake(name: string, outputs: (SummaryDraft | Error)[]): Summarizer & { c
   return s;
 }
 
-test('template cards pass the validator (SEC 2.02, SEC 5.02, Fed)', () => {
-  for (const item of [gopro, costco, fedItem]) {
+test('template cards pass the validator (SEC 5.02, Fed); the 2.02 template card has no figures and fails no_figures', () => {
+  const g = templateDraft({ item: gopro, text: '' });
+  const gv = validateDraft(g, { text: gopro.summary_text, licenseClass: gopro.license_class, tickers: ['GPRO'], requireFigures: true });
+  assert.equal(gv.ok, false);
+  assert.match(gv.errors.join(), /no_figures/);
+  for (const item of [costco, fedItem]) {
     const d = templateDraft({ item, text: item.summary_text });
     const v = validateDraft(d, { text: item.summary_text, licenseClass: item.license_class, tickers: item.tickers.map((t) => t.symbol) });
     assert.deepEqual(v.errors, [], d.headline);
     assert.ok(d.headline.length <= 90);
   }
-  assert.equal(templateDraft({ item: gopro, text: '' }).headline, 'GoPro, Inc. files 8-K: Item 2.02, results of operations');
+  assert.equal(templateDraft({ item: gopro, text: '' }).headline, 'GoPro, Inc. shares its latest financial results');
   assert.equal(templateDraft({ item: gopro, text: '' }).body,
-    'GoPro, Inc. filed a Form 8-K under Item 2.02, which covers quarterly or annual results, plus Items 4.02 and 8.01. Open the filing for details.');
+    'GoPro, Inc. sent the SEC a report on its latest results, like sales and profit. Open the filing to see the numbers.');
+  assert.equal(templateDraft({ item: costco, text: '' }).headline, 'Costco Wholesale Corp reports a change in its top leaders');
 });
 
 test('license gate: link_out / dev_only text never reaches any provider', async () => {
@@ -138,6 +143,44 @@ test('prompt includes the rules and the retry errors', () => {
   assert.match(p, /Every number you write must appear in the source text/);
   assert.match(p, /rejected for: numbers not in source: 9/);
   assert.match(p, /TICKERS: GPRO \(GoPro, Inc\.\)/);
+});
+
+test('prompt: plain headline and body rules (lead with what happened; no over-specific details; precise details only in detail.key_points)', () => {
+  const p = buildPrompt({ item: gopro, text: 'T' });
+  // headline leads with what happened
+  assert.match(p, /headline must say WHAT HAPPENED in plain words/i);
+  // no over-specific details in headline AND body
+  assert.match(p, /OUT of the headline AND the body/);
+  assert.match(p, /no exact distances, compass bearings, coordinates, exact clock times, docket, item or section numbers, model numbers, or long official titles/i);
+  // precise details only in detail.key_points
+  assert.match(p, /belong ONLY in "detail"\.key_points, never in the headline or the body/);
+  // about 60 characters target still present
+  assert.match(p, /aim for about 60/);
+});
+
+// A product-recall item (category 'safety'), like the ones CPSC produces.
+const recall = { ...gopro, source: 'cpsc', category: 'safety', event_type: 'recall', tickers: [] } as unknown as RawItem;
+
+test('safety-card prompt tells the AI to give a direct instruction and avoid "should"', () => {
+  const p = buildPrompt({ item: recall, text: 'Acme recalls heaters.' });
+  assert.match(p, /PRODUCT-SAFETY RECALL/);
+  assert.match(p, /do NOT use the word "should"/i);
+  assert.match(p, /Stop using it and contact the company for a refund/);
+});
+
+test('a non-safety prompt does not add the recall instruction block', () => {
+  const p = buildPrompt({ item: gopro, text: 'T' });
+  assert.doesNotMatch(p, /PRODUCT-SAFETY RECALL/);
+});
+
+test('detail prompt asks for paraphrase, source-only numbers and under the copy limit', () => {
+  const p = buildPrompt({ item: gopro, text: 'T' });
+  // paraphrase in the model's own words, not copy
+  assert.match(p, /your OWN plain words/i);
+  assert.match(p, /never copy a phrase of more than 8 words in a row/i);
+  // numbers only from the source
+  assert.match(p, /Use ONLY numbers that appear in the source text exactly/i);
+  assert.match(p, /if a number is not in the source, leave it out/i);
 });
 
 test('AI calls are spaced by minIntervalMs (free-tier requests-per-minute limit)', async () => {

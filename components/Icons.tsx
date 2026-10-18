@@ -126,3 +126,113 @@ export function DocumentIcon(p: IconProps) {
     </Icon>
   );
 }
+
+// Person: the design's "Me" icon, used for the Account nav item.
+export function PersonIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <Circle cx={12} cy={8} r={4} />
+      <Path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+    </Icon>
+  );
+}
+
+// Thumbs for "More like this" / "Less like this" (same stroke style as the design icons).
+const THUMB = 'M7 11l4-7a2 2 0 0 1 3.4 1.9L13.6 10H19a2 2 0 0 1 2 2.4l-1.3 6A2 2 0 0 1 17.7 20H7z';
+
+export function ThumbUpIcon(p: IconProps) {
+  return (
+    <Icon size={18} {...p}>
+      <Path d="M3 11h4v9H3z" />
+      <Path d={THUMB} />
+    </Icon>
+  );
+}
+
+export function ThumbDownIcon(p: IconProps) {
+  return (
+    <Icon size={18} {...p}>
+      <Path d="M3 11h4v9H3z" transform="rotate(180 12 12)" />
+      <Path d={THUMB} transform="rotate(180 12 12)" />
+    </Icon>
+  );
+}
+
+// Share, path data from Mobile-Final / Web-Final.
+export function ShareIcon(p: IconProps) {
+  return (
+    <Icon size={22} {...p}>
+      <Path d="M12 15V3" />
+      <Path d="M7 8l5-5 5 5" />
+      <Path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </Icon>
+  );
+}
+
+
+// Eye / eye-off for the show-password toggle (same stroke style as the design icons).
+const EYE = 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z';
+
+export function EyeIcon(p: IconProps) {
+  return (
+    <Icon size={20} {...p}>
+      <Path d={EYE} />
+      <Circle cx={12} cy={12} r={3} />
+    </Icon>
+  );
+}
+
+export function EyeOffIcon(p: IconProps) {
+  return (
+    <Icon size={20} {...p}>
+      <Path d={EYE} />
+      <Circle cx={12} cy={12} r={3} />
+      <Path d="M3 3l18 18" />
+    </Icon>
+  );
+}
+
+// Previous / next arrows for the trends card (design Web-Final).
+export function ChevronLeftIcon(p: IconProps) {
+  return (
+    <Icon size={18} strokeWidth={2} {...p}>
+      <Path d="M15 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
+export function ChevronRightIcon(p: IconProps) {
+  return (
+    <Icon size={18} strokeWidth={2} {...p}>
+      <Path d="M9 6l6 6-6 6" />
+    </Icon>
+  );
+}
+
+// Bottom-bar icons for Brief, Search and Following (design Mobile-Final nav).
+export function BriefIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <Circle cx={12} cy={12} r={4} />
+      <Path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </Icon>
+  );
+}
+
+export function SearchIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <Circle cx={11} cy={11} r={6.5} />
+      <Path d="M16 16l4.5 4.5" />
+    </Icon>
+  );
+}
+
+// Pulse line: Following tab and the card's "Follow this story" button.
+export function PulseIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <Path d="M3 12h4l3-7 4 14 3-7h4" />
+    </Icon>
+  );
+}

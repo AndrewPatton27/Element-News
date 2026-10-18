@@ -9,7 +9,9 @@ import {
   howMadeText,
   isRenderableKind,
   noticesFor,
+  shareAlikeCredit,
   sourcesText,
+  CC_BY_SA_LICENSE_URL,
 } from '../labels.ts';
 import { card, config, dataCard } from './helpers.ts';
 
@@ -74,4 +76,35 @@ test('how-made text is honest about AI use', () => {
   assert.match(howMadeText(card()), /An AI wrote this summary/);
   assert.match(howMadeText(card({ ai: { generated: false, label: null } })), /No AI was used/);
   assert.match(howMadeText(dataCard()), /No AI was used/);
+});
+
+test('share-alike credit: shown for cc_by_sa sources with a license link', () => {
+  const wiki = card({
+    attribution: 'Adapted from Wikipedia ("Nobel Prize") · CC BY-SA 4.0',
+    sources: [
+      {
+        name: 'Wikipedia',
+        kind: 'news',
+        doc_label: 'In the news',
+        url: 'https://en.wikipedia.org/wiki/Nobel_Prize',
+        published_at: '2026-10-17T12:00:00Z',
+        license_class: 'cc_by_sa' as never,
+        attribution: 'Adapted from Wikipedia ("Nobel Prize") · CC BY-SA 4.0',
+        is_primary: true,
+      },
+    ],
+  });
+  const credit = shareAlikeCredit(wiki, null);
+  assert.ok(credit);
+  assert.equal(credit.text, 'Adapted from Wikipedia ("Nobel Prize") · CC BY-SA 4.0');
+  assert.equal(credit.articleUrl, 'https://en.wikipedia.org/wiki/Nobel_Prize');
+  assert.equal(credit.licenseUrl, CC_BY_SA_LICENSE_URL);
+  const cfg = config({ required_notices: [{ key: 'cc_by_sa', text: 'x', url: 'https://example.org/by-sa', placements: ['about'] }] });
+  assert.equal(shareAlikeCredit(wiki, cfg)?.licenseUrl, 'https://example.org/by-sa');
+  const noAttr = { ...wiki, attribution: null, sources: [{ ...wiki.sources[0], attribution: null }] };
+  assert.equal(shareAlikeCredit(noAttr, null)?.text, 'Adapted from Wikipedia · CC BY-SA 4.0');
+  assert.equal(shareAlikeCredit(card(), cfg), null);
+  // the disclaimer and AI label still apply to share-alike cards
+  assert.equal(cardLabels(wiki, null).disclaimer, DISCLAIMER_FALLBACK);
+  assert.equal(cardLabels(wiki, null).aiLabel, AI_NOTICE_FALLBACK);
 });

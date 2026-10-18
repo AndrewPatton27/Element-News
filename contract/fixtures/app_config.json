@@ -12,6 +12,14 @@
         "share",
         "about"
       ]
+    },
+    {
+      "key": "cc_by_sa",
+      "text": "Adapted from Wikipedia · CC BY-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "placements": [
+        "about"
+      ]
     }
   ],
   "min_supported_app_version": "1.0.0",

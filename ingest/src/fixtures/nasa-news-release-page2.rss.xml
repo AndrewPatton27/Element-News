@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- SYNTHETIC: NASA news-release RSS shape, page 2 (?paged=2) of the feed, made up for the dry run and tests (dry-run day 2026-10-17). Items: a news release 9 days old (inside 14 days, outside 7), a news release 20 days old (too old), a repeat of the page 1 release (pages overlap), an image article and a blog post (not news releases). Fictional wording; no real NASA text. -->
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+	<title>NASA</title>
+	<link>https://www.nasa.gov</link>
+	<description>Official National Aeronautics and Space Administration Website</description>
+	<item>
+		<title>NASA Sets Launch Date for Example Weather Satellite</title>
+		<link>https://www.nasa.gov/news-release/nasa-sets-launch-date-for-example-weather-satellite/</link>
+		<pubDate>Thu, 08 Oct 2026 15:00:00 +0000</pubDate>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=press-release&#038;p=2000001</guid>
+		<description><![CDATA[NASA set a launch date for a new weather satellite.]]></description>
+		<content:encoded><![CDATA[<p>NASA has set a launch date for a new weather satellite that will help forecasters track storms. The satellite will orbit about 22,000 miles above Earth.</p><p>The launch is planned for next spring.</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>NASA Selects Example University Teams for Student Challenge</title>
+		<link>https://www.nasa.gov/news-release/nasa-selects-example-university-teams-for-student-challenge/</link>
+		<pubDate>Sun, 27 Sep 2026 15:00:00 +0000</pubDate>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=press-release&#038;p=2000002</guid>
+		<description><![CDATA[NASA selected teams.]]></description>
+		<content:encoded><![CDATA[<p>NASA selected 12 university teams for a student design challenge.</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>NASA Names Stephen Cash Marshall Space Flight Center Director</title>
+		<link>https://www.nasa.gov/news-release/nasa-names-stephen-cash-marshall-space-flight-center-director/</link>
+		<pubDate>Fri, 16 Oct 2026 20:14:39 +0000</pubDate>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=press-release&#038;p=1057238</guid>
+		<description><![CDATA[Repeat of the page 1 release.]]></description>
+		<content:encoded><![CDATA[<p>Repeat of the page 1 release.</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>Example Nebula, Seen Again</title>
+		<link>https://www.nasa.gov/image-article/example-nebula-seen-again/</link>
+		<pubDate>Wed, 07 Oct 2026 12:00:00 +0000</pubDate>
+		<guid isPermaLink="false">https://www.nasa.gov/?post_type=image-article&#038;p=2000003</guid>
+		<description><![CDATA[An image.]]></description>
+		<content:encoded><![CDATA[<p>An image article.</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>Example Blog Post From Mission Control</title>
+		<link>https://www.nasa.gov/blogs/example-mission-control/2026/10/06/example-blog-post/</link>
+		<pubDate>Tue, 06 Oct 2026 12:00:00 +0000</pubDate>
+		<guid isPermaLink="false">https://www.nasa.gov/?p=2000004</guid>
+		<description><![CDATA[A blog post.]]></description>
+		<content:encoded><![CDATA[<p>A blog post.</p>]]></content:encoded>
+	</item>
+</channel>
+</rss>

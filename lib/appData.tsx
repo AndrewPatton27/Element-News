@@ -24,12 +24,19 @@ export function AppDataProvider({ api, children }: { api: Api; children: ReactNo
       .appConfig()
       .then((c) => alive && setConfig(c))
       .catch(() => undefined);
-    api
-      .categories()
-      .then((c) => alive && setCategories(c))
-      .catch(() => undefined);
+    const loadCategories = (retry: boolean) =>
+      api
+        .categories()
+        .then((c) => alive && setCategories(c))
+        .catch(() => {
+          // one retry after 3 s, so a slow first load doesn't leave empty chips all session
+          if (retry && alive) timer = setTimeout(() => loadCategories(false), 3000);
+        });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    loadCategories(true);
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, [api]);
 

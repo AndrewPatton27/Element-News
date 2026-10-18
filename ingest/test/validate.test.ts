@@ -42,6 +42,48 @@ test('validator rejects advice language', () => {
   console.log('  validator output (advice):', r.errors.join('; '));
 });
 
+// ---- safety-card advice relaxation (CPSC recalls) -------------------------------------------------
+// A recall card's real category is 'safety' (set in code; carried on source.category). Plain
+// safety instructions that use "should" are allowed there, but investment advice never is.
+const recallSrc = {
+  text: 'Acme is recalling about 10,000 space heaters because they can overheat and catch fire. '
+    + 'Consumers should stop using the product and contact the company for a full refund.',
+  licenseClass: 'public_domain',
+  category: 'safety',
+};
+// The AI draft category is always one of the 9 business slugs; the safety signal is source.category.
+const recallDraft: Draft = {
+  headline: 'Acme recalls space heaters that can catch fire',
+  body: 'Acme is recalling about 10,000 space heaters that can overheat and catch fire. Consumers should stop using them and contact the company for a refund.',
+  category: 'tech',
+  event_type: null,
+  tickers: [],
+};
+
+test('"should" in a safety card is allowed', () => {
+  const r = validateDraft(recallDraft, recallSrc);
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.ok, true);
+});
+
+test('buy/sell advice in a safety card is still rejected', () => {
+  const r = validateDraft(
+    { ...recallDraft, body: 'Acme is recalling space heaters. Buy and sell the shares before the news spreads.' },
+    recallSrc,
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.errors.join('; '), /advice language:.*\bbuy\b/);
+  assert.match(r.errors.join('; '), /\bsell\b/);
+  console.log('  validator output (safety card, investment advice):', r.errors.join('; '));
+});
+
+test('"should" in a non-safety card is still rejected', () => {
+  // same wording, but the source carries no safety category (a normal filing)
+  const r = validateDraft({ ...recallDraft, category: 'tech' }, { ...recallSrc, category: 'tech' });
+  assert.equal(r.ok, false);
+  assert.match(r.errors.join('; '), /advice language: should/);
+});
+
 test('validator rejects a ticker that is not in the source', () => {
   const r = validateDraft({ ...good, tickers: ['NWND', 'ZZZQ'] }, src);
   assert.equal(r.ok, false);

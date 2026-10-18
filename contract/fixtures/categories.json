@@ -1,12 +1,12 @@
 [
   {
-    "slug": "markets",
-    "name": "Markets",
+    "slug": "world",
+    "name": "World",
     "sort_order": 1
   },
   {
-    "slug": "earnings",
-    "name": "Earnings",
+    "slug": "policy",
+    "name": "Government",
     "sort_order": 2
   },
   {
@@ -15,33 +15,48 @@
     "sort_order": 3
   },
   {
-    "slug": "policy",
-    "name": "Policy",
+    "slug": "personal-finance",
+    "name": "Money",
     "sort_order": 4
+  },
+  {
+    "slug": "markets",
+    "name": "Business",
+    "sort_order": 5
   },
   {
     "slug": "tech",
     "name": "Tech",
-    "sort_order": 5
+    "sort_order": 6
+  },
+  {
+    "slug": "science",
+    "name": "Science & Space",
+    "sort_order": 7
+  },
+  {
+    "slug": "safety",
+    "name": "Recalls & Safety",
+    "sort_order": 8
+  },
+  {
+    "slug": "earnings",
+    "name": "Earnings",
+    "sort_order": 9
   },
   {
     "slug": "deals",
     "name": "Deals",
-    "sort_order": 6
+    "sort_order": 10
   },
   {
     "slug": "energy",
     "name": "Energy",
-    "sort_order": 7
+    "sort_order": 11
   },
   {
     "slug": "insider",
     "name": "Insider trades",
-    "sort_order": 8
-  },
-  {
-    "slug": "personal-finance",
-    "name": "Personal finance",
-    "sort_order": 9
+    "sort_order": 12
   }
 ]

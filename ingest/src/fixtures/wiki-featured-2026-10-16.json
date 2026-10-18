@@ -1,0 +1,29 @@
+{
+ "_comment": "SYNTHETIC: Wikipedia REST featured-feed shape for the day before the dry-run day (2026-10-16). Two stories: one that is also in the 2026-10-17 feed (same story text and article, used to test the cross-day dedupe) and one that only this day has. Made-up wording about a fictional event; not fetched from Wikipedia. Text would be CC BY-SA 4.0.",
+ "news": [
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "Navi_Pillay",
+     "titles": { "canonical": "Navi_Pillay", "normalized": "Navi Pillay" },
+     "extract": "Navanetham Pillay is a South African jurist who has served on the International Criminal Court and as United Nations High Commissioner for Human Rights.",
+     "content_urls": { "desktop": { "page": "https://en.wikipedia.org/wiki/Navi_Pillay" } }
+    }
+   ],
+   "story": "<!--Oct 09-->South African jurist <b><a rel=\"mw:WikiLink\" href=\"./Navi_Pillay\" title=\"Navi Pillay\">Navi Pillay</a></b> is awarded <a rel=\"mw:WikiLink\" href=\"./2026_Nobel_Peace_Prize\" title=\"2026 Nobel Peace Prize\">the Nobel Peace Prize</a>."
+  },
+  {
+   "links": [
+    {
+     "type": "standard",
+     "title": "Example_City_flood",
+     "titles": { "canonical": "Example_City_flood", "normalized": "Example City flood" },
+     "extract": "A flood struck Example City after several days of heavy rain. Officials said about 3,000 residents left their homes.",
+     "content_urls": { "desktop": { "page": "https://en.wikipedia.org/wiki/Example_City_flood" } }
+    }
+   ],
+   "story": "<!--Oct 15-->Heavy rain causes a <b><a rel=\"mw:WikiLink\" href=\"./Example_City_flood\" title=\"Example City flood\">flood in Example City</a></b>, forcing about 3,000 people from their homes."
+  }
+ ]
+}

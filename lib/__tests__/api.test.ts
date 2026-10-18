@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolveApiConfig } from '../config.ts';
 import { ApiError, createSupabaseApi, planRequest } from '../api.supabase.ts';
 import { card, config } from './helpers.ts';
+import { createMockFeatureApi } from '../api.mockFeatures.ts';
 
 const URL_ = 'https://abc123.supabase.co';
 const KEY = 'sb_publishable_testkey123';
@@ -89,4 +90,75 @@ test('errors carry status and never the key', async () => {
     }) as typeof fetch,
   });
   await assert.rejects(down.categories(), (err: unknown) => err instanceof ApiError && err.status === 0);
+});
+
+const TREND = { key: 'DGS10', name: '10-year Treasury yield', value: '5.10%', change: '▼ 0.09 this week', direction: 'down', source: 'U.S. Treasury', points: [4.9, 5.1] };
+
+test('side column requests are RPC calls in the api schema', () => {
+  for (const op of ['top_stories', 'number_trends'] as const) {
+    const p = planRequest(URL_, KEY, op);
+    assert.equal(p.url, `${URL_}/rest/v1/rpc/${op}`);
+    assert.equal(p.init.method, 'POST');
+    assert.equal(p.init.headers['Content-Profile'], 'api');
+    assert.equal(p.init.body, '{}');
+  }
+});
+
+test('search and following requests send the documented RPC parameters', () => {
+  const search = planRequest(URL_, KEY, 'search', { mode: 'top', q: 'AAPL', cursor: 'next', limit: 12 });
+  assert.equal(search.url, `${URL_}/rest/v1/rpc/search`);
+  assert.deepEqual(JSON.parse(search.init.body as string), { p_q: 'AAPL', p_cursor: 'next', p_limit: 12 });
+  const following = planRequest(URL_, KEY, 'following_feed', { mode: 'top', topics: ['Fed'], sources: ['SEC'], tickers: ['AAPL'], cursor: null, limit: 15 });
+  assert.deepEqual(JSON.parse(following.init.body as string), { p_topics: ['Fed'], p_sources: ['SEC'], p_tickers: ['AAPL'], p_cursor: null, p_limit: 15 });
+});
+
+test('topStories and numberTrends parse good rows and skip bad ones', async () => {
+  const api = createSupabaseApi({ url: URL_, key: KEY, fetchFn: fakeFetch(200, [card(), { id: 'bad' }]) });
+  assert.equal((await api.topStories()).length, 1);
+  const many = createSupabaseApi({ url: URL_, key: KEY, fetchFn: fakeFetch(200, Array.from({ length: 8 }, () => card())) });
+  assert.equal((await many.topStories()).length, 5);
+  const tr = createSupabaseApi({ url: URL_, key: KEY, fetchFn: fakeFetch(200, [TREND, { key: 'x' }, { ...TREND, points: Array.from({ length: 15 }, (_, i) => i) }]) });
+  const got = await tr.numberTrends();
+  assert.equal(got.length, 2);
+  assert.equal(got[1]!.points.length, 12);
+});
+
+test('new mock endpoints provide searchable, related, following and brief data', async () => {
+  const api = createMockFeatureApi([card(), card({ id: 'c2', headline: '[SAMPLE] Northwind raises outlook', category: 'markets' }), card({ id: 'c3', headline: '[SAMPLE] Another company beats estimates', category: 'earnings' })], [], []);
+  assert.equal((await api.search('Northwind')).items.length, 3);
+  assert.deepEqual(await api.search('x'), { items: [], next_cursor: null });
+  assert.ok((await api.relatedCards('c1')).every((c) => c.id !== 'c1'));
+  const followed = await api.followingFeed({ topics: ['earnings'], sources: [], tickers: [] });
+  assert.ok(followed.items.length > 0);
+  assert.ok(followed.items[0]?.follow_reason);
+  assert.ok((await api.followingFeed({ topics: [], sources: [], tickers: [] })).items.length > 0);
+  const daily = await api.dailyBrief();
+  assert.ok([48, 72].includes(daily.window_hours), 'thin supply widens the daily window');
+  assert.ok(daily.headline_cards.length > 0);
+  assert.equal(new Set(daily.headline_cards.map((c) => c.category)).size, daily.headline_cards.length, 'brief headlines cover different topics');
+  assert.equal((await api.weeklyBrief()).window_hours, 168);
+});
+
+test('missing optional brief/search RPCs return empty values without throwing', async () => {
+  const api = createSupabaseApi({ url: URL_, key: KEY, fetchFn: fakeFetch(404, { message: 'Could not find the function' }) });
+  assert.deepEqual(await api.search('Fed'), { items: [], next_cursor: null });
+  assert.deepEqual(await api.relatedCards('missing'), []);
+  assert.deepEqual(await api.followingFeed({ topics: [], sources: [], tickers: [] }), { items: [], next_cursor: null });
+  assert.deepEqual((await api.dailyBrief()).headline_cards, []);
+  assert.deepEqual((await api.weeklyBrief()).movers, []);
+});
+
+test('topStories and numberTrends return [] on a missing RPC, an error or a network failure', async () => {
+  for (const f of [
+    fakeFetch(404, { code: 'PGRST202', message: 'Could not find the function' }),
+    fakeFetch(500, { message: 'boom' }),
+    fakeFetch(200, { not: 'a list' }),
+    (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch,
+  ]) {
+    const api = createSupabaseApi({ url: URL_, key: KEY, fetchFn: f });
+    assert.deepEqual(await api.topStories(), []);
+    assert.deepEqual(await api.numberTrends(), []);
+  }
 });

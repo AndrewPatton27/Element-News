@@ -1,0 +1,16 @@
+{
+  "followed_categories": [
+    "energy",
+    "tech"
+  ],
+  "hidden_categories": [
+    "insider"
+  ],
+  "hidden_sources": [],
+  "onboarded": true,
+  "updated_at": "2026-10-17T23:05:00.000000+00:00",
+  "affinity": {
+    "deals": 1,
+    "markets": -1
+  }
+}

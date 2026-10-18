@@ -66,6 +66,6 @@ const styles = StyleSheet.create({
   full: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   title: { fontFamily: fonts.serif, fontSize: 24, textAlign: 'center' },
   text: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 22, textAlign: 'center', maxWidth: 420 },
-  button: { minHeight: 48, paddingHorizontal: 24, borderRadius: 14, justifyContent: 'center' },
+  button: { minHeight: 48, paddingHorizontal: 24, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   buttonText: { fontFamily: fonts.sansSemi, fontSize: 16 },
 });

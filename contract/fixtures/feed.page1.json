@@ -65,7 +65,20 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/051ea99f-23fe-5e02-b6ce-e0104e8109d5",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": {
+        "paragraphs": [
+          "The 10-year Treasury yield was 4.02% on Oct 16. That is up 0.06 points from the day before.",
+          "This rate is what the U.S. government pays to borrow money for 10 years. Many mortgage and loan rates follow it.",
+          "The number comes from the Federal Reserve Board, shared through FRED."
+        ],
+        "key_points": [
+          "10-year Treasury yield: 4.02% on Oct 16",
+          "Up 0.06 points from the prior day",
+          "Many mortgage and loan rates follow this rate",
+          "Source: Federal Reserve Board via FRED"
+        ]
+      }
     },
     {
       "id": "bbfd4443-8e95-5e56-b250-33a19033be52",
@@ -115,7 +128,19 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/bbfd4443-8e95-5e56-b250-33a19033be52",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": {
+        "paragraphs": [
+          "The Federal Reserve kept its main interest rate the same after a two-day meeting.",
+          "The Fed is the U.S. central bank. It raises or lowers this rate to slow down or speed up the economy.",
+          "Officials said prices are rising more slowly than before, but still faster than their 2% goal. They said their next steps depend on new numbers about jobs and prices."
+        ],
+        "key_points": [
+          "The Fed left its main interest rate unchanged",
+          "Inflation has eased but is above the 2% goal",
+          "Next moves depend on new jobs and price data"
+        ]
+      }
     },
     {
       "id": "d5e7f1fa-df5b-5b9f-ae31-4e3f2269ad41",
@@ -169,7 +194,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/d5e7f1fa-df5b-5b9f-ae31-4e3f2269ad41",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "f42df827-3ba8-53dc-a950-689eae128646",
@@ -223,7 +249,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/f42df827-3ba8-53dc-a950-689eae128646",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "9450a4d2-1873-5e45-9a94-ae9b2953f560",
@@ -270,7 +297,19 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/9450a4d2-1873-5e45-9a94-ae9b2953f560",
-      "importance": 5.0
+      "importance": 5.0,
+      "detail": {
+        "paragraphs": [
+          "Northwind Corp said its sales for the third quarter were $4.1 billion. That is 12% more than a year earlier.",
+          "The company also raised its forecast for sales over the full year. It said customers in logistics, the business of moving goods, are buying more.",
+          "The numbers come from a report the company filed with the SEC, the agency that oversees public companies."
+        ],
+        "key_points": [
+          "Quarterly revenue: $4.1 billion, up 12% from a year earlier",
+          "Full-year sales forecast raised",
+          "Company points to stronger demand from logistics customers"
+        ]
+      }
     },
     {
       "id": "9bc84212-6263-56bd-a74c-42ef7540758a",
@@ -310,7 +349,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/9bc84212-6263-56bd-a74c-42ef7540758a",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "b641c7b0-e382-5d80-a431-441775298775",
@@ -357,7 +397,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/b641c7b0-e382-5d80-a431-441775298775",
-      "importance": 5.0
+      "importance": 5.0,
+      "detail": null
     },
     {
       "id": "8f482c69-06b7-57db-b465-e5163e85485a",
@@ -404,7 +445,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/8f482c69-06b7-57db-b465-e5163e85485a",
-      "importance": 5.0
+      "importance": 5.0,
+      "detail": null
     },
     {
       "id": "28263e51-9fc1-588e-9113-473b10d7a75e",
@@ -457,7 +499,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/28263e51-9fc1-588e-9113-473b10d7a75e",
-      "importance": 4.0
+      "importance": 4.0,
+      "detail": null
     },
     {
       "id": "d951da74-a98f-5dbd-96ed-f181eee89e5a",
@@ -504,7 +547,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/d951da74-a98f-5dbd-96ed-f181eee89e5a",
-      "importance": 3.0
+      "importance": 3.0,
+      "detail": null
     },
     {
       "id": "47d58d66-1001-5e7c-a293-7aba896d2126",
@@ -551,7 +595,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/47d58d66-1001-5e7c-a293-7aba896d2126",
-      "importance": 2.0
+      "importance": 2.0,
+      "detail": null
     },
     {
       "id": "1fc285f1-87bf-5b33-832f-47a8eaaf3100",
@@ -591,7 +636,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/1fc285f1-87bf-5b33-832f-47a8eaaf3100",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "542351ba-4995-50e4-b6f4-1faf6296d8bb",
@@ -638,7 +684,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/542351ba-4995-50e4-b6f4-1faf6296d8bb",
-      "importance": 5.0
+      "importance": 5.0,
+      "detail": null
     },
     {
       "id": "49ee52a5-f276-55c2-8a9a-0b85c6b4c8b4",
@@ -685,7 +732,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/49ee52a5-f276-55c2-8a9a-0b85c6b4c8b4",
-      "importance": 2.0
+      "importance": 2.0,
+      "detail": null
     },
     {
       "id": "2ea4e470-38c3-5c99-9619-cbb313e1a311",
@@ -732,7 +780,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/2ea4e470-38c3-5c99-9619-cbb313e1a311",
-      "importance": 4.0
+      "importance": 4.0,
+      "detail": null
     },
     {
       "id": "7f177545-cbe9-534b-96c1-c171ef311f67",
@@ -779,7 +828,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/7f177545-cbe9-534b-96c1-c171ef311f67",
-      "importance": 5.0
+      "importance": 5.0,
+      "detail": null
     },
     {
       "id": "50786a1e-ab59-5b08-8f19-787ff2df1a4f",
@@ -826,7 +876,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/50786a1e-ab59-5b08-8f19-787ff2df1a4f",
-      "importance": 2.0
+      "importance": 2.0,
+      "detail": null
     },
     {
       "id": "3494a996-c138-5d38-9233-5231f0cdd268",
@@ -880,7 +931,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/3494a996-c138-5d38-9233-5231f0cdd268",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "c62cf8de-aff1-51cd-b00f-459e5aed599e",
@@ -927,7 +979,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/c62cf8de-aff1-51cd-b00f-459e5aed599e",
-      "importance": 2.0
+      "importance": 2.0,
+      "detail": null
     },
     {
       "id": "a6eebc4b-f99b-5e09-9980-6dbf994d68f4",
@@ -974,7 +1027,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/a6eebc4b-f99b-5e09-9980-6dbf994d68f4",
-      "importance": 4.0
+      "importance": 4.0,
+      "detail": null
     },
     {
       "id": "8171565a-0815-509f-8adc-aa45c56b3409",
@@ -1028,7 +1082,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/8171565a-0815-509f-8adc-aa45c56b3409",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     },
     {
       "id": "e78ef0fb-41f9-5406-ac29-52e851674bfe",
@@ -1068,7 +1123,8 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/e78ef0fb-41f9-5406-ac29-52e851674bfe",
-      "importance": 10.0
+      "importance": 10.0,
+      "detail": null
     }
   ],
   "next_cursor": "497845.575425|e78ef0fb-41f9-5406-ac29-52e851674bfe"

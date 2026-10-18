@@ -7,9 +7,7 @@ import { fonts, space } from '../lib/theme';
 export function SampleBanner() {
   const p = usePalette();
   return (
-    <Text style={[styles.banner, { backgroundColor: p.dataSoft, color: p.dataInk }]} accessibilityRole="alert">
-      SAMPLE DATA · fictional cards for testing, not real news
-    </Text>
+    <Text style={[styles.banner, { backgroundColor: p.dataSoft, color: p.dataInk }]}>SAMPLE DATA · fictional cards for testing, not real news</Text>
   );
 }
 

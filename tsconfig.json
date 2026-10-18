@@ -11,13 +11,12 @@
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules",
     "lib/__tests__",
-    "ingest"
+    "ingest",
+    "docs"
   ]
 }

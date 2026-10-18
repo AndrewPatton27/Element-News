@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC: shaped like the BEA news-release RSS (https://apps.bea.gov/rss/rss.xml, RSS 2.0) as described on 2026-10-17. Titles follow BEA's naming; the release URLs, descriptions and numbers are made up for offline tests and are not real BEA data. -->
+<rss version="2.0">
+<channel>
+<title>BEA News Releases</title>
+<link>https://www.bea.gov/news</link>
+<description>U.S. Bureau of Economic Analysis news releases</description>
+<item>
+<title>U.S. International Trade in Goods and Services, August 2026</title>
+<link>https://www.bea.gov/news/2026/example-trade-august-2026</link>
+<description><![CDATA[<p>The U.S. goods and services trade deficit was $61.2 billion in August, down $3.4 billion from $64.6 billion in July. Exports were $280.1 billion and imports were $341.3 billion.</p>]]></description>
+<pubDate>Tue, 06 Oct 2026 08:30:00 -0400</pubDate>
+<guid isPermaLink="false">bea-example-trade-2026-08</guid>
+</item>
+<item>
+<title>Gross Domestic Product, 2nd Quarter 2026 (Third Estimate)</title>
+<link>https://www.bea.gov/news/2026/example-gdp-q2-2026-third</link>
+<description>Real gross domestic product increased at an annual rate of 2.2 percent in the second quarter of 2026, according to the third estimate. In the first quarter, real GDP increased 1.8 percent.</description>
+<pubDate>Thu, 24 Sep 2026 08:30:00 -0400</pubDate>
+<guid isPermaLink="false">bea-example-gdp-2026-q2-3</guid>
+</item>
+<item>
+<title>Personal Income and Outlays, June 2026</title>
+<link>https://www.bea.gov/news/2026/example-pio-june-2026</link>
+<description>Personal income increased 0.3 percent in June. This release is older than the 30-day window and must be dropped.</description>
+<pubDate>Fri, 31 Jul 2026 08:30:00 -0400</pubDate>
+<guid isPermaLink="false">bea-example-pio-2026-06</guid>
+</item>
+</channel>
+</rss>
