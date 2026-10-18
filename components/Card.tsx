@@ -321,7 +321,7 @@ export function Card(props: Props) {
                 </Text>
               ) : null}
 
-              {facts.length > 0 ? (
+              {wide && facts.length > 0 ? (
                 <View style={[styles.facts, wide && styles.factsWide, compact && styles.factsCompact, { borderColor: p.divider }]}>
                   {facts.map((f) => (
                     <View key={f.label} style={styles.fact}>
