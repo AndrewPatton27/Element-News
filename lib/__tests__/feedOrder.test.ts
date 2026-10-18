@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dedupeCards, isAirworthinessCard, latestOrder, sortLatest, trendingOrder, trendingScore } from '../feedOrder.ts';
 import { mockFeedPage, mockRankScore } from '../feedLogic.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { BlurbCard } from '../../contract/types.ts';
 
 const mk = (id: string, o: Partial<BlurbCard> & Record<string, unknown> = {}): BlurbCard =>
@@ -62,4 +64,15 @@ test('mockRankScore is unchanged; trendingScore uses the shown time', () => {
   const c = mk('m', { importance: 4, sort_at: '2026-10-18T00:00:00Z', as_of: '2026-10-17T00:00:00Z' } as never);
   assert.equal(mockRankScore(c), Date.parse('2026-10-18T00:00:00Z') / 3_600_000 + 16);
   assert.equal(trendingScore(c), Date.parse('2026-10-17T00:00:00Z') / 3_600_000 + 16);
+});
+
+test('overlap@10 of trending vs latest on the sample fixtures is reported and <= 7', () => {
+  const dir = join(import.meta.dirname, '..', '..', 'contract', 'fixtures');
+  const cards = ['feed.page1.json', 'feed.page2.json'].flatMap((f) => (JSON.parse(readFileSync(join(dir, f), 'utf8')) as { items: BlurbCard[] }).items);
+  const top = trendingOrder(dedupeCards(cards)).slice(0, 10).map((c) => c.id);
+  const latest = sortLatest(dedupeCards(cards)).slice(0, 10).map((c) => c.id);
+  const overlap = top.filter((id) => latest.includes(id)).length;
+  console.log(`  overlap@10 trending vs latest: ${overlap} of ${Math.min(10, cards.length)} (fixtures: ${cards.length} cards)`);
+  assert.ok(overlap <= 7, `overlap ${overlap}`);
+  assert.notEqual(top[0], latest[0]);
 });
