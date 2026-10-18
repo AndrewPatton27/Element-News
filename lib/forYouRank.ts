@@ -1,16 +1,19 @@
-// For you candidate ranking (device side). Pure and deterministic.
-// Pool = Trending page + Latest page (deduped). Order:
-//   1. cards the reader has not seen or reacted to, before ones they have
-//   2. personal affinity (likes, dislikes, followed topics/sources/tickers) high to low
-//   3. freshness (published_at, newest first)
-//   4. trending position, as the last tie-break
-// Then diversifyFeed, then a guard so the first card differs from Trending's first card
-// whenever another card exists.
+// For you candidate ranking (device side). Pure and deterministic. Every term is in HOURS of
+// freshness (same unit as feedLogic.mockRankScore: hours + 8 per importance doubling).
+//   score = pulledAt hours + 8*log2(importance)      base (freshness from published_at, like Latest)
+//         + personal taste (localScore minus its base): follows +24, likes +8/+4, dislikes -8/-4
+//         - FY.overlapTop3 / FY.overlapTop10 if the card is one of Trending's top stories (set order = Trending order)
+//         - FY.seenPenalty if seen, - FY.reactedPenalty if the reader reacted
+// Warm reader: score desc. Cold reader (no follows, < FY.coldReactions reactions): topic
+// round-robin, best card of each topic first (importance + freshness inside a topic).
+// Then spread from Trending's top stories, the first-card guard, and diversifyFeed LAST.
+// All constants are in FY (context/settings.md, rows foryou.*).
 
 import type { BlurbCard } from '../contract/types.ts';
 import { diversifyFeed } from './diversify.ts';
 import { localScore } from './localRank.ts';
 import { mockRankScore } from './feedLogic.ts';
+import { pulledAt } from './feedOrder.ts';
 import type { LocalPrefs } from './localPrefs.ts';
 import { cardSourceKey } from './sourceKeys.ts';
 
@@ -44,29 +47,46 @@ export function spreadFromTrending(cards: BlurbCard[], trendingTopIds: ReadonlyS
   return [...head, ...held, ...rest];
 }
 
+/** Every tunable For you constant, in hours unless noted. */
+export const FY = { seenPenalty: 12, reactedPenalty: 20, coldReactions: 3, overlapWindow: 5, overlapMax: 2, overlapTop3: 10, overlapTop10: 6 } as const;
+
+const HOUR_MS = 3_600_000;
+const base = (c: BlurbCard): number => pulledAt(c) / HOUR_MS + 8 * Math.log2(c.importance && c.importance > 0 ? c.importance : 1);
+const idDesc = (a: BlurbCard, b: BlurbCard) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+
+/** Shared post-step (signed-out and signed-in pages): spread away from Trending's top stories, make the
+ *  first card differ from Trending's first, then diversify LAST so no topic run is recreated.
+ *  Cards before `reached` stay where they are; only the rest is touched. */
+export function finishForYou(cards: BlurbCard[], trendingTopIds: ReadonlySet<string> = new Set(), trendingFirstId: string | null = null, reached = 0): BlurbCard[] {
+  const keep = Math.max(0, Math.min(cards.length, reached));
+  let rest = spreadFromTrending(cards.slice(keep), trendingTopIds, FY.overlapWindow, FY.overlapMax);
+  if (keep === 0 && trendingFirstId && rest.length > 1 && rest[0].id === trendingFirstId) rest = [rest[1], rest[0], ...rest.slice(2)];
+  return [...cards.slice(0, keep), ...diversifyFeed(rest)];
+}
+
 export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet<string>, trendingFirstId: string | null, trendingTopIds: ReadonlySet<string> = new Set()): BlurbCard[] {
-  const trendPos = new Map(pool.map((c, i) => [c.id, i]));
   const kept = pool.filter((c) => {
     if (prefs.reactions[c.id]?.r === 'dislike') return false;
     if (prefs.hiddenTopics.includes(c.category)) return false;
     const src = cardSourceKey(c);
     return !(src && prefs.hiddenSources.includes(src));
   });
-  const used = (c: BlurbCard) => seenIds.has(c.id) || !!prefs.reactions[c.id];
-  const sorted = kept
-    .map((c) => ({ c, affinity: localScore(c, prefs) - mockRankScore(c), used: used(c) }))
-    .sort(
-      (a, b) =>
-        Number(a.used) - Number(b.used) ||
-        b.affinity - a.affinity ||
-        Date.parse(b.c.published_at) - Date.parse(a.c.published_at) ||
-        (trendPos.get(a.c.id) ?? 0) - (trendPos.get(b.c.id) ?? 0),
-    )
-    .map((x) => x.c);
-  const out = spreadFromTrending(diversifyFeed(sorted), trendingTopIds);
-  if (trendingFirstId && out.length > 1 && out[0].id === trendingFirstId) {
-    const [first, ...rest] = out;
-    return [rest[0], first, ...rest.slice(1)];
+  const trendRank = new Map([...trendingTopIds].map((id, i) => [id, i]));
+  const scored = kept.map((c) => {
+    const tr = trendRank.get(c.id);
+    const overlap = tr === undefined ? 0 : tr < 3 ? FY.overlapTop3 : FY.overlapTop10;
+    const reacted = !!prefs.reactions[c.id];
+    const penalty = reacted ? FY.reactedPenalty : seenIds.has(c.id) ? FY.seenPenalty : 0;
+    return { c, s: base(c) + (localScore(c, prefs) - mockRankScore(c)) - penalty - overlap };
+  }).sort((a, b) => b.s - a.s || idDesc(a.c, b.c));
+  const f = prefs.follows;
+  const cold = !f.topics.length && !f.sources?.length && !f.tickers?.length && Object.keys(prefs.reactions).length < FY.coldReactions;
+  let ordered = scored.map((x) => x.c);
+  if (cold) {
+    // Topic round-robin: all topics' best cards first, then every topic's second, and so on.
+    const depth = new Map<string, number>();
+    ordered = scored.map((x, i) => { const d = depth.get(x.c.category) ?? 0; depth.set(x.c.category, d + 1); return { c: x.c, d, i }; })
+      .sort((a, b) => a.d - b.d || a.i - b.i).map((x) => x.c);
   }
-  return out;
+  return finishForYou(ordered, trendingTopIds, trendingFirstId);
 }

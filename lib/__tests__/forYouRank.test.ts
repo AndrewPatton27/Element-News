@@ -41,9 +41,10 @@ test('For you first card differs from Trending first card for a reader with like
   assert.equal(rankForYou(mergePool(trending, latest), noPrefs, new Set(), 't1')[0].id, 'n1');
 });
 
-test('seen and reacted cards sink', () => {
-  const out = rankForYou(mergePool(trending, latest), { ...noPrefs, reactions: { n2: { r: 'like', topic: 'tech', source: null, at: 1 } } }, new Set(['n1']), null);
-  assert.deepEqual(out.slice(-2).map((c) => c.id).sort(), ['n1', 'n2']);
+test('seen and reacted cards sink below equally fresh unseen ones (soft penalty, not a bucket)', () => {
+  const same = ['a', 'b', 'c', 'd'].map((id, i) => card(id, 'x' + i, '2026-10-18T10:00:00Z'));
+  const out = rankForYou(same, { ...noPrefs, reactions: { b: { r: 'like', topic: 'x1', source: null, at: 1 } } }, new Set(['a']), null);
+  assert.deepEqual(out.slice(-2).map((c) => c.id).sort(), ['a', 'b']);
 });
 
 test('only one card: the guard does not drop it', () => {

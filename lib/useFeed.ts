@@ -11,7 +11,7 @@ import type { LocalPrefs } from './localPrefs.ts';
 import { readLocal } from './localPrefs.ts';
 import { defaultStore } from './storage.ts';
 import { readSeen } from './forYouGate.ts';
-import { mergePool, rankForYou } from './forYouRank.ts';
+import { finishForYou, mergePool, rankForYou } from './forYouRank.ts';
 import { assignFirstCards, dedupeCards, sortLatest, trendingOrder } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
@@ -52,7 +52,7 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
       userId && account ? account.feedForYou(null, 10) : Promise.resolve(null),
     ]).then(([top, latest, personal]) => {
       const store = defaultStore();
-      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null, new Set(top.items.slice(0, 5).map((x) => x.id)));
+      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id)));
       if (category) fy = fy.filter((c) => c.category === category);
       const orders = assignFirstCards(filter(sortLatest(latest.items)), filter(trendingOrder(top.items)), filter(fy));
       setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
@@ -94,17 +94,23 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
           known: cursor === null ? [] : stateRef.current.items,
           filter: (cards) => filterRef.current(cards),
           fetchPage: async (c) => {
-            if (query.mode === 'for_you' && query.user && account) return account.feedForYou(c, 10);
+            if (query.mode === 'for_you' && query.user && account) {
+              // Server order stays; each page gets the shared post-step (spread from Trending's top stories,
+              // diversify last). Trending's top ids are only needed on page 1.
+              const [page, top] = await Promise.all([account.feedForYou(c, 10), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
+              const topItems = trendingOrder(top?.items ?? []);
+              return { ...page, items: finishForYou(page.items, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null) };
+            }
             if (query.mode === 'for_you') {
-              // Signed out: candidates are the Trending page plus the Latest page, ranked on this
+              // Signed out: candidates are Trending (20: its page 1 plus the next 10) plus the Latest page, ranked on this
               // device (lib/forYouRank.ts). The cursor holds both modes' cursors.
               const cur = c ? (JSON.parse(c) as { t: string | null; l: string | null }) : { t: null, l: null };
               const [top, latest] = await Promise.all([
-                c && cur.t === null ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: cur.t, limit: 10 }),
+                c && cur.t === null ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: cur.t, limit: 20 }),
                 c && cur.l === null ? Promise.resolve(null) : api.feed({ mode: 'latest', category: null, cursor: cur.l, limit: 10 }),
               ]);
               const store = defaultStore();
-              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : top?.items[0]?.id ?? null, c ? new Set() : new Set((top?.items ?? []).slice(0, 5).map((x) => x.id)));
+              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : trendingOrder((top?.items ?? []).slice(0, 10))[0]?.id ?? null, c ? new Set() : new Set(trendingOrder((top?.items ?? []).slice(0, 10)).map((x) => x.id)));
               const t = top ? top.next_cursor : null, l = latest ? latest.next_cursor : null;
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
