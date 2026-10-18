@@ -184,7 +184,9 @@ function byDescThenId(score: (c: BlurbCard) => number) {
 export function mockFeedPage(all: BlurbCard[], p: MockFeedParams): FeedPage {
   const limit = clampLimit(p.limit);
   const filtered = all.filter((c) => p.category === null || c.category === p.category);
-  const sorted = filtered.slice().sort(p.mode === 'latest' ? byDescThenId((c) => Date.parse(c.sort_at)) : byDescThenId(mockRankScore));
+  const sorted = filtered.slice().sort(p.mode === 'latest'
+    ? (a, b) => Date.parse(b.published_at) - Date.parse(a.published_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    : byDescThenId(mockRankScore));
   const offset = p.cursor ? Math.max(0, parseInt(p.cursor, 10) || 0) : 0;
   const items = sorted.slice(offset, offset + limit);
   const end = offset + items.length;

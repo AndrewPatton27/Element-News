@@ -11,7 +11,7 @@ import type { LocalPrefs } from './localPrefs.ts';
 import { readLocal } from './localPrefs.ts';
 import { defaultStore } from './storage.ts';
 import { readSeen } from './forYouGate.ts';
-import { mergePool, rankForYou, sortLatest } from './forYouRank.ts';
+import { mergePool, rankForYou } from './forYouRank.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
   feedKey,
@@ -82,8 +82,8 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
             const page = await api.feed({ mode: query.mode, category: query.category, cursor: c, limit: 10 });
-            // Latest is newest first by published_at within each page (the server cursor orders by sort_at).
-            return query.mode === 'latest' ? { ...page, items: sortLatest(page.items) } : page;
+            // Keep the API page order intact: sorting only within a page breaks its cursor order.
+            return page;
           },
           onRequest: () => dispatch({ type: 'request', key: k }),
           onPage: (page) => dispatch({ type: 'page', key: k, page }),
@@ -141,8 +141,9 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
   }, [key, load]);
 
   const rerank = useCallback((signals: LocalPrefs, seenCount: number, signedIn = false) => {
+    if (query.mode === 'latest') return;
     dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn) });
-  }, [key]);
+  }, [key, query.mode]);
 
   // Keep the unseen queue filled while there is still a cursor. One chain at a time;
   // load() owns in-flight suppression and existing cursor/error handling.

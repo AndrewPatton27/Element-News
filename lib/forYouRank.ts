@@ -22,12 +22,11 @@ export function mergePool(trending: BlurbCard[], latest: BlurbCard[]): BlurbCard
   return [...trending, ...latest].filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
 }
 
-/** Newest first by published_at; ties by sort_at, then id. */
+/** Newest first by published_at; ties by id. */
 export function sortLatest(cards: BlurbCard[]): BlurbCard[] {
   return [...cards].sort(
     (a, b) =>
       Date.parse(b.published_at) - Date.parse(a.published_at) ||
-      Date.parse(b.sort_at) - Date.parse(a.sort_at) ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
 }

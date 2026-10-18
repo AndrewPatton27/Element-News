@@ -74,10 +74,10 @@ test('mock paging: no repeats, no gaps, cursor ends with null', () => {
   }
 });
 
-test('mock latest is newest first; category filter applies', () => {
+test('mock latest is published_at newest first; category filter applies', () => {
   const all = many(25);
   const page = mockFeedPage(all, { mode: 'latest', category: null, cursor: null, limit: 30 });
-  const times = page.items.map((c) => Date.parse(c.sort_at));
+  const times = page.items.map((c) => Date.parse(c.published_at));
   assert.deepEqual(
     times,
     times.slice().sort((a, b) => b - a),
