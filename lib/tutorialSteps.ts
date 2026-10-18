@@ -110,9 +110,9 @@ export function getTutorialSteps(variant: TutorialVariant): TutorialStep[] {
       ],
       tiles: web
         ? [
-            { key: 'thumbs-down', title: 'Dislike', hint: 'click the thumbs-down', tone: 'warn' },
-            { key: 'thumbs-up', title: 'Like', hint: 'click the thumbs-up', tone: 'accent' },
-            { key: '↓', title: 'Next card', hint: 'or j, or scroll down', tone: 'next' },
+            { key: 'thumbs-down', title: 'Dislike', hint: 'click the thumbs-down or press ←', tone: 'warn' },
+            { key: 'thumbs-up', title: 'Like', hint: 'click the thumbs-up or press →', tone: 'accent' },
+            { key: '↓', title: 'Next card', hint: 'or press ↓, or scroll down', tone: 'next' },
           ]
         : [
             { key: '←', title: 'Swipe left', hint: 'Dislike', tone: 'warn' },
@@ -156,7 +156,7 @@ export function getTutorialSteps(variant: TutorialVariant): TutorialStep[] {
       legend: [],
       recap: [
         web
-          ? { icon: 'next', bold: 'Press ↓ or j', text: ' for the next story' }
+          ? { icon: 'next', bold: 'Press ↓', text: ' for the next story' }
           : { icon: 'next', bold: 'Swipe up', text: ' for the next story' },
         web
           ? { icon: 'swipe', bold: 'Click the thumbs-down or thumbs-up.', text: ' It tunes your For you feed, no account needed.' }

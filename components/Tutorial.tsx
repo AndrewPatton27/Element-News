@@ -138,6 +138,12 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
   const viewH = useRef(0);
   const contentH = useRef(0);
   const updateFits = () => (fits.current = contentH.current <= viewH.current + 2);
+  // Scrolling to the bottom of a step that is taller than the screen moves on to the next step.
+  const bottomFired = useRef(false);
+  useEffect(() => {
+    bottomFired.current = false;
+  }, [step]);
+
   const lastWheel = useRef(0);
   useEffect(() => {
     const el = rootRef.current as unknown as HTMLElement | null;
@@ -207,6 +213,15 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
 
         <ScrollView
           ref={scroll}
+          scrollEventThrottle={64}
+          onScroll={(e) => {
+            const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+            if (fits.current || last || bottomFired.current) return;
+            if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 6) {
+              bottomFired.current = true;
+              setTimeout(() => next(), 220);
+            }
+          }}
           style={styles.fill}
           contentContainerStyle={[styles.body, web && styles.bodyWeb]}
           onLayout={(e) => {
