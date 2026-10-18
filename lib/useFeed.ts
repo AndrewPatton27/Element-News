@@ -40,9 +40,12 @@ const SHOW_ALL: CardFilter = (cards) => cards;
 export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: string | null, category: FeedQuery['category'], filter: CardFilter, focused: boolean, refresh: string | number = 0) {
   const [heads, setHeads] = useState<Record<string, { latest: string | null; top: string | null; for_you: string | null }>>({});
   const key = `${category ?? 'all'}|${userId ?? ''}`;
+  // One pull per (category, user, tab switch): api/account/filter may change identity on every render.
+  const pulled = useRef('');
+  const pullKey = `${key}|${refresh}`;
   useEffect(() => {
-    if (!focused) return;
-    let alive = true;
+    if (!focused || pulled.current === pullKey) return;
+    pulled.current = pullKey;
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
       api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
@@ -52,10 +55,9 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
       let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null, new Set(top.items.slice(0, 5).map((x) => x.id)));
       if (category) fy = fy.filter((c) => c.category === category);
       const orders = assignFirstCards(filter(latest.items), filter(top.items), filter(fy));
-      if (alive) setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
+      setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
     }).catch(() => undefined);
-    return () => { alive = false; };
-  }, [api, account, userId, category, filter, focused, key, refresh]);
+  }, [api, account, userId, category, filter, focused, key, refresh, pullKey]);
   return heads[key] ?? null;
 }
 
