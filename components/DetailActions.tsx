@@ -34,6 +34,6 @@ const styles = StyleSheet.create({
   dock: { borderTopWidth: 1, paddingTop: 10, paddingHorizontal: 12 },
   row: { flexDirection: 'row', gap: 6, justifyContent: 'space-between' },
   button: { flex: 1, minWidth: 44, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 2 },
-  label: { fontFamily: fonts.sansMedium, fontSize: 11 },
+  label: { fontFamily: fonts.sansMedium, fontSize: 12 },
   toast: { position: 'absolute', alignSelf: 'center', bottom: 62, fontFamily: fonts.sansMedium, fontSize: 13, padding: 7, backgroundColor: '#E6E9E4', borderRadius: 10, overflow: 'hidden' },
 });

@@ -1,7 +1,7 @@
 // The search field (design Mobile-Search / Web-Search): a rounded pill with a
 // magnifier, the text, and a clear button once there is text. Enter submits.
 
-import { useRef, type ComponentRef } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SEARCH_MAX_CHARS } from '../lib/searchLogic';
 import { usePalette } from '../lib/useTheme';
@@ -20,12 +20,15 @@ export interface SearchBoxProps {
 export function SearchBox({ value, onChangeText, onSubmit, onClear, wide, placeholder = 'Search stories, companies, topics' }: SearchBoxProps) {
   const p = usePalette();
   const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const [focused, setFocused] = useState(false);
   return (
     <View
       style={[
         styles.box,
         wide ? styles.boxWide : styles.boxNarrow,
         { backgroundColor: wide ? p.surface : p.surfaceMuted, borderColor: p.borderStrong },
+        // Web: the inner input has no ring, so the pill itself shows keyboard focus (ignored on native).
+        focused ? ({ borderColor: p.accent, boxShadow: `0 0 0 2px ${p.accent}` } as object) : null,
       ]}
     >
       <SearchIcon color={p.muted} size={wide ? 22 : 20} strokeWidth={1.8} />
@@ -37,6 +40,8 @@ export function SearchBox({ value, onChangeText, onSubmit, onClear, wide, placeh
         placeholder={placeholder}
         placeholderTextColor={p.muted}
         accessibilityLabel="Search stories, companies and topics"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         returnKeyType="search"
         autoCapitalize="none"
         autoCorrect={false}

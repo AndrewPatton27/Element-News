@@ -198,9 +198,9 @@ export const config = {
   fredLookbackDays: 500,                       // enough history for CPI year-over-year
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
   backfillPauseMs: 700,                        // --backfill-macro: pause between FRED requests (limit is 120/minute)
-  fedMaxAgeDays: 7,                            // ignore older press releases
+  fedMaxAgeDays: 120,                            // ignore older press releases
   // BEA releases come 2-5 a week; on 2026-10-17 the newest was 11 days old, so 7 days would show none.
-  beaMaxAgeDays: 30,
+  beaMaxAgeDays: 120,
   beaAttribution: 'Source: U.S. Bureau of Economic Analysis',
   // Federal Register final rules (JSON API, no key). The AI sees only each document's `abstract`;
   // documents without one are skipped. Reuse permitted (1 CFR 2.6); public-domain copy limit.
@@ -220,7 +220,7 @@ export const config = {
     // rules, staff appraisals and immigration penalties. false = only query B.
     significantQuery: false,
     fields: ['title', 'abstract', 'html_url', 'publication_date', 'agencies', 'document_number', 'type'],
-    maxAgeDays: 14,
+    maxAgeDays: 90,
     // FAA airworthiness directives (title contains "Airworthiness Directives") are near-identical aircraft
     // fix orders that flooded the feed (4 in a row on 2026-10-17). At most this many become card candidates
     // per run; the rest are skipped and logged as faa_directive_cap.
@@ -239,7 +239,7 @@ export const config = {
   secTickersUrl: 'https://www.sec.gov/files/company_tickers_exchange.json',
   // Per-company filing list (JSON, data.sec.gov, API host list). {cik} = 10-digit CIK.
   secSubmissionsUrl: 'https://data.sec.gov/submissions/CIK{cik}.json',
-  secLookbackDays: 10,                        // per-company 8-Ks filed within this many days
+  secLookbackDays: 90,                        // per-company 8-Ks filed within this many days
   // Earnings press release. An Item 2.02 8-K is usually a cover page; the figures sit in the EX-99.1
   // exhibit (a page on www.sec.gov, so the page host list already allows it). For a filing with one of
   // these items the exhibit is fetched through the same limiter and cache and its text goes to the AI
@@ -321,12 +321,12 @@ export const config = {
   // the CPSC policy page could not be read). AI text = Title + Description + Hazards + Remedies.
   cpsc: {
     url: 'https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallDateStart={start}',
-    lookbackDays: 14,
+    lookbackDays: 180,
     rewriteLookbackDays: 120,                   // --rewrite looks this far back to find an old recall again
     // Recalls can flood the feed (PM review 2): at most this many NEW recalls are processed per run.
     // Recalls an earlier run already handled do not count, so each run moves on to the next
     // unprocessed recall inside the lookback window (newest first).
-    maxPerRun: 5,
+    maxPerRun: 100,
     category: 'safety',
     eventType: 'recall',
     sourceName: 'U.S. Consumer Product Safety Commission',
@@ -342,7 +342,7 @@ export const config = {
     // correct and stays; releases are infrequent, so the age window is 14 days (was 7) and the run also
     // reads `feedPages - 1` older pages of the same feed (WordPress `?paged=N`, same allowlisted host).
     // An older page that fails is logged and skipped.
-    maxAgeDays: 14,
+    maxAgeDays: 90,
     feedPages: 1,                               // live 2026-10-17: ?paged=2 answered HTTP 403, so only page 1 is read
     category: 'science',
     eventType: 'science',
