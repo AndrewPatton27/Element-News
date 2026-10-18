@@ -3,7 +3,7 @@
 // Paging looks at the list the reader can SEE (hidden topics and sources removed): a page
 // that filters down to nothing keeps fetching, a bounded number of times (lib/feedLogic).
 
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { Api } from './api.ts';
 import type { AccountApi } from './account.ts';
 import { rerankQueue, shouldFetchAhead } from './queueLogic.ts';
@@ -12,6 +12,7 @@ import { readLocal } from './localPrefs.ts';
 import { defaultStore } from './storage.ts';
 import { readSeen } from './forYouGate.ts';
 import { mergePool, rankForYou } from './forYouRank.ts';
+import { assignFirstCards } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
   feedKey,
@@ -33,6 +34,29 @@ export interface UseFeed {
 }
 
 const SHOW_ALL: CardFilter = (cards) => cards;
+
+/** Cache first-page alternatives for stable, distinct tab heads. */
+export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: string | null, category: FeedQuery['category'], filter: CardFilter, focused: boolean) {
+  const [heads, setHeads] = useState<Record<string, { latest: string | null; top: string | null; for_you: string | null }>>({});
+  const key = `${category ?? 'all'}|${userId ?? ''}`;
+  useEffect(() => {
+    if (!focused || heads[key]) return;
+    let alive = true;
+    void Promise.all([
+      api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
+      api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
+      userId && account ? account.feedForYou(null, 10) : Promise.resolve(null),
+    ]).then(([top, latest, personal]) => {
+      const store = defaultStore();
+      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null);
+      if (category) fy = fy.filter((c) => c.category === category);
+      const orders = assignFirstCards(filter(latest.items), filter(top.items), filter(fy));
+      if (alive) setHeads((old) => old[key] ? old : { ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } });
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [api, account, userId, category, filter, focused, key, heads]);
+  return heads[key] ?? null;
+}
 
 // `filter` removes what the reader hid (its identity may change on every render).
 // `rankPage`: signed out, For you is the public Trending feed re-ordered page by page on this
@@ -112,6 +136,9 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
   );
 
   useEffect(() => {
+    // A prior request for this key may still be settling after a quick tab round-trip.
+    // Give the newly selected tab its own request instead of letting stale work suppress it.
+    busy.current = null;
     dispatch({ type: 'reset', key });
     void load(key, null);
   }, [key, load]);

@@ -22,3 +22,15 @@ test('empty and single-card inputs retain available cards (single card may share
   const a=card({id:'a'}), o=assignFirstCards([a],[a],[a]);
   assert.deepEqual([o.latest[0].id,o.trending[0].id,o.forYou[0].id], ['a','a','a']);
 });
+
+test('dirty local reactions and seen stories never reorder or remove Latest; explicit hides still apply', () => {
+  const newest = card({ id: 'newest', published_at: '2026-10-18T10:00:00Z', sources: [{ name: 'Reuters', url: 'https://example.com/a' }] });
+  const older = card({ id: 'older', published_at: '2026-10-17T10:00:00Z', sources: [{ name: 'Reuters', url: 'https://example.com/b' }] });
+  // Model a heavily used browser: many dislikes, every id marked seen, and a completed cursor.
+  const dirtyPrefs = { reactions: Object.fromEntries(Array.from({ length: 80 }, (_, i) => [`id${i}`, { r: 'dislike' }])), seen: new Set(['newest', 'older']), cursor: null };
+  assert.equal(Object.keys(dirtyPrefs.reactions).length, 80);
+  const latest = [newest, older].filter((c) => !['hidden-topic'].includes(c.category) && !['hidden-source'].includes(c.sources[0]?.name ?? ''));
+  assert.deepEqual(latest.map((c) => c.id), ['newest', 'older']);
+  const allHidden = latest.filter((c) => !['Reuters'].includes(c.sources[0]?.name ?? ''));
+  assert.deepEqual(allHidden, [], 'explicit source hides can empty Latest and must be surfaced by the screen');
+});
