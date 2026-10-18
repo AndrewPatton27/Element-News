@@ -28,7 +28,7 @@ export function UndoToast({ message, onUndo, onDone }: { message: string | null;
 }
 
 const styles = StyleSheet.create({
-  dock: { position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center', paddingHorizontal: 16 },
+  dock: { position: 'absolute', left: 0, right: 0, top: 104, zIndex: 30, alignItems: 'center', paddingHorizontal: 16 },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',

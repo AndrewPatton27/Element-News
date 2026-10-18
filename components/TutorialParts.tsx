@@ -5,6 +5,7 @@
 // are hidden from screen readers (the legend under each panel says it).
 
 import { useState, type ReactNode } from 'react';
+import { tip } from '../lib/tooltip';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Palette } from '../lib/theme';
 import { fonts } from '../lib/theme';
@@ -78,6 +79,8 @@ export function PracticeCard(props: {
   const { p, web, reaction } = props;
   const liked = reaction === 'like';
   const disliked = reaction === 'dislike';
+  // Practice only: the Follow button toggles its look and saves nothing.
+  const [followed, setFollowed] = useState(false);
   return (
     <Animated.View
       style={[
@@ -168,6 +171,9 @@ export function PracticeCard(props: {
               </IconButton>
             </>
           ) : null}
+          <IconButton p={p} label="Practice follow. On real cards this follows the story." active={followed} activeBg={p.accentSoft} onPress={() => setFollowed((v) => !v)}>
+            <PulseIcon color={followed ? p.accent : p.ink} size={22} />
+          </IconButton>
           <IconButton p={p} label="Practice share. On real cards this opens Share." onPress={props.onShare}>
             <ShareIcon color={p.ink} size={22} />
           </IconButton>
@@ -184,6 +190,7 @@ function IconButton(props: { p: Palette; label: string; active?: boolean; active
       onPress={props.onPress}
       accessibilityRole="button"
       accessibilityLabel={props.label}
+      {...tip(props.label.split('.')[0])}
       accessibilityState={active === undefined ? undefined : { selected: active }}
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         styles.iconBox,
