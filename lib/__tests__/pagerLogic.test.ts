@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextRevealCount, scrollToIndexFallbackOffset } from '../pagerLogic.ts';
+import { nextRevealCount, scrollToIndexFallbackOffset, shouldHandleFeedKey } from '../pagerLogic.ts';
 
 const info = (index: number, averageItemLength = 0) => ({ index, highestMeasuredFrameIndex: 0, averageItemLength });
 
@@ -31,4 +31,14 @@ test('never returns a negative offset and floors fractional indexes', () => {
   assert.equal(scrollToIndexFallbackOffset(info(-2), 800), 0);
   assert.equal(scrollToIndexFallbackOffset(info(2.9), 800), 1600);
   assert.equal(scrollToIndexFallbackOffset(info(Number.NaN), 800), 0);
+});
+
+test('feed shortcuts require active feed and ignore editable controls', () => {
+  for (const key of ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'j', 'k']) {
+    assert.equal(shouldHandleFeedKey({ active: true, key }), true);
+    assert.equal(shouldHandleFeedKey({ active: false, key }), false);
+    for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) assert.equal(shouldHandleFeedKey({ active: true, key, tagName }), false);
+    assert.equal(shouldHandleFeedKey({ active: true, key, contentEditable: true }), false);
+  }
+  assert.equal(shouldHandleFeedKey({ active: true, key: 'Escape' }), false);
 });

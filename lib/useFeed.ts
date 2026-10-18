@@ -8,6 +8,10 @@ import type { Api } from './api.ts';
 import type { AccountApi } from './account.ts';
 import { rerankQueue, shouldFetchAhead } from './queueLogic.ts';
 import type { LocalPrefs } from './localPrefs.ts';
+import { readLocal } from './localPrefs.ts';
+import { defaultStore } from './storage.ts';
+import { readSeen } from './forYouGate.ts';
+import { mergePool, rankForYou, sortLatest } from './forYouRank.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
   feedKey,
@@ -64,11 +68,22 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
           filter: (cards) => filterRef.current(cards),
           fetchPage: async (c) => {
             if (query.mode === 'for_you' && query.user && account) return account.feedForYou(c, 10);
-            // Signed out: the same public call Trending makes; ranking happens here on the device.
-            const mode = query.mode === 'for_you' ? 'top' : query.mode;
-            const page = await api.feed({ mode, category: query.category, cursor: c, limit: 10 });
-            const rank = rankRef.current;
-            return query.mode === 'for_you' && rank ? { ...page, items: rank(page.items) } : page;
+            if (query.mode === 'for_you') {
+              // Signed out: candidates are the Trending page plus the Latest page, ranked on this
+              // device (lib/forYouRank.ts). The cursor holds both modes' cursors.
+              const cur = c ? (JSON.parse(c) as { t: string | null; l: string | null }) : { t: null, l: null };
+              const [top, latest] = await Promise.all([
+                c && cur.t === null ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: cur.t, limit: 10 }),
+                c && cur.l === null ? Promise.resolve(null) : api.feed({ mode: 'latest', category: null, cursor: cur.l, limit: 10 }),
+              ]);
+              const store = defaultStore();
+              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : top?.items[0]?.id ?? null);
+              const t = top ? top.next_cursor : null, l = latest ? latest.next_cursor : null;
+              return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
+            }
+            const page = await api.feed({ mode: query.mode, category: query.category, cursor: c, limit: 10 });
+            // Latest is newest first by published_at within each page (the server cursor orders by sort_at).
+            return query.mode === 'latest' ? { ...page, items: sortLatest(page.items) } : page;
           },
           onRequest: () => dispatch({ type: 'request', key: k }),
           onPage: (page) => dispatch({ type: 'page', key: k, page }),

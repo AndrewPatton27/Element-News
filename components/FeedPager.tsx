@@ -29,7 +29,7 @@ import {
 import type { AppConfig, BlurbCard, Category } from '../contract/types.ts';
 import { usePalette } from '../lib/useTheme';
 import { fonts, radius } from '../lib/theme';
-import { nextRevealCount, scrollToIndexFallbackOffset } from '../lib/pagerLogic';
+import { nextRevealCount, scrollToIndexFallbackOffset, shouldHandleFeedKey } from '../lib/pagerLogic';
 import {
   MAX_TILT_DEG,
   SWIPE_COACH_KEY,
@@ -347,12 +347,12 @@ export function FeedPager({
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined' || active === false) return;
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'ArrowDown') {
+      const target = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || target?.closest?.('[contenteditable], [role="dialog"], [aria-modal="true"]') || !shouldHandleFeedKey({ active: true, key: e.key, tagName: target?.tagName, contentEditable: target?.isContentEditable })) return;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'j') {
         e.preventDefault();
         goTo(indexRef.current + 1);
-      } else if (e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'k') {
         e.preventDefault();
         goTo(indexRef.current - 1);
       } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && canReact) {
