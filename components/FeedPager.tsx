@@ -410,6 +410,8 @@ export function FeedPager({
       {height > 0 ? (
         <FlatList
           ref={list}
+          // Smooth, eased paging between cards on the web (arrow keys, buttons and swipes).
+          style={Platform.OS === 'web' ? ({ scrollBehavior: 'smooth' } as object) : undefined}
           data={items.slice(0, revealed)}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           keyExtractor={(c) => c.id}

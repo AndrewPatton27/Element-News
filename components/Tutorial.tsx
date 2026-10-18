@@ -46,7 +46,7 @@ import { PRACTICE_FOOTER, TUTORIAL_FOOTNOTE, TUTORIAL_MOTION, getTutorialSteps }
 import { usePalette, useWide } from '../lib/useTheme';
 import { ChevronRightIcon, ChevronLeftIcon, ChevronUpIcon } from './Icons';
 import { useKeyframeLoop, useLinearLoop, useReducedMotion } from './TutorialMotion';
-import { BriefFollowingPanel, FeedTopPanel, Legend, Recap } from './TutorialParts';
+import { BriefFollowingPanel, FeedTopPanel, Legend, Recap, StepTransition } from './TutorialParts';
 import { PracticeArea } from './TutorialPractice';
 
 export type TutorialExit = 'skip' | 'done' | 'signup';
@@ -62,6 +62,11 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
   const s = steps[step];
   const last = isLastStep(step, count);
   const reduced = useReducedMotion();
+  const prevStep = useRef(0);
+  const dir: 1 | -1 = step >= prevStep.current ? 1 : -1;
+  useEffect(() => {
+    prevStep.current = step;
+  }, [step]);
 
   const go = useCallback((to: number) => setStep(to), []);
   const next = useCallback(() => go(nextStep(stepRef.current, count)), [go, count]);
@@ -213,7 +218,7 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
             updateFits();
           }}
         >
-          <View style={styles.progressRow}>
+          <StepTransition stepKey={step} dir={dir} reduced={reduced}>          <View style={styles.progressRow}>
             <Text accessibilityLiveRegion="polite" style={[styles.progress, web && { fontSize: 14 }, { color: p.accentInk }]}>
               {progress}
             </Text>
@@ -334,6 +339,7 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
           <Text style={[styles.footer, { color: p.muted }]}>
             {last ? DISCLAIMER_FALLBACK : `${PRACTICE_FOOTER} · ${DISCLAIMER_FALLBACK}`}
           </Text>
+          </StepTransition>
         </ScrollView>
       </SafeAreaView>
     </View>
