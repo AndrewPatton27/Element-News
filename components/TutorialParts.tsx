@@ -4,9 +4,9 @@
 // only reach the practice handlers, which save nothing. Other decorative pieces
 // are hidden from screen readers (the legend under each panel says it).
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { tip } from '../lib/tooltip';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, Easing } from 'react-native';
 import type { Palette } from '../lib/theme';
 import { fonts } from '../lib/theme';
 import type { PracticeReaction } from '../lib/tutorialLogic';
@@ -497,3 +497,20 @@ const styles = StyleSheet.create({
   recapText: { flex: 1, fontFamily: fonts.sans, fontSize: 15, lineHeight: 20 },
   recapTextWeb: { flex: 1, fontFamily: fonts.sans, fontSize: 17, lineHeight: 23 },
 });
+
+
+// Slide and fade between tutorial steps: the new step eases in from the side it was reached from
+// (next from the right, back from the left). With reduced motion the step simply appears.
+export function StepTransition({ stepKey, dir, reduced, children }: { stepKey: number; dir: 1 | -1; reduced: boolean; children: ReactNode }) {
+  const v = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) {
+      v.setValue(1);
+      return;
+    }
+    v.setValue(0);
+    Animated.timing(v, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [stepKey, reduced, v]);
+  const translateX = v.interpolate({ inputRange: [0, 1], outputRange: [dir * 28, 0] });
+  return <Animated.View style={{ opacity: v, transform: [{ translateX }] }}>{children}</Animated.View>;
+}
