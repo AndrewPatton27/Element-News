@@ -22,7 +22,6 @@ import { ExternalIcon, InfoIcon, NumbersIcon, PulseIcon, ShareIcon, SparkleIcon,
 import type { Feedback } from '../lib/accountLogic';
 import { Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
-import { FollowPill } from './FollowPill';
 import { useFollowedStories } from '../lib/useFollowedStories';
 import { footerLabels, linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
 import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } from '../lib/swipeLogic';
@@ -270,7 +269,6 @@ export function Card(props: Props) {
           <View style={styles.metaRight}>
             {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
             <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories)}</Text>
-            {onToggleTopicFollow ? <FollowPill topic={categoryName(card.category, categories)} followed={!!followedTopic} onPress={() => onToggleTopicFollow(card)} /> : null}
             {onMore ? (
               <Pressable onPress={() => onMore(card)} accessibilityRole="button" accessibilityLabel="More options for this card" style={styles.moreBtn}>
                 <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>
