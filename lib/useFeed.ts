@@ -12,7 +12,7 @@ import { readLocal } from './localPrefs.ts';
 import { defaultStore } from './storage.ts';
 import { readSeen } from './forYouGate.ts';
 import { mergePool, rankForYou } from './forYouRank.ts';
-import { assignFirstCards } from './feedOrder.ts';
+import { assignFirstCards, dedupeCards, sortLatest, trendingOrder } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from './errors.ts';
 import {
   feedKey,
@@ -54,7 +54,7 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
       const store = defaultStore();
       let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null, new Set(top.items.slice(0, 5).map((x) => x.id)));
       if (category) fy = fy.filter((c) => c.category === category);
-      const orders = assignFirstCards(filter(latest.items), filter(top.items), filter(fy));
+      const orders = assignFirstCards(filter(sortLatest(latest.items)), filter(trendingOrder(top.items)), filter(fy));
       setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
     }).catch(() => undefined);
   }, [api, account, userId, category, filter, focused, key, refresh, pullKey]);
@@ -109,8 +109,10 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
             const page = await api.feed({ mode: query.mode, category: query.category, cursor: c, limit: 10 });
-            // Keep the API page order intact: sorting only within a page breaks its cursor order.
-            return page;
+            // Re-order only this fetched page (the server's cursor does not depend on item order); pages
+            // already shown are never touched. Latest = published_at desc; Trending = lib/feedOrder.ts trendingOrder.
+            const items = query.mode === 'latest' ? sortLatest(dedupeCards(page.items)) : query.mode === 'top' ? trendingOrder(dedupeCards(page.items)) : page.items;
+            return { ...page, items };
           },
           onRequest: () => dispatch({ type: 'request', key: k }),
           onPage: (page) => dispatch({ type: 'page', key: k, page }),

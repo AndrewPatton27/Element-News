@@ -22,13 +22,8 @@ export function mergePool(trending: BlurbCard[], latest: BlurbCard[]): BlurbCard
   return [...trending, ...latest].filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
 }
 
-/** The time a card shows in the feed (lib/format.ts cardTime): as_of, or published_at for data cards. */
-const shownTime = (c: BlurbCard): number => Date.parse((c.kind === 'data' ? c.published_at : c.as_of) || c.published_at);
-
-/** Newest first by the time the card shows; ties by id. */
-export function sortLatest(cards: BlurbCard[]): BlurbCard[] {
-  return [...cards].sort((a, b) => shownTime(b) - shownTime(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-}
+// Latest helpers live in lib/feedOrder.ts; re-exported so older imports keep working.
+export { shownTime, sortLatest } from './feedOrder.ts';
 
 /** Keeps For you from opening as a copy of Trending: in the first `window` slots at most
  *  `maxShared` cards may come from Trending's top stories; the rest move down, in order. */

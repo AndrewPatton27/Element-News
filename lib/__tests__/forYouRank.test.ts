@@ -15,8 +15,8 @@ test('Latest is newest first by published_at (the Truist case)', () => {
   const truist = card('truist', 'earnings', '2026-10-18T14:51:00Z', '2026-10-18T14:51:00Z');
   const out = sortLatest([...faa, truist]);
   assert.equal(out[0].id, 'truist');
-  // ties: sort_at then id
-  assert.deepEqual(out.slice(1).map((c) => c.id), ['a1', 'a2', 'a3', 'a4']);
+  // ties: id DESC (deliberately changed from ascending: same tie-break as the SQL and Latest everywhere)
+  assert.deepEqual(out.slice(1).map((c) => c.id), ['a4', 'a3', 'a2', 'a1']);
 });
 
 test('mergePool dedupes', () => {
