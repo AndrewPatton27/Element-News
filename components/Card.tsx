@@ -7,7 +7,7 @@
 // own layout from the Feed-LinkOut draft. Swiping to react lives in FeedPager.
 
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, Share, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { router } from 'expo-router';
 import type { AppConfig, BlurbCard, Category } from '../contract/types.ts';
 import { cardTime, categoryName, clampHeadline, eventLabel } from '../lib/format';
@@ -24,6 +24,7 @@ import { Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
 import { useFollowedStories } from '../lib/useFollowedStories';
 import { footerLabels, linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
+import { shareStory } from '../lib/useCardActions';
 import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } from '../lib/swipeLogic';
 
 interface Props {
@@ -50,37 +51,7 @@ const LINK_OUT_BADGE = { bg: '#E9ECF3', fg: '#2D3A5C' };
 
 // Share the card's /b/<id> page: the Web Share sheet where the browser has one, else
 // copy the link. Returns the toast text, or null when the system sheet handled it.
-async function shareCard(card: BlurbCard): Promise<string | null> {
-  const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : null;
-  const url = shareUrl(card.share_path, origin);
-  if (!url) return 'No link to share for this card.';
-  if (Platform.OS !== 'web') {
-    try {
-      await Share.share({ message: url, url, title: card.headline });
-      return null;
-    } catch {
-      return 'Could not open sharing.';
-    }
-  }
-  const nav = (globalThis as { navigator?: Navigator }).navigator;
-  if (nav && typeof nav.share === 'function') {
-    try {
-      await nav.share({ title: card.headline, url });
-      return null;
-    } catch (e) {
-      if ((e as { name?: string } | null)?.name === 'AbortError') return null; // the reader closed the sheet
-    }
-  }
-  if (nav?.clipboard && typeof nav.clipboard.writeText === 'function') {
-    try {
-      await nav.clipboard.writeText(url);
-      return 'Link copied';
-    } catch {
-      // blocked: fall through
-    }
-  }
-  return 'Could not copy the link.';
-}
+const shareCard = shareStory;
 
 function badgeFor(card: BlurbCard, p: Palette): { text: string; bg: string; fg: string; Icon: BadgeIcon | null } {
   if (card.kind === 'data') return { text: 'New data', bg: p.dataSoft, fg: p.dataInk, Icon: NumbersIcon };
