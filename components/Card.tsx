@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   stack: { height: 10, marginHorizontal: 28, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   below: { paddingTop: 6, paddingHorizontal: 4 },
   meta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-  metaRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  metaRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' },
   moreBtn: { minWidth: 44, minHeight: 44, marginVertical: -8, marginHorizontal: -6, alignItems: 'center', justifyContent: 'center' },
   moreDots: { fontSize: 20, lineHeight: 22 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 10, borderRadius: 14 },
