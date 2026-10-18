@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { tip } from '../lib/tooltip';
 import type { BlurbCard } from '../contract/types.ts';
 import { useCardActions } from '../lib/useCardActions';
 import { usePalette } from '../lib/useTheme';
@@ -9,7 +10,7 @@ export function CardActionRow({ card, compact = false }: { card: BlurbCard; comp
   const a = useCardActions(card);
   const on = (kind: 'like' | 'dislike') => a.reaction === kind;
   const button = (label: string, active: boolean, Icon: typeof ThumbUpIcon, press: () => void) => (
-    <Pressable key={label} onPress={press} accessibilityRole="button" accessibilityLabel={label}
+    <Pressable key={label} onPress={press} accessibilityRole="button" accessibilityLabel={label} {...tip(label)}
       accessibilityState={{ selected: active }} aria-pressed={active}
       style={({ pressed }) => [styles.button, compact && styles.compact, { backgroundColor: active ? p.accentSoft : 'transparent', opacity: pressed ? 0.7 : 1 }]}>
       <Icon color={active ? p.accent : p.ink} size={20} />

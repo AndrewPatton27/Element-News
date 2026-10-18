@@ -351,10 +351,10 @@ export function FeedPager({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || target?.closest?.('[contenteditable], [role="dialog"], [aria-modal="true"]') || !shouldHandleFeedKey({ active: true, key: e.key, tagName: target?.tagName, contentEditable: target?.isContentEditable })) return;
-      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'j') {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
         goTo(indexRef.current + 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'k') {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         goTo(indexRef.current - 1);
       } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && canReact) {

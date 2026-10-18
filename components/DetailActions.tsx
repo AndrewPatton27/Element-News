@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { tip } from '../lib/tooltip';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BlurbCard } from '../contract/types.ts';
@@ -13,7 +14,7 @@ export function DetailActions({ card }: { card: BlurbCard }) {
   const insets = useSafeAreaInsets();
   const a = useCardActions(card);
   const button = (label: string, active: boolean, icon: ReactNode, onPress: () => void) => (
-    <Pressable key={label} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
+    <Pressable key={label} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} {...tip(label)}
       accessibilityState={{ selected: active }} aria-pressed={active}
       style={({ pressed }) => [styles.button, { backgroundColor: active ? p.accentSoft : p.surfaceMuted, opacity: pressed ? 0.72 : 1 }]}>
       {icon}<Text numberOfLines={1} style={[styles.label, { color: active ? p.accentInk : p.ink }]}>{label === 'Follow this story' && active ? 'Following' : label.replace(' this story', '')}</Text>

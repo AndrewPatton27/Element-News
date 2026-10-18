@@ -34,11 +34,15 @@ test('never returns a negative offset and floors fractional indexes', () => {
 });
 
 test('feed shortcuts require active feed and ignore editable controls', () => {
-  for (const key of ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'j', 'k']) {
+  for (const key of ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight']) {
     assert.equal(shouldHandleFeedKey({ active: true, key }), true);
     assert.equal(shouldHandleFeedKey({ active: false, key }), false);
     for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) assert.equal(shouldHandleFeedKey({ active: true, key, tagName }), false);
     assert.equal(shouldHandleFeedKey({ active: true, key, contentEditable: true }), false);
   }
   assert.equal(shouldHandleFeedKey({ active: true, key: 'Escape' }), false);
+});
+
+test('j, k, PageUp and PageDown no longer move the feed (arrow keys only)', () => {
+  for (const key of ['j', 'k', 'PageUp', 'PageDown']) assert.equal(shouldHandleFeedKey({ active: true, key }), false);
 });

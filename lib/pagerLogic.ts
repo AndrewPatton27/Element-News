@@ -24,7 +24,7 @@ export function nextRevealCount(position: number, revealed: number, total: numbe
 }
 
 export function shouldHandleFeedKey(input: { active: boolean; key: string; tagName?: string | null; contentEditable?: boolean }): boolean {
-  if (!input.active || !['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'PageDown', 'PageUp', 'j', 'k'].includes(input.key)) return false;
+  if (!input.active || !['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(input.key)) return false;
   if (input.contentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes((input.tagName ?? '').toUpperCase())) return false;
   return true;
 }

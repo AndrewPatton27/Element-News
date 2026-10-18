@@ -25,6 +25,7 @@ import { SourceRow } from './SourceChip';
 import { useFollowedStories } from '../lib/useFollowedStories';
 import { footerLabels, linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
 import { shareStory } from '../lib/useCardActions';
+import { tip } from '../lib/tooltip';
 import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } from '../lib/swipeLogic';
 
 interface Props {
@@ -202,6 +203,7 @@ export function Card(props: Props) {
             onPress={onToggleStory}
             accessibilityRole="button"
             accessibilityLabel={storyFollowed ? 'Following this story, double tap to stop' : 'Follow this story'}
+            {...tip(storyFollowed ? 'Following this story (click to stop)' : 'Follow this story')}
             accessibilityState={{ selected: storyFollowed }}
             aria-pressed={storyFollowed}
             style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
@@ -213,6 +215,7 @@ export function Card(props: Props) {
               onPress={onShare}
               accessibilityRole="button"
               accessibilityLabel="Share"
+              {...tip('Share this story')}
               style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
             >
               <ShareIcon color={p.ink} size={22} />
@@ -398,6 +401,7 @@ function ReactButton({ kind, on, onPress }: { kind: Feedback; on: boolean; onPre
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={like ? 'More like this' : 'Less like this'}
+      {...tip(like ? 'Like this story' : 'Dislike this story')}
       aria-pressed={on}
       style={({ pressed }) => [
         styles.react,
