@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard, Category } from '../contract/types.ts';
 import type { FeedState } from '../lib/feedLogic';
+import type { Feedback } from '../lib/accountLogic';
 import { usePalette } from '../lib/useTheme';
 import { fonts } from '../lib/theme';
 import { SearchResultCard } from './SearchResultCard';
@@ -19,6 +20,8 @@ export interface SearchResultsProps {
   categories: Category[];
   columns?: 1 | 2;
   reasonFor?: (card: BlurbCard) => string | null;
+  reactions?: Record<string, Feedback>;
+  onReact?: (card: BlurbCard, pressed: Feedback) => void;
   onOpen: (card: BlurbCard) => void;
   onShowSources: (card: BlurbCard) => void;
   onLoadMore: () => void;

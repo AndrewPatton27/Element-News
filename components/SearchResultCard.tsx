@@ -16,6 +16,7 @@ import { PulseIcon } from './Icons';
 import { ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
 import { footerLabels } from './cardFooter';
+import { CardActionRow } from './CardActionRow';
 
 export interface SearchResultCardProps {
   card: BlurbCard;
@@ -84,6 +85,8 @@ export function SearchResultCard({ card, config, categories, reason, onOpen, onS
           <Text style={[styles.moreText, wide && styles.moreTextWide, { color: p.accent }]}>More detail ›</Text>
         </Pressable>
       </View>
+
+      <CardActionRow card={card} compact />
 
       <View style={styles.small}>
         {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}

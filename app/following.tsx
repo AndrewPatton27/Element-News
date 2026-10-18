@@ -48,7 +48,7 @@ export default function FollowingScreen() {
   const { rows, loading: storiesLoading } = useStoryRows(api, followedStories.stories);
   const [undo, setUndo] = useState<BlurbCard | null>(null);
   const hdr = storiesHeader(rows.filter((r) => r.updates.length > 0).length, rows.length);
-  const countLine = rows.length ? [hdr.left, hdr.right].filter(Boolean).join(' · ') : undefined;
+  const countLine = rows.length ? [hdr.left, hdr.right].filter(Boolean).join(' Â· ') : undefined;
 
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
@@ -164,7 +164,7 @@ export default function FollowingScreen() {
 
       {!signedIn && following ? (
         <Pressable onPress={() => go('/signin')} accessibilityRole="link" style={styles.signIn}>
-          <Text style={[styles.signInText, { color: p.accentInk }]}>Saved on this device. Sign in to keep your topics on every device →</Text>
+          <Text style={[styles.signInText, { color: p.accentInk }]}>Saved on this device. Sign in to keep your topics on every device â†’</Text>
         </Pressable>
       ) : null}
 
@@ -173,9 +173,7 @@ export default function FollowingScreen() {
         state={state}
         config={config}
         categories={categories}
-        reactions={signedIn ? acct.reactions : Object.fromEntries(Object.entries(acct.localPrefs.reactions).map(([id, r]) => [id, r.r]))}
         reasonFor={(c) => followReasonText(c, categories)}
-        onReact={acct.react}
         onOpen={setDetailCard}
         onSources={setSheetCard}
         onMore={loadMore}
@@ -183,7 +181,7 @@ export default function FollowingScreen() {
         empty={empty}
       />
 
-      <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} · {disclaimerText(config)}</Text>
+      <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} Â· {disclaimerText(config)}</Text>
 
       <UndoToast
         message={undo ? 'Stopped following this story' : null}

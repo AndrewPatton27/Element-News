@@ -11,6 +11,7 @@ import { clearStoryUpdatesCache, loadStoryUpdates, sortStories, storyBadge, upda
 import { usePalette, useWide } from '../lib/useTheme';
 import { fonts } from '../lib/theme';
 import { PulseIcon } from './Icons';
+import { CardActionRow } from './CardActionRow';
 
 const updateListeners = new Set<() => void>();
 
@@ -111,6 +112,7 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                 <Text style={[styles.openText, wide && { fontSize: 15 }, { color: p.accent }]}>Following</Text>
               </Pressable>
             </View>
+            <CardActionRow card={latest} />
           </View>
         );
       })}
