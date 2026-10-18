@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { router } from 'expo-router';
 import type { AppConfig, BlurbCard, Category } from '../contract/types.ts';
-import { cardTime, categoryName, clampHeadline, eventLabel } from '../lib/format';
+import { addedLabel, cardTime, categoryName, clampHeadline, eventLabel } from '../lib/format';
 import { cardLabels, disclaimerText, primarySource, shareAlikeCredit } from '../lib/labels';
 import { OPEN_DETAIL_HINT, cardDetail } from '../lib/detail';
 import { openUrl } from '../lib/openUrl';
@@ -29,6 +29,7 @@ import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } f
 
 interface Props {
   card: BlurbCard;
+  timeLabel?: 'added'; // Latest tab: show "Added X ago" (published_at) instead of the event time
   config: AppConfig | null;
   categories: Category[];
   onShowSources: (card: BlurbCard) => void;
@@ -81,19 +82,19 @@ function factsFor(card: BlurbCard): { label: string; value: string }[] {
 }
 
 // "World Â· 2 h ago", or "Recalls & Safety Â· Recall Â· 2 h ago" when the event adds something.
-function metaLine(card: BlurbCard, categories: Category[]): string {
+function metaLine(card: BlurbCard, categories: Category[], timeLabel?: 'added'): string {
   const category = categoryName(card.category, categories);
   if (card.kind === 'link_out') return [category, linkOutDelay(card.freshness?.delayed_hours)].filter(Boolean).join(' · ');
   const event = eventLabel(card.event_type);
   const parts = [category];
   if (event && !category.toLowerCase().includes(event.toLowerCase())) parts.push(event);
   // Same label the detail sheet shows (lib/format cardTime), so the two never disagree.
-  parts.push(cardTime(card));
+  parts.push(timeLabel === 'added' ? addedLabel(card) || cardTime(card) : cardTime(card));
   return parts.join(' · ');
 }
 
 export function Card(props: Props) {
-  const { card, config, categories, onShowSources, onOpenDetail, onNext, wide, compact, peek, reaction, onReact, onMore, followedTopic, onToggleTopicFollow } = props;
+  const { card, timeLabel, config, categories, onShowSources, onOpenDetail, onNext, wide, compact, peek, reaction, onReact, onMore, followedTopic, onToggleTopicFollow } = props;
   const p = usePalette();
   const pressStart = useRef<{ point: PointerPoint | null; at: number } | null>(null);
   const recordPressStart = (x?: number, y?: number) => {
@@ -244,7 +245,7 @@ export function Card(props: Props) {
           )}
           <View style={styles.metaRight}>
             {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
-            <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories)}</Text>
+            <Text style={[styles.metaText, wide && { fontSize: 14 }, { color: p.muted }]}>{metaLine(card, categories, timeLabel)}</Text>
             {onMore ? (
               <Pressable onPress={() => onMore(card)} accessibilityRole="button" accessibilityLabel="More options for this card" style={styles.moreBtn}>
                 <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>

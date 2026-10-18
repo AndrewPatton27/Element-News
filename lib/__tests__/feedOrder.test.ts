@@ -76,3 +76,11 @@ test('overlap@10 of trending vs latest on the sample fixtures is reported and <=
   assert.ok(overlap <= 7, `overlap ${overlap}`);
   assert.notEqual(top[0], latest[0]);
 });
+
+test('addedLabel shows when the card was added (published_at), not the event time', async () => {
+  const { addedLabel } = await import('../format.ts');
+  const now = new Date('2026-10-18T12:00:00Z');
+  assert.equal(addedLabel({ published_at: '2026-10-18T07:00:00Z' }, now), 'Added 5 h ago');
+  assert.equal(addedLabel({ published_at: '2026-10-18T11:59:30Z' }, now), 'Added just now');
+  assert.equal(addedLabel({ published_at: 'bad' }, now), '');
+});

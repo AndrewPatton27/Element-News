@@ -54,6 +54,7 @@ import { shouldUseCompactCard } from '../lib/cardFit';
 
 interface Props {
   items: BlurbCard[];
+  timeLabel?: 'added';
   config: AppConfig | null;
   categories: Category[];
   loadingMore: boolean;
@@ -212,6 +213,7 @@ export function FeedPager({
   onMore,
   followedTopics,
   onToggleTopicFollow,
+  timeLabel,
 }: Props) {
   const p = usePalette();
   const { height: windowHeight } = useWindowDimensions();
@@ -379,6 +381,7 @@ export function FeedPager({
               <SwipeCard enabled={swipeOn} reduced={reduced} width={width} onSwipe={(r) => swiped(item, r)}>
                 <Card
                   card={item}
+                  timeLabel={timeLabel}
                   config={config}
                   categories={categories}
                   onShowSources={onShowSources}
@@ -399,7 +402,7 @@ export function FeedPager({
         </View>
       );
     },
-    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, items.length, done, reactions, react, swipeOn, reduced, swiped],
+    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, items.length, done, reactions, react, swipeOn, reduced, swiped, timeLabel],
   );
 
   return (

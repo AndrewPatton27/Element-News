@@ -276,6 +276,7 @@ export default function FeedScreen() {
     body = (
       <FeedPager
         items={pagerItems}
+        timeLabel={mode === 'latest' ? 'added' : undefined}
         config={config}
         categories={categories}
         loadingMore={state.loading}

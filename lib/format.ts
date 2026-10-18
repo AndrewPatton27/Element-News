@@ -30,6 +30,12 @@ export function cardTime(card: Pick<BlurbCard, 'kind' | 'published_at' | 'as_of'
   return relativeTime(card.kind === 'data' ? card.published_at : card.as_of, now);
 }
 
+// Latest tab only: when we added the card ("Added 5 h ago"), from published_at. Empty if the time is unreadable.
+export function addedLabel(card: Pick<BlurbCard, 'published_at'>, now: Date = new Date()): string {
+  const t = relativeTime(card.published_at, now);
+  return t ? `Added ${t}` : '';
+}
+
 export function clampText(text: string, max: number): string {
   if (text.length <= max) return text;
   return text.slice(0, max - 1).trimEnd() + '…';
