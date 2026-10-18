@@ -25,7 +25,7 @@ import { defaultStore } from '../lib/storage';
 import { FOR_YOU_SEEN_MS, forYouProgress, readSeen, recordSeen } from '../lib/forYouGate';
 import { ForYouWarmup } from '../components/ForYouWarmup';
 import { useFeed, useFeedHeads } from '../lib/useFeed';
-import { promoteHead } from '../lib/feedOrder';
+import { latestOrder, promoteHead } from '../lib/feedOrder';
 import { usePalette, useWide } from '../lib/useTheme';
 import { MOBILE_HEADER_HEIGHT, fonts } from '../lib/theme';
 import { CategoryChips, CategoryList } from '../components/CategoryChips';
@@ -103,7 +103,7 @@ export default function FeedScreen() {
     (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
     [hidden, hiddenSources],
   );
-  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused);
+  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused, mode);
   const local = acct.localPrefs;
   // For you stays locked until 10 stories across 4 topics have been read or reacted to.
   const [seenList, setSeenList] = useState(() => readSeen(store));
@@ -136,7 +136,8 @@ export default function FeedScreen() {
   const pagerKey = `${mode}|${category ?? 'all'}`;
   const queuePositions = useRef<Record<string, number>>({});
   const headId = mode === 'latest' ? null : heads?.[mode];
-  const pagerItems = (queuePositions.current[pagerKey] ?? 0) === 0 ? promoteHead(items, headId) : items;
+  const position = queuePositions.current[pagerKey] ?? 0;
+  const pagerItems = mode === 'latest' ? latestOrder(items, position) : position === 0 ? promoteHead(items, headId) : items;
   const followed = acct.viewPrefs?.followed ?? [];
   const followedTopics = (signedIn ? followed : followsState.follows.topics).filter((slug) => followOverrides[slug] ?? true);
   for (const [slug, isFollowed] of Object.entries(followOverrides)) {

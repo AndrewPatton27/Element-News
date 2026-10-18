@@ -31,7 +31,26 @@ export function sortLatest(cards: BlurbCard[]): BlurbCard[] {
   );
 }
 
-export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet<string>, trendingFirstId: string | null): BlurbCard[] {
+/** Keeps For you from opening as a copy of Trending: in the first `window` slots at most
+ *  `maxShared` cards may come from Trending's top stories; the rest move down, in order. */
+export function spreadFromTrending(cards: BlurbCard[], trendingTopIds: ReadonlySet<string>, window = 5, maxShared = 2): BlurbCard[] {
+  if (trendingTopIds.size === 0) return cards;
+  const head: BlurbCard[] = [];
+  const held: BlurbCard[] = [];
+  const rest: BlurbCard[] = [];
+  let shared = 0;
+  for (const c of cards) {
+    if (head.length >= window) { rest.push(c); continue; }
+    if (trendingTopIds.has(c.id)) {
+      if (shared >= maxShared) { held.push(c); continue; }
+      shared += 1;
+    }
+    head.push(c);
+  }
+  return [...head, ...held, ...rest];
+}
+
+export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet<string>, trendingFirstId: string | null, trendingTopIds: ReadonlySet<string> = new Set()): BlurbCard[] {
   const trendPos = new Map(pool.map((c, i) => [c.id, i]));
   const kept = pool.filter((c) => {
     if (prefs.reactions[c.id]?.r === 'dislike') return false;
@@ -50,7 +69,7 @@ export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet
         (trendPos.get(a.c.id) ?? 0) - (trendPos.get(b.c.id) ?? 0),
     )
     .map((x) => x.c);
-  const out = diversifyFeed(sorted);
+  const out = spreadFromTrending(diversifyFeed(sorted), trendingTopIds);
   if (trendingFirstId && out.length > 1 && out[0].id === trendingFirstId) {
     const [first, ...rest] = out;
     return [rest[0], first, ...rest.slice(1)];

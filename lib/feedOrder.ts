@@ -1,4 +1,5 @@
 import type { BlurbCard } from '../contract/types.ts';
+import { sortLatest } from './forYouRank.ts';
 
 export interface FeedOrders { latest: BlurbCard[]; trending: BlurbCard[]; forYou: BlurbCard[] }
 
@@ -23,4 +24,11 @@ export function assignFirstCards(latest: BlurbCard[], trending: BlurbCard[], for
   const heads = new Set([latestId, nextTrend[0]?.id].filter((x): x is string => !!x));
   const nextForYou = promote(f, heads);
   return { latest: l, trending: nextTrend, forYou: nextForYou };
+}
+
+/** Latest = newest published first. Cards the reader has already reached (index <= position)
+ *  stay where they are; everything after them is sorted by published time. */
+export function latestOrder(cards: BlurbCard[], position = 0): BlurbCard[] {
+  const keep = position > 0 ? Math.min(cards.length, position + 1) : 0;
+  return [...cards.slice(0, keep), ...sortLatest(cards.slice(keep))];
 }

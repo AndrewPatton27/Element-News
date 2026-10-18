@@ -35,12 +35,13 @@ export interface UseFeed {
 
 const SHOW_ALL: CardFilter = (cards) => cards;
 
-/** Cache first-page alternatives for stable, distinct tab heads. */
-export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: string | null, category: FeedQuery['category'], filter: CardFilter, focused: boolean) {
+/** First-page heads that keep the three tabs distinct. `refresh` changes on every tab switch,
+ *  so the heads are pulled again each time; the last heads stay in use while the new ones load. */
+export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: string | null, category: FeedQuery['category'], filter: CardFilter, focused: boolean, refresh: string | number = 0) {
   const [heads, setHeads] = useState<Record<string, { latest: string | null; top: string | null; for_you: string | null }>>({});
   const key = `${category ?? 'all'}|${userId ?? ''}`;
   useEffect(() => {
-    if (!focused || heads[key]) return;
+    if (!focused) return;
     let alive = true;
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
@@ -48,13 +49,13 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
       userId && account ? account.feedForYou(null, 10) : Promise.resolve(null),
     ]).then(([top, latest, personal]) => {
       const store = defaultStore();
-      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null);
+      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), top.items[0]?.id ?? null, new Set(top.items.slice(0, 5).map((x) => x.id)));
       if (category) fy = fy.filter((c) => c.category === category);
       const orders = assignFirstCards(filter(latest.items), filter(top.items), filter(fy));
-      if (alive) setHeads((old) => old[key] ? old : { ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } });
+      if (alive) setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
     }).catch(() => undefined);
     return () => { alive = false; };
-  }, [api, account, userId, category, filter, focused, key, heads]);
+  }, [api, account, userId, category, filter, focused, key, refresh]);
   return heads[key] ?? null;
 }
 
@@ -101,7 +102,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
                 c && cur.l === null ? Promise.resolve(null) : api.feed({ mode: 'latest', category: null, cursor: cur.l, limit: 10 }),
               ]);
               const store = defaultStore();
-              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : top?.items[0]?.id ?? null);
+              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : top?.items[0]?.id ?? null, c ? new Set() : new Set((top?.items ?? []).slice(0, 5).map((x) => x.id)));
               const t = top ? top.next_cursor : null, l = latest ? latest.next_cursor : null;
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
