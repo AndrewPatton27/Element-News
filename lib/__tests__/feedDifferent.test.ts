@@ -8,7 +8,7 @@ import { diversifyFeed } from '../diversify.ts';
 import { localScore } from '../localRank.ts';
 import { mockRankScore } from '../feedLogic.ts';
 import { cardSourceKey } from '../sourceKeys.ts';
-import { mergePool, rankForYou, spreadFromTrending } from '../forYouRank.ts';
+import { capTopics, mergePool, rankForYou, spreadFromTrending } from '../forYouRank.ts';
 import { sortLatest, trendingOrder } from '../feedOrder.ts';
 
 type Prefs = Parameters<typeof rankForYou>[1];
@@ -138,4 +138,26 @@ test('real-shaped fixtures: same cards in, no repeats, hidden respected, report 
   assert.deepEqual([...ids(v2)].sort(), [...ids(v1)].sort());
   assert.equal(new Set(ids(v2)).size, v2.length);
   assert.ok(!v2.some((c) => prefs.hiddenTopics.includes(c.category)));
+});
+
+test('stage 2: topic cap, old likes fade, explore slot, recent dislike spill', () => {
+  const mk = (id: string, cat: string, h: number, imp = 1) => { const t = new Date(NOW - h * 3_600_000).toISOString(); return { id, kind: 'summary', category: cat, importance: imp, published_at: t, as_of: t, sort_at: t, headline: id, sources: [], tickers: [], macro: [] } as unknown as BlurbCard; };
+  const many = Array.from({ length: 8 }, (_, i) => mk(`m${i}`, 'markets', i));
+  assert.ok(capTopics(many, 10, 3).slice(0, 3).every((c) => c.category === 'markets'));
+  const mixed = [...many, mk('t0', 'tech', 9), mk('s0', 'sports', 9)];
+  assert.ok(capTopics(mixed, 5, 3).slice(0, 5).filter((c) => c.category === 'markets').length <= 3);
+  // an old like is worth less than a fresh one
+  const day = 86_400_000;
+  const prefOf = (age: number): Prefs => ({ ...noPrefs, reactions: { x: { r: 'like', topic: 'tech', source: null, at: NOW - age } as never } });
+  const cards = [mk('tech', 'tech', 5), mk('mk', 'markets', 4)];
+  assert.equal(rankForYou(cards, prefOf(0), new Set(), null, new Set(), NOW)[0].id, 'tech');
+  assert.equal(rankForYou(cards, prefOf(60 * day), new Set(), null, new Set(), NOW)[0].id, 'mk');
+  // explore: with 3 reactions in markets, an unseen new topic card reaches slot 4
+  const reactions = Object.fromEntries(['a', 'b', 'c'].map((k) => [k, { r: 'like', topic: 'markets', source: null, at: NOW } as never]));
+  const pool2 = [...Array.from({ length: 8 }, (_, i) => mk(`k${i}`, i % 2 ? 'markets' : 'policy', i, 4)), mk('new', 'science', 20)];
+  const out = rankForYou(pool2, { ...noPrefs, reactions, follows: { topics: ['markets'] } }, new Set(), null, new Set(), NOW);
+  assert.ok(ids(out).indexOf('new') <= 4);
+  // a dislike among the last reactions lowers its topic a bit more
+  const dis: Prefs = { ...noPrefs, reactions: { d: { r: 'dislike', topic: 'tech', source: null, at: NOW } as never } };
+  assert.equal(rankForYou([mk('tech', 'tech', 4), mk('mk', 'markets', 5)], dis, new Set(), null, new Set(), NOW)[0].id, 'mk');
 });
