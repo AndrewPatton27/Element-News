@@ -274,11 +274,6 @@ export function Card(props: Props) {
                 <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>
               </Pressable>
             ) : null}
-            {!wide ? (
-              <Pressable onPress={() => router.push('/about' as never)} accessibilityRole="link" accessibilityLabel="About Element" style={styles.aboutBtn}>
-                <InfoIcon color={p.inkSoft} size={22} />
-              </Pressable>
-            ) : null}
           </View>
         </View>
 
