@@ -1,5 +1,6 @@
 // Federal Register source: offline, from the REAL fixtures (2026-10-17) plus one SYNTHETIC
 // null-abstract document. No network, no keys.
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

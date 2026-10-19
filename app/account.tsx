@@ -23,6 +23,9 @@ import { OutlineButton, PrimaryButton, ListRow, SectionLabel } from '../componen
 import { AccountPrompt, DeviceData, QuickLinks } from '../components/account/AccountEntry';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { TopicStatePicker } from '../components/feed/TopicStatePicker';
+import { DeletedNotice } from '../components/account/DeletedNotice';
+import type { DeletedKind } from '../lib/account/deletedNotice';
+import { BriefEmailSettings } from '../components/account/BriefEmailSettings';
 import { FollowingWatchlist } from '../components/following/FollowingWatchlist';
 import { useFollows } from '../lib/following/useFollows';
 
@@ -32,7 +35,7 @@ type Msg = { text: string; error: boolean };
 export default function AccountScreen() {
   const p = usePalette();
   const wide = useWide();
-  const { categories: publicCategories, config } = useAppData();
+  const { categories: publicCategories, config, api } = useAppData();
   // Signed in: my_categories also lists favorite or hidden topics that have no cards right now,
   // so a hidden topic can always be un-hidden. Falls back to the public list.
   const [myCategories, setMyCategories] = useState<Category[] | null>(null);
@@ -48,6 +51,8 @@ export default function AccountScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [hideSignal, setHideSignal] = useState(0);
   const [deleteText, setDeleteText] = useState('');
+  // Set only after a delete succeeded (and the local state was cleared); never on failure.
+  const [deleted, setDeleted] = useState<DeletedKind | null>(null);
 
   // Signed out the page still works: topics, companies and sources are kept on this device.
   const signedIn = acct.user !== null;
@@ -214,6 +219,8 @@ export default function AccountScreen() {
       </View>
     ) : null;
 
+  const briefEmailSection = signedIn ? <BriefEmailSettings key={acct.user?.email ?? 'me'} api={api} /> : null;
+
   // Guests: no account settings, just the links (Numbers, About, quick tour). Signing in is the card at the top.
   const settings = !signedIn ? (
     <QuickLinks about />
@@ -300,6 +307,7 @@ export default function AccountScreen() {
                     async () => {
                       await acct.deleteMyData();
                       setOpen(null);
+                      setDeleted('data');
                     },
                     'Your data was deleted.',
                   )
@@ -332,7 +340,18 @@ export default function AccountScreen() {
               <PrimaryButton danger
                 label={busy === 'account' ? 'Deleting…' : 'Delete my account'}
                 disabled={!deleteConfirmed(deleteText) || busy === 'account'}
-                onPress={() => void run('account', () => acct.deleteAccount(), 'Your account was deleted.')}
+                onPress={() =>
+                  void run(
+                    'account',
+                    async () => {
+                      await acct.deleteAccount();
+                      setDeleteText('');
+                      setOpen(null);
+                      setDeleted('account');
+                    },
+                    'Your account was deleted.',
+                  )
+                }
               />
             </View>
           ) : null,
@@ -350,6 +369,7 @@ export default function AccountScreen() {
             {topicsSection}
             {watchlistSection}
             {sourcesSection}
+            {briefEmailSection}
           </View>
           <View style={styles.colSide}>
             {settings}
@@ -361,11 +381,13 @@ export default function AccountScreen() {
           {topicsSection}
           {watchlistSection}
           {sourcesSection}
+          {briefEmailSection}
           {settings}
           <DeviceData />
         </>
       )}
       <Text style={[styles.disclaimer, { color: p.muted }]}>{disclaimerText(config)}</Text>
+      <DeletedNotice kind={deleted} onClose={() => setDeleted(null)} />
     </ScreenShell>
   );
 }

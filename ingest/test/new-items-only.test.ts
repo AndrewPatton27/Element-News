@@ -1,6 +1,7 @@
 // New-items-only caps (2026-10-18): a per-run cap counts only items an earlier run has not handled.
 // CPSC (max 5 NEW recalls per run), FAA airworthiness cap, Wikipedia look-back over several days,
 // NASA wider window and extra feed pages. All offline: fixtures only, no network, no keys.
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -123,7 +124,7 @@ test('FAA cap counts only NEW directives: an already-handled newest directive no
   const handled = new Set([docs[0].html_url]);
   const t = setup(handled, async () => JSON.stringify({ count: 4, results: docs }));
   const s = await runOnce(t.deps, { only: ['fedreg'] });
-  assert.deepEqual(t.titles, ['Airworthiness Directives; Pratt & Whitney Engines', 'Revision of Class E Airspace']);
+  assert.deepEqual([...t.titles].sort(), ['Airworthiness Directives; Pratt & Whitney Engines', 'Revision of Class E Airspace'].sort());   // order is chosen by candidate selection
   assert.equal(s.published, 2);
   assert.equal(t.lines.filter((l) => l.startsWith('skip faa_directive_cap (max 1 airworthiness directive per run)')).length, 1, t.lines.join('\n'));
   assert.equal(t.upserted.includes(docs[3].html_url), false, 'the capped directive is not recorded');

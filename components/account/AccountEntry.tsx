@@ -16,6 +16,7 @@ import { defaultStore } from '../../lib/storage/storage';
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts, font, radius } from '../../lib/theme/theme';
 import { ListRow, OutlineButton, PrimaryButton } from './FormParts';
+import { DeletedNotice } from './DeletedNotice';
 
 export const BENEFIT_LINE = 'Sign in to sync your likes and follows across devices.';
 
@@ -84,7 +85,7 @@ export function DeviceData() {
             onPress={() => {
               clearAll(defaultStore()); // listeners in the account context refresh the screens
               setConfirming(false);
-              setDone(true);
+              setDone(true); // the notice opens only now, after the clear
             }}
           />
           <OutlineButton label="Cancel" onPress={() => setConfirming(false)} />
@@ -105,6 +106,7 @@ export function DeviceData() {
           Cleared. This device has forgotten your choices.
         </Text>
       ) : null}
+      <DeletedNotice kind={done ? 'device' : null} onClose={() => setDone(false)} />
     </View>
   );
 }

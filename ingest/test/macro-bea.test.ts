@@ -1,5 +1,6 @@
 // More FRED series (weekly / monthly / quarterly wording, "number" unit, thresholds,
 // MORTGAGE30US forbidden) and the BEA release RSS (feed text only, apps.bea.gov as API host).
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

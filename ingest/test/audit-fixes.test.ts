@@ -243,7 +243,7 @@ test('FAA cap: only 1 airworthiness directive per run becomes a candidate; the r
   const lines: string[] = [];
   const deps: Deps = { fetchText: async () => JSON.stringify({ count: 4, results: docs }), publisher: dry.publisher, providers: [ai], counter: memoryCounter(), fredApiKey: null, now: new Date('2026-10-17T21:00:00Z'), log: (l) => lines.push(l) };
   const s = await runOnce(deps, { only: ['fedreg'] });
-  assert.deepEqual(seen, ['Airworthiness Directives; The Boeing Company Airplanes', 'Revision of Class E Airspace']);
+  assert.deepEqual([...seen].sort(), ['Airworthiness Directives; The Boeing Company Airplanes', 'Revision of Class E Airspace'].sort());   // order is chosen by candidate selection
   assert.equal(s.published, 2);
   assert.equal(s.skipped, 2);
   assert.equal(lines.filter((l) => l.startsWith('skip faa_directive_cap')).length, 2, lines.join('\n'));

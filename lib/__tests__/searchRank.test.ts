@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { editDistance, isTypo, matchedTermCount, rankSearch, searchScore, searchTerms, SEARCH_TERM_BONUS } from '../search/searchLogic.ts';
+import { editDistance, isTypo, matchedTermCount, rankSearch, searchScore, searchTerms, SEARCH_TERM_BONUS, termScores } from '../search/searchLogic.ts';
 import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
 import { card, dataCard } from './helpers.ts';
 import type { BlurbCard } from '../../contract/types.ts';
@@ -60,15 +60,17 @@ test('search finds exact tickers and series ids', () => {
   assert.equal(matchedTermCount(d, [d.macro[0].series_id.toLowerCase()]), 1);
 });
 
-test('multiple words: any word matches; ordered by trending with a x1.3 bonus per extra word', () => {
-  assert.deepEqual(ids('fed rate'), ['mortgage', 'fedcut', 'fedhold']);
+test('multiple words: any word matches; more and better matches first, then trending (x1.3 bonus per extra word)', () => {
+  // fedcut matches both words (0.5 + 0.8), fedhold one exact (1.0), mortgage one stem (0.8).
+  assert.deepEqual(ids('fed rate'), ['fedcut', 'fedhold', 'mortgage']);
   assert.ok(Math.abs(searchScore(0, 2) - 8 * Math.log2(SEARCH_TERM_BONUS)) < 1e-9);
 });
 
 test('ordering by trending: a more trending match comes first; empty and no-match give nothing', () => {
   assert.deepEqual(ids('costs'), ['mortgage', 'oil', 'infl', 'fedcut']);
-  hours.set('fedhold', 10);
-  assert.deepEqual(ids('fed rate'), ['fedhold', 'mortgage', 'fedcut']);
+  hours.set('mortgage', 0); hours.set('oil', 6);
+  assert.deepEqual(ids('costs'), ['oil', 'infl', 'mortgage', 'fedcut']);
+  hours.set('mortgage', 5); hours.set('oil', 3);
   hours.set('fedhold', 1);
   assert.deepEqual(ids(''), []);
   assert.deepEqual(ids('qqqxxnomatch'), []);
@@ -89,4 +91,25 @@ test('mock api search pages through the same results without repeats', () => {
   assert.equal(first.items.length, 2);
   assert.equal(second.next_cursor, null);
   assert.equal(new Set([...first.items, ...second.items].map((c) => c.id)).size, 4);
+});
+
+test('v4: a headline or summary match outranks a detail-only match; Trending breaks ties; gate unchanged', () => {
+  // Real trending keys are hours since 1970 (about 490,000), as in the database and mockRankScore.
+  const B = Date.parse('2026-10-19T00:00:00Z') / 3_600_000;
+  const detail = (p: string) => ({ key_points: ['Revenue rose.'], paragraphs: [p] });
+  const fed = mk('v4fed', 'Fed holds interest rates steady', 'Officials said inflation is still too high.', B + 1);
+  const cpi = mk('v4cpi', 'Inflation cools in September', 'Price growth slowed.', B + 2);
+  const pep = mk('v4pep', 'Snack maker reports quarterly earnings', 'Revenue rose 5%.', B + 50,
+    { detail: detail('Cost cuts aim to offset rising input cost inflation.') });
+  const weak = mk('v4weak', 'Bridge reopens after repairs', 'Traffic moves.', B + 100,
+    { sources: [{ ...card().sources[0], name: 'Inflation Monitor' }] });
+  const pool = [pep, fed, cpi, weak];
+  const order = (q: string) => rankSearch(pool, q, trend).map((c) => c.id);
+  assert.deepEqual(order('inflation'), ['v4cpi', 'v4fed', 'v4pep'], 'visible first (Trending among them), detail-only last, source-only dropped');
+  assert.deepEqual(order('inflaton'), ['v4cpi', 'v4fed', 'v4pep'], 'typo still matches, detail-only typo still passes the gate');
+  assert.ok(order('cpi').includes('v4cpi'), 'synonym still works');
+  assert.deepEqual(termScores('inflation', pep), { gate: 1, rank: 0.2 });
+  assert.deepEqual(termScores('inflation', cpi), { gate: 1, rank: 1 });
+  hours.set('v4fed', B + 3);
+  assert.deepEqual(order('inflation'), ['v4fed', 'v4cpi', 'v4pep'], 'equal visible matches follow Trending');
 });

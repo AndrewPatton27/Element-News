@@ -124,7 +124,7 @@ export function createGroqSummarizer(opts: {
         const res = await fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
           body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1,
-            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, response_format: { type: 'json_object' } }) });
+            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, reasoning_effort: 'low', response_format: { type: 'json_object' } }) });
         if (res.status === 429 && attempt < config.reportCard.scoreMax429Retries) {
           await new Promise(r => setTimeout(r, retryWaitMs(res)));
           continue;

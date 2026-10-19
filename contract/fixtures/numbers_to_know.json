@@ -10,7 +10,8 @@
     "source_name": "Board of Governors of the Federal Reserve System (US) via FRED",
     "source_short": "Federal Reserve via FRED",
     "source_url": "https://fred.stlouisfed.org/series/DGS2",
-    "sort_order": 1
+    "sort_order": 1,
+    "updated_at": "2026-10-19T06:00:00Z"
   },
   {
     "series_id": "DGS10",
@@ -23,7 +24,8 @@
     "source_name": "Board of Governors of the Federal Reserve System (US) via FRED",
     "source_short": "Federal Reserve via FRED",
     "source_url": "https://fred.stlouisfed.org/series/DGS10",
-    "sort_order": 2
+    "sort_order": 2,
+    "updated_at": "2026-10-19T06:00:00Z"
   },
   {
     "series_id": "DFF",
@@ -36,7 +38,8 @@
     "source_name": "Board of Governors of the Federal Reserve System (US) via FRED",
     "source_short": "Federal Reserve via FRED",
     "source_url": "https://fred.stlouisfed.org/series/DFF",
-    "sort_order": 3
+    "sort_order": 3,
+    "updated_at": "2026-10-19T06:00:00Z"
   },
   {
     "series_id": "CPIAUCSL",
@@ -49,7 +52,8 @@
     "source_name": "U.S. Bureau of Labor Statistics via FRED",
     "source_short": "BLS via FRED",
     "source_url": "https://fred.stlouisfed.org/series/CPIAUCSL",
-    "sort_order": 4
+    "sort_order": 4,
+    "updated_at": "2026-10-19T06:00:00Z"
   },
   {
     "series_id": "UNRATE",
@@ -62,7 +66,8 @@
     "source_name": "U.S. Bureau of Labor Statistics via FRED",
     "source_short": "BLS via FRED",
     "source_url": "https://fred.stlouisfed.org/series/UNRATE",
-    "sort_order": 5
+    "sort_order": 5,
+    "updated_at": "2026-10-19T06:00:00Z"
   },
   {
     "series_id": "DCOILWTICO",
@@ -75,6 +80,7 @@
     "source_name": "U.S. Energy Information Administration via FRED",
     "source_short": "EIA via FRED",
     "source_url": "https://fred.stlouisfed.org/series/DCOILWTICO",
-    "sort_order": 6
+    "sort_order": 6,
+    "updated_at": "2026-10-19T06:00:00Z"
   }
 ]

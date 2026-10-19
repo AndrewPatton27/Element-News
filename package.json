@@ -44,6 +44,7 @@
     "export:web": "expo export -p web --output-dir dist-pages && node scripts/fix-pages-assets.mjs dist-pages",
     "test:app": "node --experimental-strip-types --test \"lib/__tests__/*.test.ts\"",
     "test:ingest": "npm --prefix ingest test",
+    "test:functions": "node --experimental-strip-types --test \"supabase/functions/**/*.test.ts\"",
     "deploy": "npm run export:web && wrangler deploy",
     "preview": "npm run export:web && wrangler dev"
   },

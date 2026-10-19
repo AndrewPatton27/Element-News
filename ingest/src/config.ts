@@ -73,8 +73,8 @@ export const config = {
     protocolEnabled: false,
     scoreBatchSize: 3,                       // cards per scorer call (audit); the 8,000 tokens/minute free limit binds
     scoreMaxRecentCards: 30,
-    scoreMaxTokens: 900,
-    scoreMinIntervalMs: 20_500,
+    scoreMaxTokens: 1500,
+    scoreMinIntervalMs: 24_000,
     scoreMax429Retries: 8,
     narrowSourceMaxPerRun: 2,
     narrowSources: ['faa_airworthiness_directive'] as readonly string[],
@@ -147,6 +147,17 @@ export const config = {
   // Everywhere else they stay blocked. Investment words (buy, sell, price target, ...) are never
   // here, so investment advice stays blocked on safety cards too.
   safetyAdviceAllowlist: ['should'],
+
+  // Candidate selection (run-wide budget): every source's candidates are collected first (no AI call), scored
+  // without AI, and the run's budget (default 20 new items) is spent on the best ones. enabled=false = the old
+  // fixed source order (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa), each source taking what it wants.
+  selection: {
+    enabled: true,
+    // score = importance * log2(policy importance) + freshness * 0.5^(age / halfLife) - diversity * (picks already taken from the source)
+    weights: { importance: 1, freshness: 2, diversity: 0.5 },
+    freshnessHalfLifeHours: 24,
+    softCapShare: 0.4,                         // one source takes at most this share of the budget while others still have candidates; leftover is handed back
+  },
 
   // ---- dedupe / ranking guard --------------------------------------------------
   tickerCapPer24h: 3,                          // mirrors core.rank_params.ticker_cap_24h

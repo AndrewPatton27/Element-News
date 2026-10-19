@@ -83,15 +83,20 @@ export function serializeRecents(list: string[]): string {
   return JSON.stringify(list.slice(0, RECENT_MAX));
 }
 
-// ---- Matching and ranking (mock mode; mirrors api.search v3, 20261018050000_search_v3.sql) ----
+// ---- Matching and ranking (mock mode; mirrors api.search v4, 20261019030000_search_v4.sql) ----
 //
 // Each query term contributes its best evidence score; weak metadata and ambiguous short synonyms
-// cannot dominate. Search order keeps the Trending score and existing multi-term bonus.
+// cannot dominate. Order: relevance (visible matches count fully, detail-only matches x0.2) first,
+// then the Trending score with the existing multi-term bonus as the tiebreak.
 
 export const SEARCH_MAX_TERMS = 6; // settings.md: search_max_terms
 export const SEARCH_TERM_BONUS = 1.3; // settings.md: search_term_bonus
 export const SEARCH_TYPO_MIN_LEN = 5; // settings.md: search_typo_min_len
 export const SEARCH_PREFIX_MIN_LEN = 3; // settings.md: search_prefix_min_len
+// Detail-only evidence counts at 0.2 x its quality, below the weakest visible evidence (0.25),
+// so a headline/summary/topic match always ranks above a detail-only one (c_detail_weight in SQL).
+export const SEARCH_DETAIL_WEIGHT = 0.2; // settings.md: search_detail_weight (v4)
+export const SEARCH_MIN_QUALITY = 0.5; // settings.md: search_min_quality
 const TRENDING_HALF_LIFE_HOURS = 8; // rank_params.half_life_hours
 
 const STOPWORDS = new Set(
@@ -161,9 +166,9 @@ function wordMatches(alt: string, words: string[], allowPrefix: boolean): boolea
   return words.some((w) => w === alt || stem(w) === s || (allowPrefix && alt.length >= SEARCH_PREFIX_MIN_LEN && stem(w).startsWith(s)));
 }
 
-function termQuality(term: string, card: BlurbCard): number {
+// Best evidence for one term in one text (no metadata): exact 1, stem/prefix 0.8, synonym 0.6, typo 0.5.
+function textQuality(term: string, card: BlurbCard, content: string): number {
   const upper = term.toLocaleUpperCase();
-  const content = [card.headline, card.body, card.detail?.paragraphs.join(' '), card.detail?.key_points.join(' '), ...card.tickers.map((t) => `${t.symbol} ${t.name}`), ...card.macro.map((m) => `${m.series_id} ${m.label}`)].filter(Boolean).join(' ').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   const words = content.split(' ');
   let best = card.tickers.some((t) => t.symbol === upper) || card.macro.some((m) => m.series_id === upper) ? 1 : 0;
   const fedQuery = ['fed', 'federal', 'federl'].includes(term);
@@ -177,9 +182,31 @@ function termQuality(term: string, card: BlurbCard): number {
   const s = stem(term);
   if (!fedQuery && words.some((w) => stem(w) === s || (term.length >= SEARCH_PREFIX_MIN_LEN && stem(w).startsWith(s)))) best = Math.max(best, 0.8);
   if (words.some((w) => isTypo(term, w) && (!fedQuery || content.includes('federal reserve')))) best = Math.max(best, 0.5);
-  const meta = [card.category, card.event_type?.replace(/_/g, ' '), ...card.sources.map((x) => x.name)].filter(Boolean).join(' ').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ');
-  if (meta.includes(term)) best = Math.max(best, 0.25);
   return best;
+}
+
+const clean = (parts: (string | undefined | null)[]) =>
+  parts.filter(Boolean).join(' ').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+// What the card shows without opening it: headline, summary, ticker chips and number chips.
+function visibleText(card: BlurbCard): string {
+  return clean([card.headline, card.body, ...card.tickers.map((t) => `${t.symbol} ${t.name}`), ...card.macro.map((m) => `${m.series_id} ${m.label}`)]);
+}
+
+// v4: `gate` is the v3 quality (best match anywhere, used for the 0.5 cutoff); `rank` counts a match
+// found only in the in-depth detail at SEARCH_DETAIL_WEIGHT, so visible matches rank first.
+export function termScores(term: string, card: BlurbCard): { gate: number; rank: number } {
+  const vis = visibleText(card);
+  const all = clean([vis, card.detail?.paragraphs.join(' '), card.detail?.key_points.join(' ')]);
+  const qVis = textQuality(term, card, vis);
+  const qAll = textQuality(term, card, all);
+  const meta = clean([card.category, card.event_type?.replace(/_/g, ' '), ...card.sources.map((x) => x.name)]).split(' ');
+  const qMeta = meta.includes(term) ? 0.25 : 0;
+  return { gate: Math.max(qAll, qMeta), rank: Math.max(qVis, SEARCH_DETAIL_WEIGHT * qAll, qMeta) };
+}
+
+function termQuality(term: string, card: BlurbCard): number {
+  return termScores(term, card).gate;
 }
 
 // Everything a search looks at, lowercased with punctuation removed.
@@ -206,16 +233,19 @@ export function searchScore(trendingHours: number, matched: number): number {
   return trendingHours + TRENDING_HALF_LIFE_HOURS * Math.log2(SEARCH_TERM_BONUS) * Math.max(0, matched - 1);
 }
 
-// Matching cards in Trending order; ties: importance, newest, id desc.
+// Matching cards: visible matches before detail-only ones, then Trending; ties: importance, newest, id desc.
 export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: BlurbCard) => number): BlurbCard[] {
   const terms = searchTerms(raw);
   if (terms.length === 0) return [];
   return cards
-    .map((c) => ({ c, n: matchedTermCount(c, terms), q: matchQuality(c, terms) }))
-    .filter((x) => x.q >= 0.5)
-    .map((x) => ({ c: x.c, k: trendingHours(x.c) * (0.5 + x.q / terms.length)
-      + TRENDING_HALF_LIFE_HOURS * Math.log2(SEARCH_TERM_BONUS) * Math.max(0, x.n - 1) }))
-    .sort((a, b) => b.k - a.k || (b.c.importance ?? 1) - (a.c.importance ?? 1)
+    .map((c) => {
+      const s = terms.map((t) => termScores(t, c));
+      return { c, n: s.filter((x) => x.gate > 0).length, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0) };
+    })
+    .filter((x) => x.q >= SEARCH_MIN_QUALITY)
+    // Same as the SQL key relevance x 10,000,000 + Trending: relevance first, Trending breaks ties.
+    .map((x) => ({ c: x.c, r: Math.round(x.rq * 10000) / 10000, k: searchScore(trendingHours(x.c), x.n) }))
+    .sort((a, b) => b.r - a.r || b.k - a.k || (b.c.importance ?? 1) - (a.c.importance ?? 1)
       || Date.parse(b.c.sort_at) - Date.parse(a.c.sort_at) || (a.c.id < b.c.id ? 1 : a.c.id > b.c.id ? -1 : 0))
     .map((x) => x.c);
 }

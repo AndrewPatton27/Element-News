@@ -1,5 +1,6 @@
 // Broad topics (PM review 2): Wikipedia "In the news" (world), CPSC recalls (safety), USGS
 // significant earthquakes (science), plus the contract consistency check.
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

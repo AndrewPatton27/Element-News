@@ -21,8 +21,8 @@ import { SIGN_IN_AGAIN_MESSAGE } from '../lib/account/session';
 import type { FeedTab } from '../lib/feed/feedLogic';
 import { topicParam } from '../lib/brief/briefLogic';
 import { categoryName } from '../lib/shared/format';
-import { defaultStore } from '../lib/storage/storage';
-import { FOR_YOU_SEEN_MS, forYouProgress, readSeen, recordSeen } from '../lib/feed/forYouGate';
+import { defaultStore, onStoreChange } from '../lib/storage/storage';
+import { FOR_YOU_SEEN_MS, SEEN_KEY, forYouProgress, readSeen, recordSeen } from '../lib/feed/forYouGate';
 import { ForYouWarmup } from '../components/feed/ForYouWarmup';
 import { shadowContext, surfaceForTab, type ShadowSurface } from '../lib/ml/shadowLog';
 import { useFeed, useFeedHeads } from '../lib/feed/useFeed';
@@ -107,6 +107,15 @@ export default function FeedScreen() {
   const local = acct.localPrefs;
   // For you stays locked until 10 stories across 4 topics have been read or reacted to.
   const [seenList, setSeenList] = useState(() => readSeen(store));
+  // "Clear data on this device" / delete: forget the For you history and the dismissed prompt at once.
+  useEffect(
+    () =>
+      onStoreChange((k) => {
+        if (k === SEEN_KEY) setSeenList(readSeen(store));
+        if (k === PROMPT_KEY) setPromptHidden(store.get(PROMPT_KEY) === '1');
+      }),
+    [],
+  );
   const gate = forYouProgress({
     reacted: Object.entries(local.reactions).map(([id, v]) => ({ id, category: v.topic })),
     seen: seenList,

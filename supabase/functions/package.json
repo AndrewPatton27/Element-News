@@ -1,0 +1,10 @@
+{
+  "name": "element-functions",
+  "private": true,
+  "type": "module",
+  "description": "Supabase Edge Functions (Deno). No npm dependencies; this file only marks the folder as ES modules for the Node tests and tsc.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

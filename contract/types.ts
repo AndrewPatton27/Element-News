@@ -74,6 +74,7 @@ export interface MacroFact {
   source_short: string;                 // compact label: "EIA via FRED" (never bare "FRED")
   source_url: string;
   sort_order: number;
+  updated_at?: string | null;           // when our job last stored this number (ISO); older servers omit it
 }
 
 /** One number with a small history chart (web right column). */
@@ -214,6 +215,18 @@ export type BriefSubscribeStatus = 'pending' | 'invalid' | 'limited' | 'unavaila
 export interface BriefSubscribeResult {
   ok: boolean;
   status: BriefSubscribeStatus;
+}
+/** One row of api.my_brief_subscriptions() for the signed-in reader (parsed tolerantly; every field but kind is optional). */
+export interface MyBriefSubscription {
+  kind: 'daily' | 'weekly';
+  confirmed: boolean;                   // false = waiting for the confirmation email
+  hour: number | null;                  // local send hour 0..23, null when the server did not say
+  tz: string | null;                    // IANA zone
+}
+export interface MyBriefChangeResult {
+  ok: boolean;
+  changed: boolean;
+  status?: 'unavailable';
 }
 export interface BriefTokenResult {
   ok: boolean;

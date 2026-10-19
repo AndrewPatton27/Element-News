@@ -1,6 +1,6 @@
 // Pure mock implementations for search, related cards, following and briefs.
 // Kept separate from fixture-loading code so these rules can run under node:test.
-import type { BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, FeedPage, MacroFact, NumberTrend, StoryLink } from '../../contract/types.ts';
+import type { BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, FeedPage, MyBriefChangeResult, MyBriefSubscription, MacroFact, NumberTrend, StoryLink } from '../../contract/types.ts';
 import { mockRankScore } from '../feed/feedLogic.ts';
 import { rankSearch } from '../search/searchLogic.ts';
 import { isValidBriefInput, normalizeBriefEmail } from '../shared/types.ts';
@@ -69,6 +69,11 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
   const subs = new Map<string, Sub>();
   const attempts: { email: string; at: number }[] = [];
   const byToken = (t: string) => [...subs.values()].find((s) => s.token === t);
+  // Signed-in "my subscriptions" in the sample app: one confirmed daily and one pending weekly to start.
+  const mine: MyBriefSubscription[] = [
+    { kind: 'daily', confirmed: true, hour: 7, tz: 'America/New_York' },
+    { kind: 'weekly', confirmed: false, hour: 8, tz: 'America/New_York' },
+  ];
   let tokenSeq = 0;
   const newToken = () => `00000000-0000-4000-8000-${(++tokenSeq).toString(16).padStart(12, '0')}`;
   return {
@@ -102,8 +107,23 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       if (s) s.status = 'unsubscribed';
       return { ok: true }; // idempotent; unknown tokens look the same
     },
+    mySubscriptions(): MyBriefSubscription[] {
+      return mine.map((s) => ({ ...s }));
+    },
+    unsubscribeMine(kind: 'daily' | 'weekly'): MyBriefChangeResult {
+      const i = mine.findIndex((s) => s.kind === kind);
+      if (i >= 0) mine.splice(i, 1);
+      return { ok: true, changed: i >= 0 };
+    },
+    updateMyTime(kind: 'daily' | 'weekly', hour: number, tz: string): MyBriefChangeResult {
+      const s = mine.find((x) => x.kind === kind && x.confirmed);
+      if (!s || !Number.isInteger(hour) || hour < 0 || hour > 23) return { ok: false, changed: false };
+      const changed = s.hour !== hour || s.tz !== tz;
+      Object.assign(s, { hour, tz });
+      return { ok: true, changed };
+    },
     search(q: string, cursor?: string | null, limit = 20) {
-      // Same quality-gated matching as api.search v3; the ranker owns matching and scoring.
+      // Same quality-gated, placement-aware matching as api.search v4; the ranker owns matching and scoring.
       return page(rankSearch(cards, q, mockRankScore), cursor, limit);
     },
     relatedCards(cardId: string, limit = 5) {

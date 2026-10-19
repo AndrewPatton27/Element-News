@@ -3,7 +3,8 @@
 
 import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard, MacroFact } from '../../contract/types.ts';
-import { changeText, factA11yLabel, shortDate } from '../../lib/shared/format';
+import { changeText, factA11yLabel } from '../../lib/shared/format';
+import { factWhen } from '../../lib/numbers/numbersUpdated';
 import { cardNotices } from '../../lib/shared/labels';
 import { changeToneColor, withToneLabel } from '../../lib/numbers/numberTone';
 import { usePalette } from '../../lib/theme/useTheme';
@@ -40,7 +41,7 @@ export function DataFacts({ card, config, compact }: { card: BlurbCard; config: 
               {changeText(f) ? <Text style={[styles.change, { color: changeColor(p, f) }]}>{changeText(f)}</Text> : null}
             </View>
             <Text style={[styles.cite, multi && styles.citeMulti, { color: p.inkSoft }]}>
-              {f.period ? f.period : `As of ${shortDate(f.as_of)}`} · {f.source_short}
+              {factWhen(f)} · {f.source_short}
             </Text>
           </View>
         ))}
