@@ -5,11 +5,11 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, MacroFact } from '../../contract/types.ts';
 import type { Api } from '../../lib/api/api.ts';
-import { changeText, factA11yLabel, shortDate } from '../../lib/shared/format';
+import { changeText, factA11yLabel } from '../../lib/shared/format';
 import { withToneLabel } from '../../lib/numbers/numberTone';
 import { noticesFor } from '../../lib/shared/labels';
 import { plainExplainer } from '../../lib/numbers/seriesCopy';
-import { numbersUpdatedLabel } from '../../lib/numbers/numbersUpdated';
+import { factWhen, numbersUpdatedLabel } from '../../lib/numbers/numbersUpdated';
 import { usePalette } from '../../lib/theme/useTheme';
 import { userMessage } from '../../lib/api/errors';
 import { fonts } from '../../lib/theme/theme';
@@ -35,9 +35,7 @@ export function useNumbers(api: Api) {
   return { facts, error, retry: () => setAttempt((n) => n + 1) };
 }
 
-function when(f: MacroFact): string {
-  return f.period ?? `As of ${shortDate(f.as_of)}`;
-}
+const when = factWhen;
 
 interface Props {
   api: Api;

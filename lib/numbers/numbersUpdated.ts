@@ -6,6 +6,12 @@
 import type { MacroFact } from '../../contract/types.ts';
 import { relativeTime, shortDate } from '../shared/format.ts';
 
+// The date shown next to a number's source everywhere except the ticker: the reporting period
+// ("Sep 2026") for monthly data, otherwise "As of Oct 15".
+export function factWhen(f: Pick<MacroFact, 'period' | 'as_of'>): string {
+  return f.period ?? `As of ${shortDate(f.as_of)}`;
+}
+
 function ms(iso: string | null | undefined): number {
   return iso ? Date.parse(iso) : NaN;
 }

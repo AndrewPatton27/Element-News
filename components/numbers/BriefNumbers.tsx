@@ -10,6 +10,7 @@ import type { MacroFact, NumberTrend, RequiredNotice } from '../../contract/type
 import { trendA11yLabel } from '../../lib/brief/briefLogic';
 import { changeText, factA11yLabel } from '../../lib/shared/format';
 import { withToneLabel } from '../../lib/numbers/numberTone';
+import { factWhen } from '../../lib/numbers/numbersUpdated';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { changeColor } from '../card/DataCard';
@@ -56,7 +57,7 @@ export function BriefNumbers({
           >
             <View style={styles.rowLeft}>
               <Text style={[styles.rowLabel, { color: p.ink }]}>{f.label}</Text>
-              <Text style={[styles.rowSource, { color: p.muted }]}>{f.source_short}</Text>
+              <Text style={[styles.rowSource, { color: p.muted }]}>{f.source_short} · {factWhen(f)}</Text>
             </View>
             <View style={styles.rowRight}>
               <Text style={[styles.value, { color: p.ink }]}>{f.value}</Text>
