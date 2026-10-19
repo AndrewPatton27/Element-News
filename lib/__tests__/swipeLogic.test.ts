@@ -95,3 +95,14 @@ test('a card swiped to like or dislike never opens More detail afterwards', asyn
   assert.equal(wasCardSwiped('card-x'), true);
   assert.equal(wasCardSwiped('card-y'), false);
 });
+
+import { coachLane, COACH_LANE_PX } from '../swipeLogic.ts';
+test('swipe hint gets its own lane on every phone size, never over the card', () => {
+  // pager heights are roughly window height minus header, ticker, chips and tab bar
+  for (const h of [667 - 230, 844 - 250, 852 - 250, 932 - 250]) {
+    assert.equal(coachLane(true, h), COACH_LANE_PX);
+    assert.ok(h - coachLane(true, h) > 0);
+    assert.equal(coachLane(false, h), 0);
+  }
+  assert.equal(coachLane(true, 100), 0); // degenerate tiny pager: no lane
+});
