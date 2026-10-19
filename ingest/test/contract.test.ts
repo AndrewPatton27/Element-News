@@ -23,7 +23,7 @@ const page2 = read<FeedPage>('feed.page2.json');
 const empty = read<FeedPage>('feed.empty.json');
 
 function checkMacro(m: MacroFact) {
-  assert.deepEqual(Object.keys(m), MACRO_KEYS);
+  assert.deepEqual(Object.keys(m).filter((k) => k !== 'updated_at'), MACRO_KEYS);   // updated_at is optional (numbers_to_know only)
   assert.ok(m.source_name.length > 0 && m.source_short !== 'FRED' && !/^FRED$/.test(m.source_name), m.series_id);
   assert.ok(m.source_url.startsWith('https://'));
   assert.match(m.as_of, ISO);
