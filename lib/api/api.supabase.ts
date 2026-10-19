@@ -7,7 +7,7 @@ import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../c
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
 import { takeEarlyFeed, type EarlyFeed } from '../feed/earlyFeed.ts';
-import { isBlurbCard, isMacroFact, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
+import { isBlurbCard, isMacroFact, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
 export interface SupabaseOptions {
   url: string; // https://<project>.supabase.co, no trailing slash
@@ -130,6 +130,18 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       return null;
     }
   }
+  // Signed-in RPCs: same call helper, with the reader's token. A missing RPC (404) is reported apart from other errors.
+  async function authedRpc(name: string, body: Record<string, unknown>): Promise<{ data: unknown } | { missing: true } | { error: true }> {
+    const token = opts.getToken ? await opts.getToken() : null;
+    if (!token) return { error: true };
+    const headers = { apikey: opts.key, Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+    try {
+      return { data: await call({ url: `${opts.url}/rest/v1/rpc/${name}`, init: { method: 'POST', headers, body: JSON.stringify(body) } }) };
+    } catch (e) {
+      return e instanceof ApiError && e.status === 404 ? { missing: true } : { error: true };
+    }
+  }
+  const mineFail = (r: { missing: true } | { error: true }) => ({ ok: false, changed: false, ...('missing' in r ? { status: 'unavailable' as const } : {}) });
   const unavailable = { ok: false, status: 'unavailable' as const };
   const tokenCall = async (name: string, token: string, extra: Record<string, unknown> = {}) => {
     if (!UUID.test(String(token))) return { ok: false };
@@ -211,6 +223,19 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     confirmBrief: (token) => tokenCall('confirm_brief', token),
     updateBriefSubscription: (token, i) => (isValidBriefInput(i) ? tokenCall('update_brief_subscription', token, { p_kind: i.kind, p_hour: i.hour, p_tz: i.tz }) : Promise.resolve({ ok: false })),
     unsubscribeBrief: (token) => tokenCall('unsubscribe_brief', token),
+    async mySubscriptions() {
+      const r = await authedRpc('my_brief_subscriptions', {});
+      return 'data' in r ? parseMyBriefSubscriptions(r.data) : null;
+    },
+    async unsubscribeMine(kind) {
+      const r = await authedRpc('unsubscribe_my_brief', { p_kind: kind });
+      return 'data' in r ? parseMyBriefChange(r.data) : mineFail(r);
+    },
+    async updateMyTime(kind, hour, tz) {
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !tz || tz.length > 64) return { ok: false, changed: false };
+      const r = await authedRpc('update_my_brief_time', { p_kind: kind, p_send_hour: hour, p_timezone: tz });
+      return 'data' in r ? parseMyBriefChange(r.data) : mineFail(r);
+    },
   };
 }
 

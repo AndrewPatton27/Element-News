@@ -216,6 +216,18 @@ export interface BriefSubscribeResult {
   ok: boolean;
   status: BriefSubscribeStatus;
 }
+/** One row of api.my_brief_subscriptions() for the signed-in reader (parsed tolerantly; every field but kind is optional). */
+export interface MyBriefSubscription {
+  kind: 'daily' | 'weekly';
+  confirmed: boolean;                   // false = waiting for the confirmation email
+  hour: number | null;                  // local send hour 0..23, null when the server did not say
+  tz: string | null;                    // IANA zone
+}
+export interface MyBriefChangeResult {
+  ok: boolean;
+  changed: boolean;
+  status?: 'unavailable';
+}
 export interface BriefTokenResult {
   ok: boolean;
   status?: 'unavailable';

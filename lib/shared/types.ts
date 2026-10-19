@@ -2,7 +2,7 @@
 // contract/types.ts and are imported type-only; this file adds only guards.
 // Bad rows are skipped, never allowed to crash the feed.
 
-import type { AppConfig, BlurbCard, BriefMarkets, BriefSubscribeResult, BriefSubscriptionInput, BriefSummary, BriefTokenResult, Category, FeedPage, MacroFact, NumberTrend, RequiredNotice, Source } from '../../contract/types.ts';
+import type { AppConfig, BlurbCard, BriefMarkets, BriefSubscribeResult, BriefSubscriptionInput, BriefSummary, MyBriefChangeResult, MyBriefSubscription, BriefTokenResult, Category, FeedPage, MacroFact, NumberTrend, RequiredNotice, Source } from '../../contract/types.ts';
 import { isRenderableKind } from './labels.ts';
 
 type Obj = Record<string, unknown>;
@@ -157,4 +157,48 @@ export function parseSubscribeResult(x: unknown): BriefSubscribeResult {
 
 export function parseTokenResult(x: unknown): BriefTokenResult {
   return isObj(x) && x.ok === true ? { ok: true } : { ok: false };
+}
+
+function pickHour(r: Record<string, unknown>): number | null {
+  for (const k of ['send_hour_local', 'send_hour', 'hour', 'local_hour']) {
+    const v = r[k];
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 23) return v;
+  }
+  for (const k of ['send_time', 'send_at', 'time', 'local_time']) {
+    const v = r[k];
+    const m = typeof v === 'string' ? /^(\d{1,2}):\d{2}/.exec(v) : null;
+    if (m && Number(m[1]) <= 23) return Number(m[1]);
+  }
+  return null;
+}
+
+/**
+ * api.my_brief_subscriptions(): a jsonb array. Shape is tolerated, not trusted: rows without a
+ * daily/weekly kind or already unsubscribed are dropped; "confirmed" may be a boolean or a status
+ * word; the hour may come from several field names. Anything that is not an array gives [].
+ */
+export function parseMyBriefSubscriptions(x: unknown): MyBriefSubscription[] {
+  if (!Array.isArray(x)) return [];
+  const out: MyBriefSubscription[] = [];
+  for (const r of x) {
+    if (!isObj(r) || (r.kind !== 'daily' && r.kind !== 'weekly')) continue;
+    const status = isStr(r.status) ? r.status.toLowerCase() : '';
+    if (status === 'unsubscribed' || status === 'cancelled' || status === 'canceled' || r.unsubscribed === true) continue;
+    const confirmed = typeof r.confirmed === 'boolean' ? r.confirmed : status === 'active' || status === 'confirmed';
+    const tz = isStr(r.timezone) ? r.timezone : isStr(r.tz) ? r.tz : null;
+    out.push({ kind: r.kind, confirmed, hour: pickHour(r), tz: tz && tz.length <= 64 ? tz : null });
+  }
+  return out;
+}
+
+/** {ok, changed} from unsubscribe_my_brief / update_my_brief_time; anything else is a failure. */
+export function parseMyBriefChange(x: unknown): MyBriefChangeResult {
+  const row = Array.isArray(x) ? x[0] : x;
+  if (!isObj(row) || row.ok !== true) return { ok: false, changed: false };
+  return { ok: true, changed: row.changed !== false };
+}
+
+/** "Daily brief" / "Weekly brief (Mondays)". */
+export function mySubscriptionTitle(kind: 'daily' | 'weekly'): string {
+  return kind === 'daily' ? 'Daily brief' : 'Weekly brief (Mondays)';
 }

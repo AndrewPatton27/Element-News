@@ -1,7 +1,7 @@
 // One data interface, two implementations: sample fixtures (mock, the default) and
 // the Supabase `api` schema over plain fetch. Screens only talk to this interface.
 
-import type { AppConfig, BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, Category, CategorySlug, FeedMode, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
+import type { AppConfig, BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, Category, MyBriefChangeResult, MyBriefSubscription, CategorySlug, FeedMode, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
 import { createMockAccount, createSupabaseAccount, type AccountApi } from '../account/account.ts';
@@ -35,6 +35,11 @@ export interface Api {
   confirmBrief(token: string): Promise<BriefTokenResult>;
   updateBriefSubscription(token: string, i: BriefSubscriptionInput): Promise<BriefTokenResult>;
   unsubscribeBrief(token: string): Promise<BriefTokenResult>;
+  /** Signed-in reader's own email subscriptions. null = the server does not offer it (hide the section). */
+  mySubscriptions(): Promise<MyBriefSubscription[] | null>;
+  unsubscribeMine(kind: 'daily' | 'weekly'): Promise<MyBriefChangeResult>;
+  /** status 'unavailable' when the RPC does not exist yet. */
+  updateMyTime(kind: 'daily' | 'weekly', hour: number, tz: string): Promise<MyBriefChangeResult>;
 }
 
 export type ApiResult = { ok: true; api: Api; account: AccountApi } | { ok: false; error: string };
