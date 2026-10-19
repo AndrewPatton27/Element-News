@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BlurbCard, FeedPage } from '../../contract/types.ts';
-import { MAX_EMPTY_HOPS, decidePage, initialFeedState, loadFeedPages, needsRefill, shouldLoadMore, type FeedState } from '../feedLogic.ts';
-import { withoutHidden } from '../accountLogic.ts';
+import { MAX_EMPTY_HOPS, decidePage, initialFeedState, loadFeedPages, needsRefill, shouldLoadMore, type FeedState } from '../feed/feedLogic.ts';
+import { withoutHidden } from '../account/accountLogic.ts';
 import { card } from './helpers.ts';
 
 const page = (ids: string[], next: string | null, category = 'world'): FeedPage => ({

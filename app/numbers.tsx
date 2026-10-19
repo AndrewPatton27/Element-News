@@ -3,15 +3,15 @@
 
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useAppData } from '../lib/appData';
-import { disclaimerText } from '../lib/labels';
-import { NUMBERS_LEGEND } from '../lib/numberTone';
-import { usePalette } from '../lib/useTheme';
-import { fonts } from '../lib/theme';
-import { Disclaimer } from '../components/Labels';
-import { NumbersPanel } from '../components/NumbersPanel';
-import { ChevronLeftIcon } from '../components/Icons';
-import { Shell } from '../components/Shell';
+import { useAppData } from '../lib/shared/appData';
+import { disclaimerText } from '../lib/shared/labels';
+import { NUMBERS_LEGEND } from '../lib/numbers/numberTone';
+import { usePalette } from '../lib/theme/useTheme';
+import { fonts } from '../lib/theme/theme';
+import { Disclaimer } from '../components/card/Labels';
+import { NumbersPanel } from '../components/numbers/NumbersPanel';
+import { ChevronLeftIcon } from '../components/shell/Icons';
+import { Shell } from '../components/shell/Shell';
 
 export default function NumbersScreen() {
   const p = usePalette();

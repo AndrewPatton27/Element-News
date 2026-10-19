@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { disclaimerPlacement, disclaimerText, cardLabels } from '../labels.ts';
+import { disclaimerPlacement, disclaimerText, cardLabels } from '../shared/labels.ts';
 import { card, config, dataCard } from './helpers.ts';
 
 // Card.tsx renders the disclaimer from disclaimerPlacement: count the slots it fills.

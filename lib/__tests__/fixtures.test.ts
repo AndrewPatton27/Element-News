@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { cardLabels } from '../labels.ts';
-import { isBlurbCard, parseAppConfig, parseCategories, parseMacroFacts } from '../types.ts';
+import { cardLabels } from '../shared/labels.ts';
+import { isBlurbCard, parseAppConfig, parseCategories, parseMacroFacts } from '../shared/types.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const FIX = join(ROOT, 'contract', 'fixtures');

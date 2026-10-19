@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DWELL_MAX_MS, DwellTimer } from '../dwell.ts';
+import { DWELL_MAX_MS, DwellTimer } from '../feed/dwell.ts';
 
 test('dwell is sent when the reader moves on, only if long enough', () => {
   const t = new DwellTimer();

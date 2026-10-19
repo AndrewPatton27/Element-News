@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { takeEarlyFeed, EARLY_FEED_MAX_AGE_MS } from '../earlyFeed.ts';
+import { takeEarlyFeed, EARLY_FEED_MAX_AGE_MS } from '../feed/earlyFeed.ts';
 
 const mk = (body = '{"a":1}', t = 1000) => ({ __elementEarly: { body, t, p: Promise.resolve({ ok: 1 }) } });
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accountInitial, shortEmail } from '../accountLabel.ts';
+import { accountInitial, shortEmail } from '../account/accountLabel.ts';
 
 test('accountInitial is the upper-cased first letter, E when unknown', () => {
   assert.equal(accountInitial('drew@example.com'), 'D');

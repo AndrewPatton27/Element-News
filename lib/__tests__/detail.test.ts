@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cardDetail, detailParagraphs } from '../detail.ts';
-import { cardLabels } from '../labels.ts';
-import { isBlurbCard } from '../types.ts';
+import { cardDetail, detailParagraphs } from '../shared/detail.ts';
+import { cardLabels } from '../shared/labels.ts';
+import { isBlurbCard } from '../shared/types.ts';
 import { card } from './helpers.ts';
 
 const withDetail = (detail: unknown) => card({ detail: detail as never });

@@ -6,15 +6,15 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
-import { useAccount } from '../lib/accountContext';
-import { parseRecoveryLink, validateNewPassword, type RecoveryLink } from '../lib/session';
-import { usePalette, useWide } from '../lib/useTheme';
-import { userMessage } from '../lib/errors';
-import { fonts, font, radius } from '../lib/theme';
-import { PasswordField } from '../components/PasswordField';
-import { PrimaryButton } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
-import { LoadingState } from '../components/States';
+import { useAccount } from '../lib/account/accountContext';
+import { parseRecoveryLink, validateNewPassword, type RecoveryLink } from '../lib/account/session';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { userMessage } from '../lib/api/errors';
+import { fonts, font, radius } from '../lib/theme/theme';
+import { PasswordField } from '../components/account/PasswordField';
+import { PrimaryButton } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { LoadingState } from '../components/shell/States';
 
 let consumed: RecoveryLink | null = null; // the web link, read once per page load
 

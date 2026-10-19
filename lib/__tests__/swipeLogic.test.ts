@@ -9,7 +9,7 @@ import {
   swipeEnabled,
   swipeProgress,
   undoPress,
-} from '../swipeLogic.ts';
+} from '../feed/swipeLogic.ts';
 
 test('axis lock waits a few px, then picks the bigger move; ties go vertical', () => {
   assert.equal(lockAxis(3, 2), null);
@@ -77,7 +77,7 @@ test('coach hint: first card only, until seen', () => {
   assert.equal(showCoach({ enabled: false, seen: null, index: 0 }), false);
 });
 
-import { shouldOpenDetail } from '../swipeLogic.ts';
+import { shouldOpenDetail } from '../feed/swipeLogic.ts';
 
 const down = { x: 100, y: 100 };
 const tap = { x: 103, y: 104 };
@@ -89,14 +89,14 @@ test('a tap 100 ms after a swipe does not open detail', () => assert.equal(shoul
 test('a tap 500 ms after a swipe opens detail', () => assert.equal(shouldOpenDetail(down, tap, 100, 500), true));
 
 test('a card swiped to like or dislike never opens More detail afterwards', async () => {
-  const { markCardSwiped, wasCardSwiped } = await import('../swipeLogic.ts');
+  const { markCardSwiped, wasCardSwiped } = await import('../feed/swipeLogic.ts');
   assert.equal(wasCardSwiped('card-x'), false);
   markCardSwiped('card-x');
   assert.equal(wasCardSwiped('card-x'), true);
   assert.equal(wasCardSwiped('card-y'), false);
 });
 
-import { coachLane, COACH_LANE_PX } from '../swipeLogic.ts';
+import { coachLane, COACH_LANE_PX } from '../feed/swipeLogic.ts';
 test('swipe hint gets its own lane on every phone size, never over the card', () => {
   // pager heights are roughly window height minus header, ticker, chips and tab bar
   for (const h of [667 - 230, 844 - 250, 852 - 250, 932 - 250]) {

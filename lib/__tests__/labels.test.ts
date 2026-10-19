@@ -12,7 +12,7 @@ import {
   shareAlikeCredit,
   sourcesText,
   CC_BY_SA_LICENSE_URL,
-} from '../labels.ts';
+} from '../shared/labels.ts';
 import { card, config, dataCard } from './helpers.ts';
 
 test('exact fallback strings match the project rules', () => {

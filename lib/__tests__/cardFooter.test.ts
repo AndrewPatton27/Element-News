@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PUBLIC_SITE, delayedText, footerLabels, linkOutCredit, linkOutDelay, shareUrl } from '../../components/cardFooter.ts';
+import { PUBLIC_SITE, delayedText, footerLabels, linkOutCredit, linkOutDelay, shareUrl } from '../../components/card/cardFooter.ts';
 
 const D = 'Informational only · Not investment advice';
 const AI = 'AI-generated summary · may contain errors';

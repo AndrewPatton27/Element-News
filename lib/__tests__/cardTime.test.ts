@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { cardTime, relativeTime } from '../format.ts';
+import { cardTime, relativeTime } from '../shared/format.ts';
 import { NOW, card, dataCard } from './helpers.ts';
 
 test('cardTime: summary cards use as_of', () => {
@@ -26,7 +26,7 @@ test('cardTime: older cards fall back to a short date', () => {
 });
 
 test('the feed card and the detail sheet both use the shared cardTime helper', () => {
-  for (const file of ['../../components/Card.tsx', '../../components/DetailSheet.tsx']) {
+  for (const file of ['../../components/card/Card.tsx', '../../components/card/DetailSheet.tsx']) {
     const src = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(src, /cardTime\(card\)/, `${file} should call cardTime(card)`);
     assert.doesNotMatch(src, /relativeTime/, `${file} should not format times itself`);

@@ -15,8 +15,8 @@ import {
   serializeFollows,
   sourceLabel,
   toggleValue,
-} from '../followingLogic.ts';
-import { createMockFeatureApi } from '../api.mockFeatures.ts';
+} from '../following/followingLogic.ts';
+import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
 import { card } from './helpers.ts';
 import type { Category } from '../../contract/types.ts';
 

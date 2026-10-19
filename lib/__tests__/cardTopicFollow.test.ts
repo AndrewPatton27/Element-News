@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isTopicFollowed, toggleTopicFollow } from '../followingLogic.ts';
+import { isTopicFollowed, toggleTopicFollow } from '../following/followingLogic.ts';
 
 test('card topic follow toggles on and off without changing other follows', () => {
   const current = ['markets', 'policy'];

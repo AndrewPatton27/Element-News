@@ -17,9 +17,9 @@ import {
   trendA11yLabel,
   weekRangeLabel,
   windowText,
-} from '../briefLogic.ts';
-import { withoutHidden } from '../accountLogic.ts';
-import { withoutHiddenSources } from '../sourceKeys.ts';
+} from '../brief/briefLogic.ts';
+import { withoutHidden } from '../account/accountLogic.ts';
+import { withoutHiddenSources } from '../sources/sourceKeys.ts';
 import { card, config, dataCard, fact, NOW } from './helpers.ts';
 
 const brief = (over = {}) =>

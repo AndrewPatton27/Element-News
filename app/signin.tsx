@@ -7,17 +7,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
-import { isOnboardingSkipped, useAccount } from '../lib/accountContext';
-import { needsOnboarding } from '../lib/accountLogic';
-import { useAppData } from '../lib/appData';
-import { disclaimerText } from '../lib/labels';
-import { RESET_SENT_MESSAGE, validateCredentials, validateEmail } from '../lib/session';
-import { usePalette, useWide } from '../lib/useTheme';
-import { userMessage } from '../lib/errors';
-import { fonts, font, radius } from '../lib/theme';
-import { PasswordField, fieldStyles } from '../components/PasswordField';
-import { OutlineButton, PrimaryButton } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
+import { isOnboardingSkipped, useAccount } from '../lib/account/accountContext';
+import { needsOnboarding } from '../lib/account/accountLogic';
+import { useAppData } from '../lib/shared/appData';
+import { disclaimerText } from '../lib/shared/labels';
+import { RESET_SENT_MESSAGE, validateCredentials, validateEmail } from '../lib/account/session';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { userMessage } from '../lib/api/errors';
+import { fonts, font, radius } from '../lib/theme/theme';
+import { PasswordField, fieldStyles } from '../components/account/PasswordField';
+import { OutlineButton, PrimaryButton } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 

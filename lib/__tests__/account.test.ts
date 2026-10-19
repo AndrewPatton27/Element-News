@@ -11,7 +11,7 @@ import {
   validateCredentials,
   validateEmail,
   validateNewPassword,
-} from '../session.ts';
+} from '../account/session.ts';
 import {
   EMPTY_PREFS,
   ViewTracker,
@@ -27,9 +27,9 @@ import {
   nextFeedback,
   reactionOf,
   toggleTopic,
-} from '../accountLogic.ts';
-import { ACCOUNT_RPC, AccountError, createMockAccount, createSupabaseAccount, parseUserPrefs } from '../account.ts';
-import { memoryStore } from '../storage.ts';
+} from '../account/accountLogic.ts';
+import { ACCOUNT_RPC, AccountError, createMockAccount, createSupabaseAccount, parseUserPrefs } from '../account/account.ts';
+import { memoryStore } from '../storage/storage.ts';
 import { card } from './helpers.ts';
 
 const NOW = 1_800_000_000;

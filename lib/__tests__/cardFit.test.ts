@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldUseCompactCard } from '../cardFit.ts';
+import { shouldUseCompactCard } from '../feed/cardFit.ts';
 
 test('compact mode activates below the short-phone window threshold', () => {
   assert.equal(shouldUseCompactCard(667, 490), true);

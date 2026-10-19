@@ -5,13 +5,13 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAppData } from '../lib/appData';
-import { runMail, tokenParam, type MailOutcome } from '../lib/briefLogic';
-import { usePalette, useWide } from '../lib/useTheme';
-import { fonts, font, radius } from '../lib/theme';
-import { OutlineButton, PrimaryButton } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
-import { LoadingState } from '../components/States';
+import { useAppData } from '../lib/shared/appData';
+import { runMail, tokenParam, type MailOutcome } from '../lib/brief/briefLogic';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { fonts, font, radius } from '../lib/theme/theme';
+import { OutlineButton, PrimaryButton } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { LoadingState } from '../components/shell/States';
 
 type State = { phase: 'working' } | { phase: 'missing' } | { phase: 'result'; outcome: MailOutcome };
 

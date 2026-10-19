@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, createSupabaseApi } from '../api.supabase.ts';
-import { AccountError, createSupabaseAccount, planRpc } from '../account.ts';
-import { GENERIC_MESSAGE, NETWORK_MESSAGE, friendlyHttpError, isInvalidCursor, parseErrorBody, rawDetail, userMessage } from '../errors.ts';
-import { memoryStore } from '../storage.ts';
+import { ApiError, createSupabaseApi } from '../api/api.supabase.ts';
+import { AccountError, createSupabaseAccount, planRpc } from '../account/account.ts';
+import { GENERIC_MESSAGE, NETWORK_MESSAGE, friendlyHttpError, isInvalidCursor, parseErrorBody, rawDetail, userMessage } from '../api/errors.ts';
+import { memoryStore } from '../storage/storage.ts';
 
 const URL_ = 'https://abc123.supabase.co';
 const KEY = 'sb_publishable_testkey123';

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFollowedStories, toggleStory, isStoryFollowed, updatesFor, storyBadge, storiesHeader, sortStories, serializeFollowedStories, MAX_FOLLOWED_STORIES, clearStoryUpdatesCache, loadStoryUpdates, STORY_UPDATES_TTL_MS } from '../followedStories.ts';
+import { parseFollowedStories, toggleStory, isStoryFollowed, updatesFor, storyBadge, storiesHeader, sortStories, serializeFollowedStories, MAX_FOLLOWED_STORIES, clearStoryUpdatesCache, loadStoryUpdates, STORY_UPDATES_TTL_MS } from '../following/followedStories.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 
 const c = (id: string, published_at: string) => ({ id, published_at, sources: [] }) as unknown as BlurbCard;

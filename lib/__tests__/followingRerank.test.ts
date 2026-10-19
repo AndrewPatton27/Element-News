@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rerankFollowing } from '../followingRerank.ts';
-import { EMPTY_LOCAL, withReaction } from '../localPrefs.ts';
+import { rerankFollowing } from '../following/followingRerank.ts';
+import { EMPTY_LOCAL, withReaction } from '../storage/localPrefs.ts';
 import { card } from './helpers.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 

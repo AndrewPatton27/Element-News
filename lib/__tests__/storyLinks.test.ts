@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMockFeatureApi } from '../api.mockFeatures.ts';
+import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
 import { card } from './helpers.ts';
 
 test('linked stories appear first in related cards and Following with exact reasons', () => {

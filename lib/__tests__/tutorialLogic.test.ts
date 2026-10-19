@@ -18,9 +18,9 @@ import {
   shouldAutoShow,
   trapTabIndex,
   type PracticeEvent,
-} from '../tutorialLogic.ts';
-import { PRACTICE_SAMPLE, TUTORIAL_AI_LABEL, TUTORIAL_MOTION, getTutorialSteps } from '../tutorialSteps.ts';
-import { memoryStore, type KeyValueStore } from '../storage.ts';
+} from '../tutorial/tutorialLogic.ts';
+import { PRACTICE_SAMPLE, TUTORIAL_AI_LABEL, TUTORIAL_MOTION, getTutorialSteps } from '../tutorial/tutorialSteps.ts';
+import { memoryStore, type KeyValueStore } from '../storage/storage.ts';
 
 test('seen flag: unset on first visit, set after markTutorialSeen, versioned key', () => {
   const s = memoryStore();
@@ -230,7 +230,7 @@ test('practice code imports nothing that can save, send or share', () => {
   const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
   const imports = (src: string) => [...src.matchAll(/^import\s+(type\s+)?[^;]*?from\s+'([^']+)'/gms)].map((m) => ({ typeOnly: !!m[1], from: m[2] }));
   const banned = /(\/api|\/storage|localPrefs|account|analytics|supabase|dwell|feedback)/i;
-  for (const file of ['../tutorialLogic.ts', '../../components/TutorialPractice.tsx', '../../components/TutorialParts.tsx', '../../components/TutorialMotion.tsx']) {
+  for (const file of ['../tutorial/tutorialLogic.ts', '../../components/tutorial/TutorialPractice.tsx', '../../components/tutorial/TutorialParts.tsx', '../../components/tutorial/TutorialMotion.tsx']) {
     const src = read(file);
     for (const imp of imports(src)) {
       if (imp.typeOnly) continue;
@@ -267,7 +267,7 @@ test('motion values match the design @keyframes', () => {
 });
 
 test('bottom buttons: Back hidden on step 1, Next becomes Done on the last step', async () => {
-  const { navButtons, nextOrDone } = await import('../tutorialLogic.ts');
+  const { navButtons, nextOrDone } = await import('../tutorial/tutorialLogic.ts');
   assert.deepEqual(navButtons(0, 4), { showBack: false, primaryLabel: 'Next' });
   assert.deepEqual(navButtons(2, 4), { showBack: true, primaryLabel: 'Next' });
   assert.deepEqual(navButtons(3, 4), { showBack: true, primaryLabel: 'Done' });

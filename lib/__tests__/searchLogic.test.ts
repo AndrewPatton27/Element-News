@@ -14,7 +14,7 @@ import {
   searchTarget,
   serializeRecents,
   suggestedTopics,
-} from '../searchLogic.ts';
+} from '../search/searchLogic.ts';
 import type { Category } from '../../contract/types.ts';
 
 test('normalizeQuery trims, collapses spaces and caps the length', () => {
