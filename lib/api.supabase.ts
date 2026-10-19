@@ -6,6 +6,7 @@ import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../contract/types.ts';
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from './feedLogic.ts';
+import { takeEarlyFeed, type EarlyFeed } from './earlyFeed.ts';
 import { isBlurbCard, isMacroFact, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseNumberTrends, parseSubscribeResult, parseTokenResult } from './types.ts';
 
 export interface SupabaseOptions {
@@ -144,7 +145,16 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     async feed(req) {
       const token = opts.getToken ? await opts.getToken() : null;
       try {
-        return parseFeedPage(await call(planRequest(opts.url, opts.key, 'feed', req, token)));
+        const plan = planRequest(opts.url, opts.key, 'feed', req, token);
+        // First page: the inline script in index.html may already have it in flight (lib/earlyFeed.ts).
+        const early = opts.fetchFn ? null : takeEarlyFeed(globalThis as { __elementEarly?: EarlyFeed }, plan.init.body, !!token);
+        if (early) {
+          const json = await early;
+          if (json) {
+            try { return parseFeedPage(json); } catch { /* fall through to a normal request */ }
+          }
+        }
+        return parseFeedPage(await call(plan));
       } catch (e) {
         // api.feed is the same for everyone: if the user's token is rejected, read it as a guest.
         if (e instanceof ApiError && e.status === 401 && token) return parseFeedPage(await call(planRequest(opts.url, opts.key, 'feed', req, null)));

@@ -13,6 +13,7 @@ const dist = process.argv[2] ?? 'dist';
 
 injectCloudflareBeacon(dist);
 injectSplash(dist);
+injectEarlyLoad(dist);
 writeHeaders(dist);
 
 const assets = join(dist, 'assets');
@@ -115,4 +116,46 @@ function injectCloudflareBeacon(outDir) {
   }
   writeFileSync(htmlPath, html.replace('</head>', `${beacon}</head>`));
   console.log('fix-pages-assets: injected Cloudflare Web Analytics beacon');
+}
+
+// Start the network work before the 1+ MB bundle runs: preconnect to the Supabase origin,
+// fetch the first feed page from an inline script (lib/earlyFeed.ts hands it to api.feed),
+// and preload the two route chunks the first screen needs (they are otherwise discovered only
+// after the main bundle has run). Only the public URL and publishable key are used.
+function readEnvValue(name) {
+  if (process.env[name]) return process.env[name];
+  try {
+    const line = readFileSync('.env', 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
+    return line ? line.slice(name.length + 1).split('#')[0].trim().replace(/^["']|["']$/g, '') : '';
+  } catch { return ''; }
+}
+
+function injectEarlyLoad(outDir) {
+  const htmlPath = join(outDir, 'index.html');
+  if (!existsSync(htmlPath)) return;
+  let html = readFileSync(htmlPath, 'utf8');
+  if (html.includes('__elementEarly')) return;
+  let tags = '';
+  const jsDir = join(outDir, '_expo', 'static', 'js', 'web');
+  if (existsSync(jsDir)) {
+    for (const prefix of ['_layout-', 'index-']) {
+      const f = readdirSync(jsDir).find((n) => n.startsWith(prefix) && n.endsWith('.js'));
+      if (f) tags += `<link rel="preload" as="script" href="/_expo/static/js/web/${f}" />`;
+    }
+  }
+  const url = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
+  const key = readEnvValue('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  const live = readEnvValue('EXPO_PUBLIC_API_MODE').toLowerCase() === 'supabase' && /^https:\/\/[\w.-]+$/.test(url) && /^[\w.-]+$/.test(key);
+  if (live) {
+    // The body must equal what planRequest builds for the first Trending page (key order matters).
+    const body = JSON.stringify({ p_mode: 'top', p_cursor: null, p_limit: 10, p_category: null });
+    const headers = { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+    tags += `<link rel="preconnect" href="${url}" crossorigin />`;
+    tags += `<script>(function(){try{if(localStorage.getItem('element.session.v1'))return;var b=${JSON.stringify(body)};window.__elementEarly={body:b,t:Date.now(),p:fetch(${JSON.stringify(`${url}/rest/v1/rpc/feed`)},{method:'POST',headers:${JSON.stringify(headers)},body:b}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})}}catch(e){}})()</script>`;
+  }
+  if (!tags) return;
+  // Right after <head> so these start first.
+  html = html.replace('<head>', `<head>${tags}`);
+  writeFileSync(htmlPath, html);
+  console.log(`fix-pages-assets: early load tags injected (supabase prefetch ${live ? 'on' : 'off'})`);
 }
