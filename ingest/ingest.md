@@ -81,7 +81,7 @@ Keys are never printed (`[set]` / `[missing]` only), never put in URLs except wh
 
 ## Outputs
 
-- Rows in Supabase through the service-role RPCs `api.upsert_item`, `api.set_item_status`, `api.publish_blurb`, `api.upsert_macro`, `api.refresh_trending` (end of each run), and for `--rewrite` `api.blurbs_to_revise` / `api.revise_blurb`.
+- Rows in Supabase through the service-role RPCs `api.upsert_item`, `api.set_item_status`, `api.publish_blurb`, `api.upsert_macro`, `api.refresh_trending` and then `api.ml_purge` (end of each run; the purge removes old ML shadow-log rows and applies the storage stop rule, and a failure only logs a warning), and for `--rewrite` `api.blurbs_to_revise` / `api.revise_blurb`.
 - `state/ai-usage.json`: AI calls per provider for the current UTC day. Gemini's daily cap is `min(600, free requests per day)` = 500; Groq's is `min(80, requests per day, tokens per day / estimated tokens per call)` = 80 (`src/config.ts`).
 - `cache/`: cached page responses.
 

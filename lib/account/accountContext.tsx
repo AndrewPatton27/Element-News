@@ -2,6 +2,7 @@
 // like/dislike per card, and event tracking (view, open_source, like, dislike).
 // Works the same over the mock account (sample mode) and Supabase.
 
+import type { ShadowContext } from '../ml/shadowLog.ts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BlurbCard } from '../../contract/types.ts';
 import type { AccountApi, EmailChangeResult, SignUpResult } from './account.ts';
@@ -49,7 +50,7 @@ export interface AccountState {
   skipOnboarding(): void;
   react(card: BlurbCard, pressed: Feedback): void;
   noteCards(cards: BlurbCard[]): void; // pick up my_reaction from For you cards
-  trackView(card: BlurbCard): void;
+  trackView(card: BlurbCard, shadow?: ShadowContext | null): void;
   trackDwell(cardId: string, ms: number): void;
   trackDwellOnExit(cardId: string, ms: number): void;
   trackOpenDetail(card: BlurbCard): void;
@@ -266,9 +267,9 @@ export function AccountProvider({ account, children }: { account: AccountApi; ch
         );
       },
       noteCards,
-      trackView(card) {
+      trackView(card, shadow) {
         if (!user || !views.current.shouldTrack(card.id)) return;
-        account.track(card.id, 'view').catch(() => undefined);
+        account.track(card.id, 'view', undefined, shadow).catch(() => undefined);
       },
       // Fire and forget: tracking never blocks or breaks the UI.
       trackDwell(cardId, ms) {

@@ -152,6 +152,22 @@ export async function refreshTrendingSafely(publisher: Deps['publisher'], log: (
   }
 }
 
+/**
+ * Purge old ML shadow-log rows after a run (api.ml_purge: page records after 21 days, old runs,
+ * and the storage stop rule). Runs even when the ML job is off. Never fails the run: a missing RPC
+ * (older migration) or an error logs one line.
+ */
+export async function mlPurgeSafely(publisher: Deps['publisher'], log: (s: string) => void): Promise<void> {
+  if (!publisher.mlPurge) return;
+  try {
+    const r = await publisher.mlPurge() as { stopped?: boolean } | null;
+    log(`ml purge: ${JSON.stringify(r)}`);
+    if (r?.stopped) log('warning: database over ml_db_stop_mb; ML logging modes were set to 0');
+  } catch (e) {
+    log(`warning: ml purge failed (${(e as Error).message}); cards are still published`);
+  }
+}
+
 /** `--fix-category <id> <slug>`: re-files one card through api.set_card_category. Returns the process exit code. */
 export async function fixCategory(argv: string[], publisher: Pick<Deps['publisher'], 'setCardCategory'>, log: (s: string) => void = console.log): Promise<number> {
   const [flag, id, slug] = argv;
@@ -226,6 +242,7 @@ export async function main(argv: string[]): Promise<number> {
     }
     const stats = await runOnce(deps, { only: args.only, limit: args.limit });
     await refreshTrendingSafely(deps.publisher, log);
+    await mlPurgeSafely(deps.publisher, log);
     log(`dry run: ${JSON.stringify(stats)}`);
     if (args.json) console.log(JSON.stringify({ cards: dry.cards, macro: dry.macro }, null, 2));
     return 0;
@@ -260,6 +277,7 @@ export async function main(argv: string[]): Promise<number> {
     deps.now = new Date();
     const stats = await runOnce(deps, { only: args.only, limit: args.limit });
     await refreshTrendingSafely(deps.publisher, log);
+    await mlPurgeSafely(deps.publisher, log);
     log(`run finished ${deps.now.toISOString()}: ${JSON.stringify(stats)}`);
     if (args.loop) await new Promise((r) => setTimeout(r, config.pollIntervalMinutes * 60_000));
   } while (args.loop);

@@ -20,6 +20,8 @@ export interface Publisher {
   reviseBlurb?(p: RevisePayload): Promise<{ status: 'revised' | 'hidden' | 'not_found'; id: string }>;
   /** End of a run: recompute the Trending boosts from recent interactions (api.refresh_trending). */
   refreshTrending?(): Promise<unknown>;
+  /** End of a run: purge old ML shadow-log rows and apply the storage stop rule (api.ml_purge). */
+  mlPurge?(): Promise<unknown>;
   auditCards?(): Promise<RevisableCard[]>;
   setAuditStatus?(id: string, status: string): Promise<void>;
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
@@ -69,6 +71,7 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
     listToRevise: (current, limit) => rpc('blurbs_to_revise', { p_current: current, p_limit: limit }),
     reviseBlurb: (p) => rpc('revise_blurb', { p }),
     refreshTrending: () => rpc('refresh_trending', {}),
+    mlPurge: () => rpc('ml_purge', {}),
     async auditCards() {
       const rows: RevisableCard[] = [];
       // api.feed(mode,cursor,limit,category) is the deployed anon RPC. Follow cursors
@@ -98,7 +101,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
   const macro: MacroObservation[] = [];
   const revisions: RevisePayload[] = [];
   const seen = new Set<string>();
-  const trending = { refreshes: 0 };
+  const trending = { refreshes: 0, mlPurges: 0 };
   const categories: Array<{ id: string; category: string }> = [];
   const publisher: Publisher = {
     async upsertItem(item) {
@@ -123,6 +126,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
     },
     async setCardCategory(id, category) { categories.push({ id, category }); return { status: 'updated', id, category }; },
     async refreshTrending() { trending.refreshes += 1; return { generation: trending.refreshes, boosted: 0 }; },
+    async mlPurge() { trending.mlPurges += 1; return { pages: 0, events: 0, runs: 0, stopped: false }; },
   };
   return { publisher, items, cards, macro, revisions, trending, categories };
 }

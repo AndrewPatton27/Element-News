@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { Api } from '../api/api.ts';
 import type { AccountApi } from '../account/account.ts';
+import { pageIds, surfaceForTab } from '../ml/shadowLog.ts';
 import { rerankQueue, shouldFetchAhead } from './queueLogic.ts';
 import type { LocalPrefs } from '../storage/localPrefs.ts';
 import { readLocal } from '../storage/localPrefs.ts';
@@ -99,6 +100,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
               // diversify last). Trending's top ids are only needed on page 1.
               const [page, top] = await Promise.all([account.feedForYou(c, 10), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
               const topItems = trendingOrder(top?.items ?? []);
+              pageIds.note('for_you', page);
               return { ...page, items: finishForYou(page.items, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null) };
             }
             if (query.mode === 'for_you') {
@@ -115,6 +117,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
             const page = await api.feed({ mode: query.mode, category: query.category, cursor: c, limit: 10 });
+            pageIds.note(surfaceForTab(query.mode), page);
             // Re-order only this fetched page (the server's cursor does not depend on item order); pages
             // already shown are never touched. Latest = published_at desc; Trending = lib/feedOrder.ts trendingOrder.
             const items = query.mode === 'latest' ? sortLatest(dedupeCards(page.items)) : query.mode === 'top' ? trendingOrder(dedupeCards(page.items)) : page.items;
