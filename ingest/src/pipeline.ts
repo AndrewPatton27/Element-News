@@ -25,6 +25,7 @@ import { createChainState, summarizeWithChain, type ChainState, type UsageCounte
 import type { RawItem, Summarizer } from './types.ts';
 import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState } from './topicFilter.ts';
+import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
 export type SourceName = 'macro' | 'fed' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
@@ -41,6 +42,8 @@ export interface Deps {
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
   reportCard?: { enabled?: boolean; scorer?: ScoreClient };
+  /** Candidate selection overrides (tests, flags): enabled replaces config.selection.enabled. */
+  selection?: { enabled?: boolean };
 }
 
 export interface RunOptions {
@@ -102,6 +105,9 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   topicFilterState = createTopicFilterState();
   runRecent = null;
 
+  const select = deps.selection?.enabled ?? config.selection.enabled;
+  collector = select ? [] : null;                    // selection on: sources only collect; the budget is spent below
+  try {
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
   if (only.has('bea')) await runBea(deps, ctx);
@@ -111,6 +117,8 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
+  if (collector) await runSelected(collector, deps, ctx, opts.limit ?? 20);
+  } finally { collector = null; }
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
@@ -200,8 +208,9 @@ async function runWiki(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
       deps.log(`wiki: feed for ${label} failed: ${(e as Error).message}`);
     }
   }
-  const p = await processItems(items, deps, stats, budget, guard, chain, async () => '');
-  deps.log(`wiki: ${config.wiki.lookbackDays} days read (${perDay.join('; ')}); ${items.length} candidates, ${p.fresh} new, ${p.alreadyHandled} already handled`);
+  await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, {
+    onDone: (p) => deps.log(`wiki: ${config.wiki.lookbackDays} days read (${perDay.join('; ')}); ${items.length} candidates, ${p.fresh} new, ${p.alreadyHandled} already handled`),
+  });
 }
 
 /**
@@ -219,9 +228,11 @@ async function runCpsc(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
       if ('item' in x) items.push(x.item);
       else { stats.skipped++; deps.log(`skip ${x.skip}: CPSC recall ${r.RecallNumber ?? ''}`); }
     }
-    const p = await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, { total: config.cpsc.maxPerRun });
-    deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates, `
-      + `${p.alreadyHandled} already handled, ${p.fresh} new processed (max ${config.cpsc.maxPerRun} new per run)`);
+    await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, {
+      total: config.cpsc.maxPerRun,
+      onDone: (p) => deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates, `
+        + `${p.alreadyHandled} already handled, ${p.fresh} new processed (max ${config.cpsc.maxPerRun} new per run)`),
+    });
   } catch (e) {
     deps.log(`cpsc: feed failed: ${(e as Error).message}`);
   }
@@ -243,9 +254,10 @@ async function runNasa(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
       }
     }
     const items = selectNasaReleases(all, deps.now).map((i) => nasaToItem(i, deps.now));
-    const p = await processItems(items, deps, stats, budget, guard, chain, async () => '');
-    deps.log(`nasa: ${all.length} feed items over ${config.nasa.feedPages} page(s), ${items.length} news releases in the last ${config.nasa.maxAgeDays} days, `
-      + `${p.alreadyHandled} already handled, ${p.fresh} new`);
+    await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, {
+      onDone: (p) => deps.log(`nasa: ${all.length} feed items over ${config.nasa.feedPages} page(s), ${items.length} news releases in the last ${config.nasa.maxAgeDays} days, `
+        + `${p.alreadyHandled} already handled, ${p.fresh} new`),
+    });
   } catch (e) {
     deps.log(`nasa: feed failed: ${(e as Error).message}`);
   }
@@ -347,6 +359,78 @@ async function runSec(
   }
 }
 
+interface ItemRow { id: string; is_new: boolean; status: string }
+
+/** One source's candidates plus everything handleItem needs; counters are per job (per source run). */
+interface Job {
+  items: RawItem[];
+  deps: Deps;
+  stats: RunStats;
+  budget: { left: number };
+  guard: ReturnType<typeof createGuard>;
+  chain: ChainState;
+  pageText: (it: RawItem) => Promise<string>;
+  preCheck: (it: RawItem, text: string) => string | null;
+  limits: NewLimits;
+  fresh: number;
+  alreadyHandled: number;
+  perGroup: Map<string, number>;
+}
+
+/** Set during a run with candidate selection on: processItems queues its job here instead of spending budget. */
+let collector: Job[] | null = null;
+
+/**
+ * Candidate selection. Step 1 (per job, no AI): dedupe/ticker guard, topic filter and the already-handled check
+ * (upsert) drop what cannot become a card. Step 2: score what is left without AI (importance, freshness) and spend
+ * the budget in score order with a per-source soft cap (config.selection). Every per-item guard in handleItem
+ * (ticker cap, group caps, narrow-source cap, new-item totals, copy limits, report card) still runs at spend time.
+ */
+async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: number): Promise<void> {
+  const cands: Array<{ source: string; score: number; job: Job; it: RawItem; row: ItemRow }> = [];
+  for (const job of jobs) {
+    let newHere = 0;
+    const groupNew = new Map<string, number>();
+    for (const it of job.items) {
+      if (job.limits.total !== undefined && newHere >= job.limits.total) { deps.log(`new-item limit reached (${job.limits.total} new per run)`); break; }
+      const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
+      const d = ctx.guard.check(cand);
+      if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); ctx.stats.skipped++; continue; }
+      const topicReject = filterTopic(it, topicFilterState);
+      if (topicReject) { ctx.stats.skipped++; deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`); continue; }
+      const lg = job.limits.group;
+      const group = lg?.of(it) ?? null;
+      if (lg && group !== null && (groupNew.get(group) ?? 0) >= lg.max) {           // group cap counts NEW items only, so capped ones are not even recorded
+        ctx.stats.skipped++;
+        deps.log(`skip ${lg.skip} (max ${lg.max} ${lg.label} per run): ${it.title.slice(0, 80)}`);
+        continue;
+      }
+      const row = await deps.publisher.upsertItem(it);
+      if (!row.is_new && row.status !== 'new') { ctx.stats.skipped++; job.alreadyHandled++; continue; }   // handled in an earlier run
+      if (group !== null) groupNew.set(group, (groupNew.get(group) ?? 0) + 1);
+      newHere++;
+      cands.push({ source: it.source, score: baseScore(it, deps.now), job, it, row });
+    }
+  }
+  const cap = softCap(budgetTotal);
+  const spent = new Map<string, number>();
+  const bySource = new Map<string, number>();
+  for (const c of cands) bySource.set(c.source, (bySource.get(c.source) ?? 0) + 1);
+  deps.log(`selection: ${cands.length} candidates (${[...bySource].map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}), budget ${budgetTotal}, per-source soft cap ${cap}`);
+  while (cands.length) {
+    if (ctx.budget.left <= 0) { deps.log('limit reached'); break; }
+    const i = pickNext(cands, spent, cap);
+    const [c] = cands.splice(i, 1);
+    if (c.job.limits.total !== undefined && c.job.fresh >= c.job.limits.total) continue;   // that source's own new-item cap is full
+    const before = ctx.budget.left;
+    await handleItem(c.job, c.it, c.row);
+    const used = before - ctx.budget.left;
+    if (used > 0) spent.set(c.source, (spent.get(c.source) ?? 0) + used);
+  }
+  for (const job of jobs) job.limits.onDone?.({ fresh: job.fresh, alreadyHandled: job.alreadyHandled });
+  deps.log(`selection: picked ${[...spent].map(([k, n]) => `${k} ${n}`).join(', ') || 'nothing'}`);
+}
+
 /**
  * Limits on how many NEW items one processItems call works on. "New" = not handled by an earlier run
  * (the same check as the `is_new`/status test after `upsertItem`), so items already published or
@@ -357,6 +441,8 @@ export interface NewLimits {
   total?: number;
   /** At most `max` new items per group (`of` returns the group key, null = no group). The rest are skipped with `skip <skip>`. */
   group?: { of(it: RawItem): string | null; max: number; skip: string; label: string };
+  /** Called once the job's items are worked through (at once, or after candidate selection) with its final counts. */
+  onDone?: (p: { fresh: number; alreadyHandled: number }) => void;
 }
 
 /**
@@ -384,149 +470,155 @@ async function processItems(
   preCheck: (it: RawItem, text: string) => string | null = () => null,
   limits: NewLimits = {},
 ): Promise<{ fresh: number; alreadyHandled: number }> {
-  let fresh = 0;
-  let alreadyHandled = 0;
-  const perGroup = new Map<string, number>();
+  const job: Job = { items, deps, stats, budget, guard, chain, pageText, preCheck, limits, fresh: 0, alreadyHandled: 0, perGroup: new Map() };
+  if (collector) { collector.push(job); return { fresh: 0, alreadyHandled: 0 }; }   // candidate selection: spent later by runSelected
   for (const it of items) {
     if (budget.left <= 0) { deps.log('limit reached'); break; }
-    if (limits.total !== undefined && fresh >= limits.total) {
+    if (limits.total !== undefined && job.fresh >= limits.total) {
       deps.log(`new-item limit reached (${limits.total} new per run)`);
       break;
     }
-    const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
-    const d = guard.check(cand);
-    if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); stats.skipped++; continue; }
-    const topicReject = filterTopic(it, topicFilterState);
-    if (topicReject) {
-      stats.skipped++;
-      deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`);
-      continue;
-    }
-    const group = limits.group?.of(it) ?? null;
-    if (group !== null && limits.group && (perGroup.get(group) ?? 0) >= limits.group.max) {
-      stats.skipped++;
-      deps.log(`skip ${limits.group.skip} (max ${limits.group.max} ${limits.group.label} per run): ${it.title.slice(0, 80)}`);
-      continue;
-    }
-
-    const row = await deps.publisher.upsertItem(it);
-    if (!row.is_new && row.status !== 'new') { stats.skipped++; alreadyHandled++; continue; }   // handled in an earlier run
-    fresh++;
-    recordTopic(it, topicFilterState);
-    if (group !== null) perGroup.set(group, (perGroup.get(group) ?? 0) + 1);
-
-    let text = it.summary_text;
-    try {
-      const page = await pageText(it);
-      if (page) text = `${it.summary_text}\n\n${page}`.slice(0, config.sourceTextMaxChars);
-    } catch (e) {
-      deps.log(`page text unavailable (feed text only): ${it.url}: ${(e as Error).message}`);
-    }
-
-    const pre = preCheck(it, text);
-    if (pre) {
-      stats.skipped++;
-      deps.log(`skip ${pre}: ${it.title}`);
-      await deps.publisher.setItemStatus(row.id, 'skipped', pre).catch(() => {});
-      continue;
-    }
-
-    budget.left--;
-    try {
-      const r = await summarizeWithChain({ item: it, text }, deps.providers, deps.counter, {
-        state: chain, minRelevance: config.minEverydayRelevance, requireRelevance: true,   // caps and pacing per provider
-      });
-      if (r.low_relevance) {
-        // Scored too low by the AI (one call spent, nothing published). The score is kept in ingest.items.status_note.
-        stats.skipped++;
-        deps.log(`skip low_relevance (${r.relevance}): ${it.title}`);
-        await deps.publisher.setItemStatus(row.id, 'skipped', `low_relevance (${r.relevance})`).catch(() => {});
-        continue;
-      }
-      if (requiresFigures(it) && !hasFigures(r.draft.body)) {
-        // An earnings card without a single figure (the AI could not find any, or only the template was left)
-        // is never published. If an AI draft was tried and rejected for it, retrying later would repeat the
-        // same result, so the item is closed; if no AI was available, it stays 'new' for a later run.
-        stats.skipped++;
-        deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}`);
-        if (r.log.some((l) => /no_figures/.test(l))) await deps.publisher.setItemStatus(row.id, 'skipped', 'no_figures').catch(() => {});
-        continue;
-      }
-      if (!r.ai_generated && !templateAllowed(it)) {
-        stats.skipped++;
-        // Item status stays 'new' on purpose: a later run with a working AI provider retries it.
-        deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}`);
-        continue;
-      }
-      let payload = buildPublishPayload(it, r.draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
-      const v = validatePublish(payload);
-      if (!v.ok) throw new Error(v.errors.join('; '));
-      let cardScore: CardScore | null = null;
-      // Report-card protocol (config.reportCard.protocolEnabled, OFF by default; REPORT_CARD_PROTOCOL=1 or
-      // deps.reportCard turns it on): the writer (Gemini, else Groq via the chain) wrote the card, Groq scores it,
-      // one revision on REVISE, ABANDON/DUPLICATE are not published. Template cards are not scored.
-      const protocolOn = deps.reportCard?.enabled ?? config.reportCard.protocolEnabled;
-      const scorer = deps.reportCard?.scorer ?? ((): ScoreClient | null => {
-        const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
-        return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
-      })();
-      if (protocolOn && r.ai_generated && scorer) {
-        const recent = await recentCards(deps);
-        const candidate = { id: row.id, ai_generated: payload.ai_generated, as_of: payload.as_of, sources: [{ name: it.source_name, url: it.url }] } as any;
-        const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
-        const rv = await reviewCard({
-          client: scorer, card: candidate, payload, recent,
-          rewrite: async (recs) => {
-            if (!writer) throw new Error('writer unavailable');
-            const d2 = await writer.summarize({ item: it, text, retryErrors: recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'] });
-            const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
-            const v2 = validatePublish(p2);
-            if (!v2.ok) throw new Error(v2.errors.join('; '));
-            if (requiresFigures(it) && !hasFigures(p2.body)) throw new Error('no_figures');
-            return p2;
-          },
-        });
-        stats.report_provider_groq += rv.scoreCalls;
-        if (rv.revised) stats.report_revise++;
-        cardScore = rv.score;
-        if (rv.verdict === 'unscored') {
-          stats.skipped++;                                   // item stays 'new': a later run tries it again
-          deps.log(`skip report_card_unscored (${rv.error ?? 'no score'}): ${it.title}`);
-          continue;
-        }
-        if (rv.verdict !== 'publish') {
-          if (rv.verdict === 'duplicate') stats.report_duplicate++;
-          stats.report_abandon++;
-          const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
-          stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
-          await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
-          continue;
-        }
-        payload = rv.payload;
-        stats.report_pass++;
-      }
-      const res = await deps.publisher.publishBlurb(payload);
-      stats[res.status === 'published' ? 'published' : res.status]++;
-      if (res.status === 'published') {
-        stats[r.ai_generated ? 'ai' : 'template']++;
-        guard.record(cand);
-        if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
-          await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
-        if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
-      }
-      const notes = r.log.length > 1 ? [...r.log] : [];
-      if (r.relevance !== null) notes.push(`relevance ${r.relevance}`);
-      if (it.source === 'sec_8k' && r.ai_generated && r.draft.category !== payload.category) {
-        notes.push(`category ${r.draft.category} -> ${payload.category} (8-K items)`);
-      }
-      deps.log(`${res.status} [${r.provider}] ${payload.headline}${notes.length ? `  (${notes.join(' | ')})` : ''}`);
-    } catch (e) {
-      stats.failed++;
-      deps.log(`failed: ${it.url}: ${(e as Error).message}`);
-      await deps.publisher.setItemStatus(row.id, 'failed', (e as Error).message).catch(() => {});
-    }
+    await handleItem(job, it, null);
   }
-  return { fresh, alreadyHandled };
+  limits.onDone?.({ fresh: job.fresh, alreadyHandled: job.alreadyHandled });
+  return { fresh: job.fresh, alreadyHandled: job.alreadyHandled };
+}
+
+/** One candidate item through steps 2-7 of processItems. `known` = the item row when the selection step already recorded it. */
+async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise<void> {
+  const { deps, stats, budget, guard, chain, pageText, preCheck, limits, perGroup } = job;
+  const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
+  const d = guard.check(cand);
+  if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); stats.skipped++; return; }
+  const topicReject = filterTopic(it, topicFilterState);
+  if (topicReject) {
+    stats.skipped++;
+    deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`);
+    return;
+  }
+  const group = limits.group?.of(it) ?? null;
+  if (group !== null && limits.group && (perGroup.get(group) ?? 0) >= limits.group.max) {
+    stats.skipped++;
+    deps.log(`skip ${limits.group.skip} (max ${limits.group.max} ${limits.group.label} per run): ${it.title.slice(0, 80)}`);
+    return;
+  }
+
+  const row = known ?? await deps.publisher.upsertItem(it);
+  if (!known && !row.is_new && row.status !== 'new') { stats.skipped++; job.alreadyHandled++; return; }   // handled in an earlier run
+  job.fresh++;
+  recordTopic(it, topicFilterState);
+  if (group !== null) perGroup.set(group, (perGroup.get(group) ?? 0) + 1);
+
+  let text = it.summary_text;
+  try {
+    const page = await pageText(it);
+    if (page) text = `${it.summary_text}\n\n${page}`.slice(0, config.sourceTextMaxChars);
+  } catch (e) {
+    deps.log(`page text unavailable (feed text only): ${it.url}: ${(e as Error).message}`);
+  }
+
+  const pre = preCheck(it, text);
+  if (pre) {
+    stats.skipped++;
+    deps.log(`skip ${pre}: ${it.title}`);
+    await deps.publisher.setItemStatus(row.id, 'skipped', pre).catch(() => {});
+    return;
+  }
+
+  budget.left--;
+  try {
+    const r = await summarizeWithChain({ item: it, text }, deps.providers, deps.counter, {
+      state: chain, minRelevance: config.minEverydayRelevance, requireRelevance: true,   // caps and pacing per provider
+    });
+    if (r.low_relevance) {
+      // Scored too low by the AI (one call spent, nothing published). The score is kept in ingest.items.status_note.
+      stats.skipped++;
+      deps.log(`skip low_relevance (${r.relevance}): ${it.title}`);
+      await deps.publisher.setItemStatus(row.id, 'skipped', `low_relevance (${r.relevance})`).catch(() => {});
+      return;
+    }
+    if (requiresFigures(it) && !hasFigures(r.draft.body)) {
+      // An earnings card without a single figure (the AI could not find any, or only the template was left)
+      // is never published. If an AI draft was tried and rejected for it, retrying later would repeat the
+      // same result, so the item is closed; if no AI was available, it stays 'new' for a later run.
+      stats.skipped++;
+      deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}`);
+      if (r.log.some((l) => /no_figures/.test(l))) await deps.publisher.setItemStatus(row.id, 'skipped', 'no_figures').catch(() => {});
+      return;
+    }
+    if (!r.ai_generated && !templateAllowed(it)) {
+      stats.skipped++;
+      // Item status stays 'new' on purpose: a later run with a working AI provider retries it.
+      deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}`);
+      return;
+    }
+    let payload = buildPublishPayload(it, r.draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
+    const v = validatePublish(payload);
+    if (!v.ok) throw new Error(v.errors.join('; '));
+    let cardScore: CardScore | null = null;
+    // Report-card protocol (config.reportCard.protocolEnabled, OFF by default; REPORT_CARD_PROTOCOL=1 or
+    // deps.reportCard turns it on): the writer (Gemini, else Groq via the chain) wrote the card, Groq scores it,
+    // one revision on REVISE, ABANDON/DUPLICATE are not published. Template cards are not scored.
+    const protocolOn = deps.reportCard?.enabled ?? config.reportCard.protocolEnabled;
+    const scorer = deps.reportCard?.scorer ?? ((): ScoreClient | null => {
+      const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
+      return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
+    })();
+    if (protocolOn && r.ai_generated && scorer) {
+      const recent = await recentCards(deps);
+      const candidate = { id: row.id, ai_generated: payload.ai_generated, as_of: payload.as_of, sources: [{ name: it.source_name, url: it.url }] } as any;
+      const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
+      const rv = await reviewCard({
+        client: scorer, card: candidate, payload, recent,
+        rewrite: async (recs) => {
+          if (!writer) throw new Error('writer unavailable');
+          const d2 = await writer.summarize({ item: it, text, retryErrors: recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'] });
+          const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
+          const v2 = validatePublish(p2);
+          if (!v2.ok) throw new Error(v2.errors.join('; '));
+          if (requiresFigures(it) && !hasFigures(p2.body)) throw new Error('no_figures');
+          return p2;
+        },
+      });
+      stats.report_provider_groq += rv.scoreCalls;
+      if (rv.revised) stats.report_revise++;
+      cardScore = rv.score;
+      if (rv.verdict === 'unscored') {
+        stats.skipped++;                                   // item stays 'new': a later run tries it again
+        deps.log(`skip report_card_unscored (${rv.error ?? 'no score'}): ${it.title}`);
+        return;
+      }
+      if (rv.verdict !== 'publish') {
+        if (rv.verdict === 'duplicate') stats.report_duplicate++;
+        stats.report_abandon++;
+        const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
+        stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
+        await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
+        return;
+      }
+      payload = rv.payload;
+      stats.report_pass++;
+    }
+    const res = await deps.publisher.publishBlurb(payload);
+    stats[res.status === 'published' ? 'published' : res.status]++;
+    if (res.status === 'published') {
+      stats[r.ai_generated ? 'ai' : 'template']++;
+      guard.record(cand);
+      if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
+        await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
+      if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
+    }
+    const notes = r.log.length > 1 ? [...r.log] : [];
+    if (r.relevance !== null) notes.push(`relevance ${r.relevance}`);
+    if (it.source === 'sec_8k' && r.ai_generated && r.draft.category !== payload.category) {
+      notes.push(`category ${r.draft.category} -> ${payload.category} (8-K items)`);
+    }
+    deps.log(`${res.status} [${r.provider}] ${payload.headline}${notes.length ? `  (${notes.join(' | ')})` : ''}`);
+  } catch (e) {
+    stats.failed++;
+    deps.log(`failed: ${it.url}: ${(e as Error).message}`);
+    await deps.publisher.setItemStatus(row.id, 'failed', (e as Error).message).catch(() => {});
+  }
 }
 
 /**
