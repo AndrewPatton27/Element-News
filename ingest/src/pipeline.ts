@@ -25,7 +25,7 @@ import { createChainState, summarizeWithChain, type ChainState, type UsageCounte
 import type { RawItem, Summarizer } from './types.ts';
 import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState } from './topicFilter.ts';
-import { scoreCard, type CardScore } from './reportCard.ts';
+import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
 export type SourceName = 'macro' | 'fed' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'fed', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
@@ -39,6 +39,8 @@ export interface Deps {
   fredApiKey: string | null;
   now: Date;
   log(line: string): void;
+  /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
+  reportCard?: { enabled?: boolean; scorer?: ScoreClient };
 }
 
 export interface RunOptions {
@@ -72,6 +74,16 @@ interface RunCtx {
   chain: ChainState;
 }
 let topicFilterState: TopicFilterState = createTopicFilterState();
+/** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
+let runRecent: Array<{ id: string; headline: string; body: string | null }> | null = null;
+async function recentCards(deps: Deps) {
+  if (!runRecent) {
+    const all = await Promise.resolve(deps.publisher.auditCards?.()).catch(() => undefined) ?? [];
+    const cutoff = deps.now.getTime() - config.reportCard.recentCardDays * 86_400_000;
+    runRecent = all.filter((c) => Date.parse(c.as_of) >= cutoff).slice(0, config.reportCard.scoreMaxRecentCards).map((c) => ({ id: c.id, headline: c.headline, body: c.body }));
+  }
+  return runRecent;
+}
 
 /**
  * One ingest run. Sources run in a fixed order (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs,
@@ -88,6 +100,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
     chain: createChainState(),                       // provider cooldowns after a 429 last for this run
   };
   topicFilterState = createTopicFilterState();
+  runRecent = null;
 
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
@@ -445,43 +458,51 @@ async function processItems(
         deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}`);
         continue;
       }
-      let draft = r.draft;
-      let payload = buildPublishPayload(it, draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
-      let v = validatePublish(payload);
+      let payload = buildPublishPayload(it, r.draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
+      const v = validatePublish(payload);
       if (!v.ok) throw new Error(v.errors.join('; '));
       let cardScore: CardScore | null = null;
-      // Injected legacy fixture providers may not expose a scoring transport; real providers built
-      // by buildProviders include Groq when configured. Keep those fixture runs deterministic.
-      if (config.reportCard.enabled && r.ai_generated && deps.providers.some(p => p.name === 'groq' && typeof p.generate === 'function')) {
-        const scorer = deps.providers.find(p => p.name === 'groq' && typeof (p as any).generate === 'function');
-        if (!scorer) throw new Error('report-card scorer unavailable');
-        const scoreClient = { generate: (prompt: string) => (scorer as any).generate(prompt) };
-        const recentAll = await deps.publisher.auditCards?.().catch(() => []) ?? [];
-        const recent = recentAll.filter(c => Date.parse(c.as_of) >= deps.now.getTime() - config.reportCard.recentCardDays * 86_400_000).slice(0, config.reportCard.scoreMaxRecentCards);
-        const candidate = { id: row.id, headline: payload.headline, body: payload.body, category: payload.category, as_of: payload.as_of, ai_generated: payload.ai_generated, sources: it ? [{ name: it.source_name, url: it.url }] : [] } as any;
-        cardScore = await scoreCard(scoreClient, candidate, recent);
-        stats.report_provider_groq++;
-        if (cardScore.decision === 'REVISE') {
-          const writer = deps.providers.find(p => p.name === r.provider);
-          try {
+      // Report-card protocol (config.reportCard.protocolEnabled, OFF by default; REPORT_CARD_PROTOCOL=1 or
+      // deps.reportCard turns it on): the writer (Gemini, else Groq via the chain) wrote the card, Groq scores it,
+      // one revision on REVISE, ABANDON/DUPLICATE are not published. Template cards are not scored.
+      const protocolOn = deps.reportCard?.enabled ?? config.reportCard.protocolEnabled;
+      const scorer = deps.reportCard?.scorer ?? ((): ScoreClient | null => {
+        const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
+        return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
+      })();
+      if (protocolOn && r.ai_generated && scorer) {
+        const recent = await recentCards(deps);
+        const candidate = { id: row.id, ai_generated: payload.ai_generated, as_of: payload.as_of, sources: [{ name: it.source_name, url: it.url }] } as any;
+        const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
+        const rv = await reviewCard({
+          client: scorer, card: candidate, payload, recent,
+          rewrite: async (recs) => {
             if (!writer) throw new Error('writer unavailable');
-            draft = await writer.summarize({ item: it, text, retryErrors: cardScore.recommendations });
-            payload = buildPublishPayload(it, draft, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
-            v = validatePublish(payload);
-            if (!v.ok) throw new Error(v.errors.join('; '));
-            cardScore = await scoreCard(scoreClient, { ...candidate, headline: payload.headline, body: payload.body, category: payload.category }, recent);
-            stats.report_provider_groq++;
-          } catch { cardScore.decision = 'REVISE'; }
+            const d2 = await writer.summarize({ item: it, text, retryErrors: recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'] });
+            const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
+            const v2 = validatePublish(p2);
+            if (!v2.ok) throw new Error(v2.errors.join('; '));
+            if (requiresFigures(it) && !hasFigures(p2.body)) throw new Error('no_figures');
+            return p2;
+          },
+        });
+        stats.report_provider_groq += rv.scoreCalls;
+        if (rv.revised) stats.report_revise++;
+        cardScore = rv.score;
+        if (rv.verdict === 'unscored') {
+          stats.skipped++;                                   // item stays 'new': a later run tries it again
+          deps.log(`skip report_card_unscored (${rv.error ?? 'no score'}): ${it.title}`);
+          continue;
         }
-        if (cardScore.decision !== 'PASS') {
-          if (cardScore.decision === 'ABANDON') stats.report_abandon++;
-          if (cardScore.relation === 'DUPLICATE') stats.report_duplicate++;
-          stats.report_revise++;
-          const code = cardScore.relation === 'DUPLICATE' ? 'duplicate_story' : cardScore.decision === 'ABANDON' ? 'report_card_abandon' : 'report_card_revise_failed';
+        if (rv.verdict !== 'publish') {
+          if (rv.verdict === 'duplicate') stats.report_duplicate++;
+          stats.report_abandon++;
+          const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
           stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
           await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
           continue;
         }
+        payload = rv.payload;
         stats.report_pass++;
       }
       const res = await deps.publisher.publishBlurb(payload);
@@ -490,7 +511,8 @@ async function processItems(
         stats[r.ai_generated ? 'ai' : 'template']++;
         guard.record(cand);
         if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
-          await deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase()).catch(() => {});
+          await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
+        if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
       }
       const notes = r.log.length > 1 ? [...r.log] : [];
       if (r.relevance !== null) notes.push(`relevance ${r.relevance}`);

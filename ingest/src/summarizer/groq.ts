@@ -54,6 +54,14 @@ export function groqJsonSchema(withMaxLength: boolean): typeof GROQ_JSON_SCHEMA 
   return s;
 }
 
+/** How long to wait after a Groq 429: the Retry-After header or the "try again in 5.2s" text in the body, plus a margin; falls back to the scorer pacing interval. */
+export function retryWaitMs(res: { text: string; retryAfterMs?: number }): number {
+  const m = /try again in\s+(?:(\d+)m)?\s*([0-9.]+)s/i.exec(res.text ?? '');
+  const fromBody = m ? ((m[1] ? Number(m[1]) * 60 : 0) + Number(m[2])) * 1000 : undefined;
+  const hint = Math.max(res.retryAfterMs ?? 0, fromBody ?? 0);
+  return (hint > 0 ? hint + 1000 : config.reportCard.scoreMinIntervalMs);
+}
+
 /** Parses model output that should be a JSON object; tolerates code fences or text around it. */
 export function parseJsonLoose(text: string): unknown {
   const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -108,7 +116,7 @@ export function createGroqSummarizer(opts: {
     model,
     dailyCap: opts.dailyCap ?? groqDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? groqMinIntervalMs(),
-    async generate(prompt: string): Promise<string> {
+    async generate(prompt: string, gopts?: { maxTokens?: number }): Promise<string> {
       for (let attempt = 0; ; attempt++) {
         const wait = lastScoreCall + config.reportCard.scoreMinIntervalMs - Date.now();
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
@@ -116,9 +124,9 @@ export function createGroqSummarizer(opts: {
         const res = await fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
           body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1,
-            max_completion_tokens: config.reportCard.scoreMaxTokens, response_format: { type: 'json_object' } }) });
+            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, response_format: { type: 'json_object' } }) });
         if (res.status === 429 && attempt < config.reportCard.scoreMax429Retries) {
-          await new Promise(r => setTimeout(r, res.retryAfterMs ?? config.reportCard.scoreMinIntervalMs));
+          await new Promise(r => setTimeout(r, retryWaitMs(res)));
           continue;
         }
         if (res.status === 429) throw new RateLimitedError('groq');

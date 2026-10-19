@@ -9,6 +9,9 @@
 //   --only     comma-separated subset of sources (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
+//   --fix-category <card-id> <slug>   re-file one card (service role; api.set_card_category)
+//   --audit-cards [--apply]   score live cards against the report card (dry run unless --apply)
+//   REPORT_CARD_PROTOCOL=1   env flag: score each new AI card with Groq before publishing (off by default)
 //   --brief-summary [--kind daily|weekly|both] [--force] [--dry-run] [--no-ai]   AI summary of the brief, once per day/week (mailCli.ts)
 //   --send-briefs [--send] [--dry-run]   confirmation + scheduled brief emails; outbox files unless --send and the provider env vars (mailCli.ts)
 // Inputs: command-line flags and, for live runs, .env / process.env (keys are never printed).
@@ -149,6 +152,18 @@ export async function refreshTrendingSafely(publisher: Deps['publisher'], log: (
   }
 }
 
+/** `--fix-category <id> <slug>`: re-files one card through api.set_card_category. Returns the process exit code. */
+export async function fixCategory(argv: string[], publisher: Pick<Deps['publisher'], 'setCardCategory'>, log: (s: string) => void = console.log): Promise<number> {
+  const [flag, id, slug] = argv;
+  if (argv.length !== 3 || flag !== '--fix-category' || !id || !slug) throw new Error('usage: --fix-category <card-id> <category-slug> (no other options)');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('--fix-category: the card id must be a UUID');
+  if (!/^[a-z][a-z0-9_-]{0,40}$/.test(slug)) throw new Error('--fix-category: the category must be a slug such as "markets"');
+  if (!publisher.setCardCategory) throw new Error('publisher does not support set_card_category');
+  const r = await publisher.setCardCategory(id, slug);
+  log(`fix-category: ${r.status} ${r.id} -> ${r.category}`);
+  return r.status === 'updated' ? 0 : 1;
+}
+
 /**
  * CLI entry point. Dry run: fixtures, template summarizer, in-memory publisher. Live: reads the
  * environment, builds the provider chain and the Supabase publisher, then runs once, in a loop,
@@ -156,6 +171,12 @@ export async function refreshTrendingSafely(publisher: Deps['publisher'], log: (
  */
 export async function main(argv: string[]): Promise<number> {
   if (isMailCommand(argv)) return mailMain(argv);          // --brief-summary / --send-briefs (see mailCli.ts)
+  if (argv.includes('--fix-category')) {
+    loadDotEnv();
+    const url = process.env.EXPO_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error('--fix-category needs EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (api.set_card_category is a service-role RPC)');
+    return fixCategory(argv, createSupabasePublisher({ url, key }));
+  }
   if (argv.includes('--audit-cards')) {
     const allowed = new Set(['--audit-cards','--apply','--no-gemini']);
     for (const flag of argv) if (!allowed.has(flag)) throw new Error(`unknown audit option: ${flag}`);
@@ -223,6 +244,7 @@ export async function main(argv: string[]): Promise<number> {
     fredApiKey: env.fredApiKey,
     now: new Date(),
     log,
+    reportCard: process.env.REPORT_CARD_PROTOCOL === '1' ? { enabled: true } : undefined,   // write -> score -> revise-once protocol, off by default
   };
   if (args.backfillMacro) {
     const bs = await runBackfill(deps, { weeks: args.weeks });

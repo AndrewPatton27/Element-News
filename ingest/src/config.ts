@@ -64,12 +64,14 @@ export const config = {
   // v4: plain USGS headline+body and plain Federal Register headline. v5: sentence-case template headlines,
   // generic CPSC template (no product codes), figure-less earnings and low-interest quake template cards dropped.
   templateVersion: 'tpl-v5',
-  codex: { exe: 'C:\\Users\\andre\\AppData\\Local\\OpenAI\\Codex\\bin\\896a0166b774037a\\codex.exe', timeoutMs: 120_000, maxConcurrency: 2 },
   providerOrder: ['gemini', 'groq', 'template'] as const, // a list on purpose: adding a provider is one entry
 
   // Deterministic editorial gate, before any model call. Per-run narrow-source diversity cap.
   reportCard: {
-    enabled: true,
+    // The write -> Groq score -> revise-once -> publish protocol in the pipeline. OFF for the scheduled
+    // hourly run until Drew approves; the audit command (--audit-cards) does not depend on it.
+    protocolEnabled: false,
+    scoreBatchSize: 3,                       // cards per scorer call (audit); the 8,000 tokens/minute free limit binds
     scoreMaxRecentCards: 30,
     scoreMaxTokens: 900,
     scoreMinIntervalMs: 20_500,

@@ -23,6 +23,8 @@ export interface Publisher {
   auditCards?(): Promise<RevisableCard[]>;
   setAuditStatus?(id: string, status: string): Promise<void>;
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
+  /** api.set_card_category (service role): re-file a published or hidden card. */
+  setCardCategory?(id: string, category: string): Promise<{ status: 'updated' | 'not_found'; id: string; category: string }>;
 }
 
 /** Thrown when a Supabase RPC answers with a non-2xx status (message from PostgREST, no key). */
@@ -84,6 +86,7 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
       }
       return [...new Map(rows.map((r) => [r.id, r])).values()];
     },
+    setCardCategory: (id, category) => rpc('set_card_category', { p_id: id, p_category: category }),
     async setStoryLink(id, related, kind) { try { await rpc('set_story_link', { p_card_id: id, p_related_id: related, p_kind: kind }); } catch { /* optional RPC */ } },
   };
 }
@@ -96,6 +99,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
   const revisions: RevisePayload[] = [];
   const seen = new Set<string>();
   const trending = { refreshes: 0 };
+  const categories: Array<{ id: string; category: string }> = [];
   const publisher: Publisher = {
     async upsertItem(item) {
       const is_new = !seen.has(item.url);
@@ -117,9 +121,10 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
       revisions.push(p);
       return { status: p.action === 'hide' ? 'hidden' : 'revised', id: p.id };
     },
+    async setCardCategory(id, category) { categories.push({ id, category }); return { status: 'updated', id, category }; },
     async refreshTrending() { trending.refreshes += 1; return { generation: trending.refreshes, boosted: 0 }; },
   };
-  return { publisher, items, cards, macro, revisions, trending };
+  return { publisher, items, cards, macro, revisions, trending, categories };
 }
 
 /** Row for api.upsert_item: the item's metadata (page text is never stored). */
