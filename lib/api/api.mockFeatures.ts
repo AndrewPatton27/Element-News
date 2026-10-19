@@ -103,7 +103,7 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       return { ok: true }; // idempotent; unknown tokens look the same
     },
     search(q: string, cursor?: string | null, limit = 20) {
-      // Same quality-gated matching as api.search v3; the ranker owns matching and scoring.
+      // Same quality-gated, placement-aware matching as api.search v4; the ranker owns matching and scoring.
       return page(rankSearch(cards, q, mockRankScore), cursor, limit);
     },
     relatedCards(cardId: string, limit = 5) {
