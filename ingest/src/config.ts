@@ -73,8 +73,8 @@ export const config = {
     protocolEnabled: false,
     scoreBatchSize: 3,                       // cards per scorer call (audit); the 8,000 tokens/minute free limit binds
     scoreMaxRecentCards: 30,
-    scoreMaxTokens: 900,
-    scoreMinIntervalMs: 20_500,
+    scoreMaxTokens: 1500,
+    scoreMinIntervalMs: 24_000,
     scoreMax429Retries: 8,
     narrowSourceMaxPerRun: 2,
     narrowSources: ['faa_airworthiness_directive'] as readonly string[],
