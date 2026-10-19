@@ -9,6 +9,7 @@ import { changeText, factA11yLabel, shortDate } from '../../lib/shared/format';
 import { withToneLabel } from '../../lib/numbers/numberTone';
 import { noticesFor } from '../../lib/shared/labels';
 import { plainExplainer } from '../../lib/numbers/seriesCopy';
+import { numbersUpdatedLabel } from '../../lib/numbers/numbersUpdated';
 import { usePalette } from '../../lib/theme/useTheme';
 import { userMessage } from '../../lib/api/errors';
 import { fonts } from '../../lib/theme/theme';
@@ -53,6 +54,8 @@ export function NumbersPanel({ api, config, variant }: Props) {
   if (!facts) return <LoadingState />;
   if (facts.length === 0) return <EmptyState message="No numbers yet. Check back soon." />;
 
+  const updated = numbersUpdatedLabel(facts);
+  const updatedEl = updated ? <Text style={[styles.notice, { color: p.muted }]}>{updated}</Text> : null;
   const noticeEls = notices.map((n) => (
     <Text
       key={n.key}
@@ -87,7 +90,7 @@ export function NumbersPanel({ api, config, variant }: Props) {
             </View>
           </Pressable>
         ))}
-        <View style={styles.cNotices}>{noticeEls}</View>
+        <View style={styles.cNotices}>{updatedEl}{noticeEls}</View>
       </View>
     );
   }
@@ -118,6 +121,7 @@ export function NumbersPanel({ api, config, variant }: Props) {
           </Pressable>
         );
       })}
+      {updatedEl}
       {noticeEls}
       <Text style={[styles.notice, { color: p.muted }]}>Tap a number to open the original data series.</Text>
     </View>

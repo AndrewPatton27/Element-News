@@ -74,6 +74,7 @@ export interface MacroFact {
   source_short: string;                 // compact label: "EIA via FRED" (never bare "FRED")
   source_url: string;
   sort_order: number;
+  updated_at?: string | null;           // when our job last stored this number (ISO); older servers omit it
 }
 
 /** One number with a small history chart (web right column). */
