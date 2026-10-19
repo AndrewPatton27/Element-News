@@ -103,7 +103,6 @@ export default function FeedScreen() {
     (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
     [hidden, hiddenSources],
   );
-  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused, mode);
   const local = acct.localPrefs;
   // For you stays locked until 10 stories across 4 topics have been read or reacted to.
   const [seenList, setSeenList] = useState(() => readSeen(store));
@@ -127,6 +126,10 @@ export default function FeedScreen() {
     signedIn ? undefined : rankPage,
     targetAhead(confidence({ reactions: Object.keys(local.reactions).length, topics: local.follows.topics.length + (acct.viewPrefs?.followed.length ?? 0), sources: local.follows.sources.length, tickers: local.follows.tickers.length, favorites: (acct.viewPrefs?.followed.length ?? 0), accountSignals: signedIn ? Object.keys(acct.reactions).length : 0 })),
   );
+  // Load speed: the extra first-page pulls (tab heads) and the wide side column wait until the first
+  // cards are on screen (or the request ended), so the first page gets the connection to itself.
+  const firstPaintDone = state.items.length > 0 || state.done || !!state.error;
+  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused && firstPaintDone, mode);
   const queuePosition = useRef(0);
   useEffect(() => { rerank(local, queuePosition.current, signedIn); }, [local, signedIn, rerank]);
   const showSources = useCallback((c: BlurbCard) => setSheetCard(c), []);
@@ -357,7 +360,7 @@ export default function FeedScreen() {
   // Under ~1180 px the right column would squeeze the card, so it steps aside (and its
   // two RPCs are not called).
   const asideFits = wide && width >= ASIDE_MIN_WIDTH;
-  const aside = useAsideData(api, asideFits);
+  const aside = useAsideData(api, asideFits && firstPaintDone);
   // Hidden topics and sources leave Top stories too.
   const asideShown = { ...aside, stories: visible(aside.stories) };
   const showAside = asideFits && (aside.loading || asideShown.stories.length > 0 || aside.trends.length > 0);

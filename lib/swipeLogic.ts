@@ -74,6 +74,14 @@ export function showCoach(o: { enabled: boolean; seen: string | null; index: num
   return o.enabled && o.seen !== '1' && o.index === 0;
 }
 
+/** Height kept free under the cards while the swipe hint shows (pill is 44 px high at bottom 4). */
+export const COACH_LANE_PX = 52;
+export const COACH_AUTO_DISMISS_MS = 5000;
+/** The hint lives in its own lane under the card, so it can never cover card text or buttons. */
+export function coachLane(coachVisible: boolean, pageHeight: number): number {
+  return coachVisible && pageHeight > COACH_LANE_PX * 4 ? COACH_LANE_PX : 0;
+}
+
 export interface PointerPoint { x: number; y: number; }
 const MAX_TAP_MOVEMENT_PX = 10;
 const MAX_TAP_DURATION_MS = 400;

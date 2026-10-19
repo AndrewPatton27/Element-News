@@ -7,24 +7,16 @@ import { config } from '../config.ts';
 import type { FetchLike } from '../allowlist.ts';
 import { createGeminiSummarizer } from './gemini.ts';
 import { createGroqSummarizer } from './groq.ts';
-import { createCodexSummarizer } from './codex.ts';
 import { templateSummarizer } from './template.ts';
 import type { Summarizer } from '../types.ts';
 
 /** Providers in config.providerOrder; AI providers without a key go to `skipped` instead. */
 export function buildProviders(
   keys: { geminiApiKey: string | null; groqApiKey: string | null },
-  opts: { fetchImpl?: FetchLike; minIntervalMs?: number; writer?: string; codexExe?: string } = {},
+  opts: { fetchImpl?: FetchLike; minIntervalMs?: number } = {},
 ): { providers: Summarizer[]; skipped: string[] } {
   const providers: Summarizer[] = [];
   const skipped: string[] = [];
-  if ((opts.writer ?? process.env.INGEST_WRITER) === 'codex') {
-    providers.push(createCodexSummarizer({ exe: opts.codexExe ?? process.env.CODEX_EXE ?? config.codex.exe }));
-    if (keys.groqApiKey) providers.push(createGroqSummarizer({ apiKey: keys.groqApiKey, ...opts }));
-    else skipped.push('groq (GROQ_API_KEY not set)');
-    providers.push(templateSummarizer);
-    return { providers, skipped };
-  }
   for (const name of config.providerOrder) {
     if (name === 'gemini') {
       if (keys.geminiApiKey) providers.push(createGeminiSummarizer({ apiKey: keys.geminiApiKey, ...opts }));

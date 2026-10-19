@@ -38,6 +38,8 @@ import {
   lockAxis,
   reactionToSend,
   showCoach,
+  coachLane,
+  COACH_AUTO_DISMISS_MS,
   swipeDecision,
   swipeEnabled,
   undoPress,
@@ -244,7 +246,7 @@ export function FeedPager({
   const coach = showCoach({ enabled: swipeOn, seen: coachSeen, index });
   useEffect(() => {
     if (!coach) return;
-    const timer = setTimeout(dismissCoach, 5000);
+    const timer = setTimeout(dismissCoach, COACH_AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
   }, [coach, dismissCoach]);
   const [undo, setUndo] = useState<{ card: BlurbCard; previous: Feedback | undefined; sent: Feedback; message: string } | null>(null);
@@ -376,7 +378,7 @@ export function FeedPager({
       const last = i === items.length - 1 && done;
       return (
         <View style={[styles.page, wide && styles.pageWide, { height }]}>
-          <View style={compact && coach ? { height: Math.max(0, height - 52) } : styles.cardArea}>
+          <View style={coachLane(coach, height) ? { height: height - coachLane(coach, height) } : styles.cardArea}>
             <CardErrorBoundary resetKey={item.id}>
               <SwipeCard enabled={swipeOn} reduced={reduced} width={width} onSwipe={(r) => swiped(item, r)}>
                 <Card
@@ -402,11 +404,11 @@ export function FeedPager({
         </View>
       );
     },
-    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, items.length, done, reactions, react, swipeOn, reduced, swiped, timeLabel],
+    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, items.length, done, reactions, react, swipeOn, reduced, swiped, timeLabel, coach],
   );
 
   return (
-    <View style={styles.fill} onLayout={onLayout}>
+    <View style={styles.fill} onLayout={onLayout} onTouchStart={coach ? dismissCoach : undefined}>
       {height > 0 ? (
         <FlatList
           ref={list}
