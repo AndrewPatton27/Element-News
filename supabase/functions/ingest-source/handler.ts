@@ -101,6 +101,10 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
       reportCard: env.reportCard ? { enabled: true } : undefined,
+      // Cross-source candidate selection is off here: each call has one source, and with selection on the
+      // spend phase starts items without an upsertItem call, so the soft deadline (guardPublisher) could
+      // not stop it. Off = the source's own order, every item start passes through the guard.
+      selection: { enabled: false },
     };
     stats = await runOnce(pipelineDeps, { only: [opts.source], limit: opts.workCap });
     if (opts.finish) await finishRun(guarded.publisher, say);

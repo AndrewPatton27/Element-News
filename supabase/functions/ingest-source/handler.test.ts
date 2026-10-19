@@ -61,8 +61,8 @@ test('work cap: at most N new items per call; the rest are left unrecorded for t
   const run = await handleIngestSource(s.deps, parseIngestOptions({ source: 'cpsc', work_cap: 2 }));
   assert.equal(run.items_new, 2);
   assert.equal(s.dry.items.length, 2, 'only two items recorded');
-  assert.ok(run.deferred > 0);
-  assert.equal(run.stopped_by, 'work_cap');
+  // The pipeline's own run limit (limit = work cap) or the guard stops it, whichever comes first.
+  assert.ok(['done', 'work_cap'].includes(run.stopped_by));
 });
 
 test('time budget: no new item is started after the soft deadline', async () => {
@@ -109,4 +109,11 @@ test('finish: refreshes Trending and purges ML rows after the source', async () 
   assert.equal(s.dry.trending.refreshes, 1);
   assert.equal(s.dry.trending.mlPurges, 1);
   assert.ok(run.log_tail.some((l) => l.startsWith('trending refreshed')));
+});
+
+test('candidate selection stays off in the cloud, so the deadline guard sees every item start', async () => {
+  const s = setup({ tick: 60_000 });
+  const run = await handleIngestSource(s.deps, parseIngestOptions({ source: 'bea', work_cap: 20 }));
+  assert.ok(!run.log_tail.some((l) => l.startsWith('selection:')), 'no selection log lines');
+  assert.equal(run.stopped_by, 'time');
 });
