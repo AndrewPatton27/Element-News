@@ -57,10 +57,14 @@ export function isBlurbCard(x: unknown): x is BlurbCard {
 }
 
 // Keeps only valid, renderable cards. next_cursor must be a string or null.
-export function parseFeedPage(x: unknown): FeedPage {
+// `page_id` (signed-in pages only, added by the ML shadow logging migration) is kept when it is a
+// non-empty string and ignored otherwise; the key is absent when the server sends none.
+export function parseFeedPage(x: unknown): FeedPage & { page_id?: string } {
   if (!isObj(x) || !Array.isArray(x.items)) throw new Error('Feed response has no items array.');
   const next = isStr(x.next_cursor) && x.next_cursor !== '' ? x.next_cursor : null;
-  return { items: x.items.filter(isBlurbCard), next_cursor: next };
+  const page: FeedPage & { page_id?: string } = { items: x.items.filter(isBlurbCard), next_cursor: next };
+  if (isStr(x.page_id) && x.page_id !== '') page.page_id = x.page_id;
+  return page;
 }
 
 export function parseMacroFacts(x: unknown): MacroFact[] {

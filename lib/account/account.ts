@@ -5,6 +5,7 @@
 
 import type { BlurbCard, Category, FeedPage } from '../../contract/types.ts';
 import type { FeedForYouParams, SetPrefsParams, TrackParams } from '../../contract/account.ts';
+import { shadowArgs, isUnknownArgsError, type ShadowContext, type ShadowTrackArgs } from '../ml/shadowLog.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
 import { EMPTY_PREFS, mockForYouOrder, type Feedback, type TrackEvent, type UserPrefs } from './accountLogic.ts';
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from '../api/errors.ts';
@@ -39,7 +40,7 @@ export interface AccountApi {
   setPrefs(followed: string[], hidden?: string[], hiddenSources?: string[]): Promise<UserPrefs>;
   feedForYou(cursor: string | null, limit?: number): Promise<FeedPage>;
   /** `ms` only with 'dwell' (how long the card was looked at). */
-  track(cardId: string, event: TrackEvent, ms?: number): Promise<void>;
+  track(cardId: string, event: TrackEvent, ms?: number, shadow?: ShadowContext | null): Promise<void>;
   /** The last dwell when the page is closing: fire and forget, sent with fetch `keepalive` so it
    *  survives the unload and keeps the auth header. Uses the stored token as it is (no refresh
    *  is possible while closing); skipped when signed out or the token has expired. */
@@ -118,10 +119,12 @@ export const ACCOUNT_RPC = {
   feedForYou: { fn: 'feed_for_you', args: (cursor: string | null, limit: number): FeedForYouParams => ({ p_cursor: cursor, p_limit: limit }) },
   track: {
     fn: 'track',
-    args: (cardId: string, event: TrackEvent, ms?: number): TrackParams => ({
+    args: (cardId: string, event: TrackEvent, ms?: number, shadow?: ShadowContext | null): TrackParams & ShadowTrackArgs => ({
       p_blurb: cardId,
       p_kind: event,
       ...(ms !== undefined ? { p_ms: ms } : {}),
+      // Only a view carries them (page, slot, surface); empty without a page id.
+      ...(event === 'view' ? shadowArgs(shadow) : {}),
     }),
   },
   deleteMyData: { fn: 'delete_my_data', args: () => ({}) },
@@ -286,6 +289,7 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
     return text ? JSON.parse(text) : null;
   }
 
+  let shadowRejected = false;
   return {
     sample: false,
     currentUser: () => session?.user ?? null,
@@ -323,8 +327,20 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
     async feedForYou(cursor, limit) {
       return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit))));
     },
-    async track(cardId, event, ms) {
-      await rpc(ACCOUNT_RPC.track.fn, ACCOUNT_RPC.track.args(cardId, event, ms));
+    async track(cardId, event, ms, shadow) {
+      const extra = event === 'view' && !shadowRejected && shadowArgs(shadow).p_page !== undefined;
+      try {
+        await rpc(ACCOUNT_RPC.track.fn, ACCOUNT_RPC.track.args(cardId, event, ms, extra ? shadow : null));
+      } catch (e) {
+        // Server without the new arguments (migration not applied): stop sending them and send
+        // the plain view once, so the event is not lost.
+        if (extra && e instanceof AccountError && isUnknownArgsError(e.status)) {
+          shadowRejected = true;
+          await rpc(ACCOUNT_RPC.track.fn, ACCOUNT_RPC.track.args(cardId, event, ms));
+          return;
+        }
+        throw e;
+      }
     },
     trackDwellOnExit(cardId, ms) {
       // Synchronous on purpose: nothing may be awaited while the page unloads.

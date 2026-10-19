@@ -154,6 +154,9 @@ export interface BlurbCard {
 export interface FeedPage {
   items: BlurbCard[];
   next_cursor: string | null;
+  /** Signed-in Trending / For you pages only, while ML shadow logging is on (migration
+   *  20261019010000). Send it back with the 'view' event (api.track p_page). Absent otherwise. */
+  page_id?: string;
 }
 
 /**

@@ -24,6 +24,7 @@ import { categoryName } from '../lib/shared/format';
 import { defaultStore } from '../lib/storage/storage';
 import { FOR_YOU_SEEN_MS, forYouProgress, readSeen, recordSeen } from '../lib/feed/forYouGate';
 import { ForYouWarmup } from '../components/feed/ForYouWarmup';
+import { shadowContext, surfaceForTab, type ShadowSurface } from '../lib/ml/shadowLog';
 import { useFeed, useFeedHeads } from '../lib/feed/useFeed';
 import { latestOrder, promoteHead } from '../lib/feed/feedOrder';
 import { usePalette, useWide } from '../lib/theme/useTheme';
@@ -130,6 +131,9 @@ export default function FeedScreen() {
   // cards are on screen (or the request ended), so the first page gets the connection to itself.
   const firstPaintDone = state.items.length > 0 || state.done || !!state.error;
   const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused && firstPaintDone, mode);
+  // What the pager shows right now (after all re-ordering), for the view's slot.
+  const shownRef = useRef<BlurbCard[]>([]);
+  const surfaceRef = useRef<ShadowSurface | null>(null);
   const queuePosition = useRef(0);
   useEffect(() => { rerank(local, queuePosition.current, signedIn); }, [local, signedIn, rerank]);
   const showSources = useCallback((c: BlurbCard) => setSheetCard(c), []);
@@ -141,6 +145,8 @@ export default function FeedScreen() {
   const headId = mode === 'latest' ? null : heads?.[mode];
   const position = queuePositions.current[pagerKey] ?? 0;
   const pagerItems = mode === 'latest' ? latestOrder(items, position) : position === 0 ? promoteHead(items, headId) : items;
+  shownRef.current = pagerItems;
+  surfaceRef.current = surfaceForTab(locked ? 'top' : mode);
   const followed = acct.viewPrefs?.followed ?? [];
   const followedTopics = (signedIn ? followed : followsState.follows.topics).filter((slug) => followOverrides[slug] ?? true);
   for (const [slug, isFollowed] of Object.entries(followOverrides)) {
@@ -211,7 +217,7 @@ export default function FeedScreen() {
   const sendDwell = useCallback((r: { cardId: string; ms: number } | null) => r && trackDwell(r.cardId, r.ms), [trackDwell]);
   const onActiveCard = useCallback(
     (c: BlurbCard) => {
-      trackView(c);
+      trackView(c, shadowContext(surfaceRef.current, shownRef.current, c.id));
       sendDwell(dwell.current.show(c.id, Date.now()));
     },
     [trackView, sendDwell],

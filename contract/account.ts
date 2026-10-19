@@ -68,6 +68,12 @@ export interface TrackParams {
   /** Only for 'dwell': milliseconds the card was on screen (required there; ignored otherwise).
    *  Under 300 is ignored; over 600000 is stored as 600000. Omit it for every other kind. */
   p_ms?: number | null;
+  /** Only for 'view' (migration 20261019010000; stored only while an ML logging mode is on, else
+   *  ignored): the feed page's `page_id`, the card's displayed index (0..499, after any client
+   *  re-ordering) and the surface. Invalid values are stored as null; they never cause an error. */
+  p_page?: string | null;
+  p_slot?: number | null;
+  p_surface?: 'for_you' | 'trending' | 'latest' | 'search' | 'following' | 'brief' | 'detail' | null;
 }
 
 /** Response of api.track. 'ignored' = deduped or rate-limited; not an error. */
