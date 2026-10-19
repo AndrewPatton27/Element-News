@@ -14,6 +14,7 @@ import { FOLLOWS_KEY } from '../following/followingLogic.ts';
 import {
   LOCAL_PREFS_KEY,
   asUserPrefs,
+  clearAll,
   hasLocalChoices,
   mergeIntoAccount,
   migratedKey,
@@ -284,6 +285,7 @@ export function AccountProvider({ account, children }: { account: AccountApi; ch
       },
       async deleteMyData() {
         await account.deleteMyData();
+        clearAll(store); // this device's likes, follows, history and queue go too (listeners refresh the screens)
         setReactions({});
         views.current.reset();
         noted.current.clear();
@@ -306,6 +308,7 @@ export function AccountProvider({ account, children }: { account: AccountApi; ch
       },
       async deleteAccount() {
         await account.deleteAccount();
+        clearAll(store);
         setReactions({});
         views.current.reset();
         setNotice('Your account was deleted.');

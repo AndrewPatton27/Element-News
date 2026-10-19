@@ -16,6 +16,8 @@ import { FOLLOWS_KEY, parseFollows, serializeFollows, type Follows } from '../fo
 import { RECENT_KEY } from '../search/searchLogic.ts';
 import { cardSourceKey } from '../sources/sourceKeys.ts';
 import { TUTORIAL_SEEN_KEY } from '../tutorial/tutorialLogic.ts';
+import { SEEN_KEY } from '../feed/forYouGate.ts';
+import { FOLLOWED_STORIES_KEY } from '../following/followedStories.ts';
 import type { KeyValueStore } from './storage.ts';
 
 export const LOCAL_PREFS_KEY = 'element.local-prefs';
@@ -110,7 +112,11 @@ export function asUserPrefs(p: LocalPrefs): UserPrefs {
 }
 
 /** Every key "Clear data on this device" removes: choices, follows, recent searches, the quick-tour flag. */
-export const DEVICE_DATA_KEYS = [LOCAL_PREFS_KEY, FOLLOWS_KEY, RECENT_KEY, TUTORIAL_SEEN_KEY] as const;
+// Also the For you history (stories seen), followed stories, the remembered brief email and the
+// dismissed sign-in prompt. The last two keys are literals: their modules pull in React-side code.
+export const BRIEF_EMAIL_STORE_KEY = 'element.brief-email'; // = BRIEF_EMAIL_KEY in lib/brief/briefLogic.ts
+export const SIGNIN_PROMPT_STORE_KEY = 'element.signin-prompt-dismissed'; // = PROMPT_KEY in app/index.tsx
+export const DEVICE_DATA_KEYS = [LOCAL_PREFS_KEY, FOLLOWS_KEY, RECENT_KEY, TUTORIAL_SEEN_KEY, SEEN_KEY, FOLLOWED_STORIES_KEY, BRIEF_EMAIL_STORE_KEY, SIGNIN_PROMPT_STORE_KEY] as const;
 
 /** Forgets everything this device saved. Local only: nothing is sent to or removed from the server. */
 export function clearAll(store: KeyValueStore): void {
