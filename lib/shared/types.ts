@@ -69,7 +69,14 @@ export function parseFeedPage(x: unknown): FeedPage & { page_id?: string } {
 
 export function parseMacroFacts(x: unknown): MacroFact[] {
   if (!Array.isArray(x)) throw new Error('numbers_to_know response is not a list.');
-  return x.filter(isMacroFact).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  // updated_at is kept only when it is a string; anything else is dropped.
+  return x
+    .filter(isMacroFact)
+    .map((f) => {
+      const { updated_at, ...rest } = f;
+      return typeof updated_at === 'string' ? { ...rest, updated_at } : rest;
+    })
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
 export function parseCategories(x: unknown): Category[] {
