@@ -1,6 +1,7 @@
 // New-items-only caps (2026-10-18): a per-run cap counts only items an earlier run has not handled.
 // CPSC (max 5 NEW recalls per run), FAA airworthiness cap, Wikipedia look-back over several days,
 // NASA wider window and extra feed pages. All offline: fixtures only, no network, no keys.
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

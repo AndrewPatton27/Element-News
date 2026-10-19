@@ -1,6 +1,7 @@
 // Topic filter (2026-10-17): SEC cards only for household-name companies and big 8-K items,
 // routine director-only 5.02s skipped, an AI everyday_relevance score gates every AI card,
 // template cards only where the source is reliably relevant, plain-language prompt.
+import './helpers/fixtureWindows.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
