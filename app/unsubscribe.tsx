@@ -6,12 +6,12 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAppData } from '../lib/appData';
-import { runMail, tokenParam, type MailOutcome } from '../lib/briefLogic';
-import { usePalette, useWide } from '../lib/useTheme';
-import { fonts, font, radius } from '../lib/theme';
-import { OutlineButton, PrimaryButton } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
+import { useAppData } from '../lib/shared/appData';
+import { runMail, tokenParam, type MailOutcome } from '../lib/brief/briefLogic';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { fonts, font, radius } from '../lib/theme/theme';
+import { OutlineButton, PrimaryButton } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
 
 export default function UnsubscribeScreen() {
   const p = usePalette();

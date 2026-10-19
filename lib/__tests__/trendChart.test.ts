@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chartShape, stepIndex, storiesToShow, BASELINE } from '../../components/trendChart.ts';
+import { chartShape, stepIndex, storiesToShow, BASELINE } from '../../components/card/trendChart.ts';
 
 test('chartShape: the last point is at the right edge and the area closes on the baseline', () => {
   const s = chartShape([1, 2, 3, 4]);
@@ -40,8 +40,8 @@ test('storiesToShow: 3 on short laptops, 4 in between, 5 on tall windows', () =>
   assert.equal(storiesToShow(900), 5);
 });
 
-import { trendColors } from '../../components/trendChart.ts';
-import { light as lightPalette } from '../theme.ts';
+import { trendColors } from '../../components/card/trendChart.ts';
+import { light as lightPalette } from '../theme/theme.ts';
 
 test('trend colours follow the tone; the line stays accent when neutral', () => {
   const bad = trendColors(lightPalette, 'CPIAUCSL', 'up');

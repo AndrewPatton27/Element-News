@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INCREASE_JUDGED, NUMBERS_LEGEND, changeToneColor, numberTone, toneWords, withToneLabel } from '../numberTone.ts';
-import { light } from '../theme.ts';
+import { INCREASE_JUDGED, NUMBERS_LEGEND, changeToneColor, numberTone, toneWords, withToneLabel } from '../numbers/numberTone.ts';
+import { light } from '../theme/theme.ts';
 
 test('increase bad: inflation, unemployment, jobless claims, gas', () => {
   for (const id of ['CPIAUCSL', 'UNRATE', 'ICSA', 'GASREGW']) {

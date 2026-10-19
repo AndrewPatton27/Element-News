@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergePool, rankForYou, sortLatest } from '../forYouRank.ts';
-import { forYouProgress } from '../forYouGate.ts';
-import { diversifyFeed } from '../diversify.ts';
+import { mergePool, rankForYou, sortLatest } from '../feed/forYouRank.ts';
+import { forYouProgress } from '../feed/forYouGate.ts';
+import { diversifyFeed } from '../feed/diversify.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 
 const card = (id: string, category: string, published: string, sortAt = published): BlurbCard =>
@@ -58,7 +58,7 @@ test('gate unchanged and Trending order only goes through diversify', () => {
 });
 
 test('For you does not open as a copy of Trending (at most 2 of its top 5 in the first 5)', async () => {
-  const { spreadFromTrending } = await import('../forYouRank.ts');
+  const { spreadFromTrending } = await import('../feed/forYouRank.ts');
   const cards = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id, i) => card(id, 'x' + i, `2026-10-18T0${i}:00:00Z`));
   const out = spreadFromTrending(cards, new Set(['a', 'b', 'c', 'd', 'e']));
   const first5 = out.slice(0, 5).map((c) => c.id);
@@ -68,7 +68,7 @@ test('For you does not open as a copy of Trending (at most 2 of its top 5 in the
 });
 
 test('latestOrder sorts by published time but never moves cards the reader already passed', async () => {
-  const { latestOrder } = await import('../feedOrder.ts');
+  const { latestOrder } = await import('../feed/feedOrder.ts');
   const c = (id: string, t: string) => card(id, 'x', t);
   const list = [c('old', '2026-10-17T00:00:00Z'), c('mid', '2026-10-18T00:00:00Z'), c('new', '2026-10-18T12:00:00Z')];
   assert.deepEqual(latestOrder(list).map((x) => x.id), ['new', 'mid', 'old']);

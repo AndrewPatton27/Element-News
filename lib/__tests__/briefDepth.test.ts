@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { card } from './helpers.ts';
-import { createMockFeatureApi } from '../api.mockFeatures.ts';
-import { toBriefData } from '../briefLogic.ts';
+import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
+import { toBriefData } from '../brief/briefLogic.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();

@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SOURCE_KEYS, cardSourceKey, sourceName, toggleSource, withoutHiddenSources } from '../sourceKeys.ts';
-import { SOURCES } from '../sourcesInfo.ts';
+import { SOURCE_KEYS, cardSourceKey, sourceName, toggleSource, withoutHiddenSources } from '../sources/sourceKeys.ts';
+import { SOURCES } from '../sources/sourcesInfo.ts';
 import { card, dataCard } from './helpers.ts';
 
 const src = (name: string, is_primary = true) => ({ ...card().sources[0], name, is_primary });

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SAMPLE_NUMBER_TRENDS } from '../numberTrendsSample.ts';
-import { parseNumberTrends } from '../types.ts';
+import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
+import { parseNumberTrends } from '../shared/types.ts';
 
 test('sample number trends match the interface and the design', () => {
   assert.equal(parseNumberTrends(SAMPLE_NUMBER_TRENDS).length, 4);

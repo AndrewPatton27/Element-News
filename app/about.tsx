@@ -7,19 +7,19 @@
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useAppData } from '../lib/appData';
-import { aiNoticeText, disclaimerText, noticesFor } from '../lib/labels';
-import { APP_NAME } from '../lib/config';
-import { SOURCES } from '../lib/sourcesInfo';
-import { SOURCE_KEYS, toggleSource } from '../lib/sourceKeys';
-import { useAccount } from '../lib/accountContext';
-import { userMessage } from '../lib/errors';
-import { usePalette, useWide } from '../lib/useTheme';
-import { fonts, font } from '../lib/theme';
-import { openUrl } from '../components/SourceChip';
-import { SectionLabel } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
-import { AccountPrompt, DeviceData, QuickLinks } from '../components/AccountEntry';
+import { useAppData } from '../lib/shared/appData';
+import { aiNoticeText, disclaimerText, noticesFor } from '../lib/shared/labels';
+import { APP_NAME } from '../lib/api/config';
+import { SOURCES } from '../lib/sources/sourcesInfo';
+import { SOURCE_KEYS, toggleSource } from '../lib/sources/sourceKeys';
+import { useAccount } from '../lib/account/accountContext';
+import { userMessage } from '../lib/api/errors';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { fonts, font } from '../lib/theme/theme';
+import { openUrl } from '../components/card/SourceChip';
+import { SectionLabel } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { AccountPrompt, DeviceData, QuickLinks } from '../components/account/AccountEntry';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextRevealCount, scrollToIndexFallbackOffset, shouldHandleFeedKey } from '../pagerLogic.ts';
+import { nextRevealCount, scrollToIndexFallbackOffset, shouldHandleFeedKey } from '../feed/pagerLogic.ts';
 
 const info = (index: number, averageItemLength = 0) => ({ index, highestMeasuredFrameIndex: 0, averageItemLength });
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { confidence, rerankQueue, shouldFetchAhead, targetAhead } from '../queueLogic.ts';
-import { EMPTY_LOCAL, withReaction } from '../localPrefs.ts';
+import { confidence, rerankQueue, shouldFetchAhead, targetAhead } from '../feed/queueLogic.ts';
+import { EMPTY_LOCAL, withReaction } from '../storage/localPrefs.ts';
 import { card } from './helpers.ts';
 
 test('confidence rises with volume and variety; target stays in 3..7', () => {
@@ -31,7 +31,7 @@ test('rerank preserves current and next cards, removes duplicates, ranks farther
 });
 
 test('append overlap is deduplicated without changing existing card order', async () => {
-  const { appendPage } = await import('../feedLogic.ts');
+  const { appendPage } = await import('../feed/feedLogic.ts');
   const a = card({ id: 'a' });
   const b = card({ id: 'b' });
   const result = appendPage([a, b], { items: [b, card({ id: 'c' })], next_cursor: 'next' });

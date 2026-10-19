@@ -16,9 +16,9 @@ import {
   withReaction,
   withTopics,
   writeLocal,
-} from '../localPrefs.ts';
-import { FOLLOWS_KEY } from '../followingLogic.ts';
-import { memoryStore, onStoreChange, defaultStore } from '../storage.ts';
+} from '../storage/localPrefs.ts';
+import { FOLLOWS_KEY } from '../following/followingLogic.ts';
+import { memoryStore, onStoreChange, defaultStore } from '../storage/storage.ts';
 import { card } from './helpers.ts';
 
 test('readLocal survives empty and broken storage', () => {

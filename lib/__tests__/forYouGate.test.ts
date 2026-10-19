@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { forYouProgress, recordSeen, readSeen, MAX_SEEN, FOR_YOU_MIN_STORIES, FOR_YOU_MIN_TOPICS } from '../forYouGate.ts';
-import { memoryStore } from '../storage.ts';
+import { forYouProgress, recordSeen, readSeen, MAX_SEEN, FOR_YOU_MIN_STORIES, FOR_YOU_MIN_TOPICS } from '../feed/forYouGate.ts';
+import { memoryStore } from '../storage/storage.ts';
 
 const mk = (n: number, topics: number, p = 's') => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, category: `t${i % topics}` }));
 

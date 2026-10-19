@@ -15,13 +15,13 @@ import { Newsreader_600SemiBold } from '@expo-google-fonts/newsreader/600SemiBol
 import { InstrumentSans_400Regular } from '@expo-google-fonts/instrument-sans/400Regular';
 import { InstrumentSans_500Medium } from '@expo-google-fonts/instrument-sans/500Medium';
 import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans/600SemiBold';
-import { getApi } from '../lib/api';
-import { AppDataProvider } from '../lib/appData';
-import { AccountProvider } from '../lib/accountContext';
-import { light, paletteFor } from '../lib/theme';
-import { ConfigErrorScreen } from '../components/States';
-import { AppErrorBoundary } from '../components/ErrorBoundary';
-const TutorialGate = lazy(() => import('../components/Tutorial').then((module) => ({ default: module.TutorialGate })));
+import { getApi } from '../lib/api/api';
+import { AppDataProvider } from '../lib/shared/appData';
+import { AccountProvider } from '../lib/account/accountContext';
+import { light, paletteFor } from '../lib/theme/theme';
+import { ConfigErrorScreen } from '../components/shell/States';
+import { AppErrorBoundary } from '../components/shell/ErrorBoundary';
+const TutorialGate = lazy(() => import('../components/tutorial/Tutorial').then((module) => ({ default: module.TutorialGate })));
 
 export default function RootLayout() {
   const scheme = useColorScheme();

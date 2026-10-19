@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { editDistance, isTypo, matchedTermCount, rankSearch, searchScore, searchTerms, SEARCH_TERM_BONUS } from '../searchLogic.ts';
-import { createMockFeatureApi } from '../api.mockFeatures.ts';
+import { editDistance, isTypo, matchedTermCount, rankSearch, searchScore, searchTerms, SEARCH_TERM_BONUS } from '../search/searchLogic.ts';
+import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
 import { card, dataCard } from './helpers.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 

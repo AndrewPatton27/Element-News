@@ -4,5 +4,7 @@ rem then Trending refresh. Scheduled hourly by Windows Task Scheduler (task name
 cd /d "%~dp0"
 if not exist logs mkdir logs
 echo ===== %date% %time% >> logs\run.log
+rem Groq scores every card against the report card and runs the format check (one revision, then publish or drop).
+set REPORT_CARD_PROTOCOL=1
 "C:\Program Files\nodejs\node.exe" src\main.ts --once >> logs\run.log 2>&1
 echo exit %errorlevel% >> logs\run.log

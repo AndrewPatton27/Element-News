@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveApiConfig } from '../config.ts';
-import { ApiError, createSupabaseApi, planRequest } from '../api.supabase.ts';
+import { resolveApiConfig } from '../api/config.ts';
+import { ApiError, createSupabaseApi, planRequest } from '../api/api.supabase.ts';
 import { card, config } from './helpers.ts';
-import { createMockFeatureApi } from '../api.mockFeatures.ts';
+import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
 
 const URL_ = 'https://abc123.supabase.co';
 const KEY = 'sb_publishable_testkey123';

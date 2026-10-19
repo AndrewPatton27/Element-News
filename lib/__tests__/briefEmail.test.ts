@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { card } from './helpers.ts';
-import { BRIEF_CAPS, createMockFeatureApi } from '../api.mockFeatures.ts';
-import { createSupabaseApi } from '../api.supabase.ts';
-import { normalizeBriefEmail, parseBriefMarkets, parseBriefSummary, parseSubscribeResult } from '../types.ts';
+import { BRIEF_CAPS, createMockFeatureApi } from '../api/api.mockFeatures.ts';
+import { createSupabaseApi } from '../api/api.supabase.ts';
+import { normalizeBriefEmail, parseBriefMarkets, parseBriefSummary, parseSubscribeResult } from '../shared/types.ts';
 import type { MacroFact } from '../../contract/types.ts';
 
 const URL_ = 'https://example.supabase.co';

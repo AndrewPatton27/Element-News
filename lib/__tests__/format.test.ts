@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { categoryName, changeText, clampHeadline, eventLabel, factA11yLabel, hostOf, relativeTime } from '../format.ts';
+import { categoryName, changeText, clampHeadline, eventLabel, factA11yLabel, hostOf, relativeTime } from '../shared/format.ts';
 import { NOW, fact } from './helpers.ts';
 
 test('relative time', () => {

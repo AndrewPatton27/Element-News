@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { card } from './helpers.ts';
-import { diversifyFeed, pickTopStories } from '../diversify.ts';
-import { feedReducer, initialFeedState } from '../feedLogic.ts';
+import { diversifyFeed, pickTopStories } from '../feed/diversify.ts';
+import { feedReducer, initialFeedState } from '../feed/feedLogic.ts';
 
 test('Top stories picks distinct categories and excludes shared symbols and story links', () => {
   const items = [

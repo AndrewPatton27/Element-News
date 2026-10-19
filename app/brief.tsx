@@ -8,10 +8,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { BlurbCard } from '../contract/types.ts';
-import type { Api } from '../lib/api.ts';
-import { useAppData } from '../lib/appData';
-import { useAccount } from '../lib/accountContext';
-import { withoutHidden } from '../lib/accountLogic';
+import type { Api } from '../lib/api/api.ts';
+import { useAppData } from '../lib/shared/appData';
+import { useAccount } from '../lib/account/accountContext';
+import { withoutHidden } from '../lib/account/accountLogic';
 import {
   briefCards,
   briefDate,
@@ -28,24 +28,24 @@ import {
   tokenParam,
   type BriefData,
   type BriefMode,
-} from '../lib/briefLogic';
-import { userMessage } from '../lib/errors';
-import { isRenderableKind, noticesFor } from '../lib/labels';
-import { withoutHiddenSources } from '../lib/sourceKeys';
-import { usePalette, useWide } from '../lib/useTheme';
-import { MOBILE_HEADER_HEIGHT, fonts, space } from '../lib/theme';
-import { BriefEmpty, BriefMeta, BriefTabs } from '../components/BriefChrome';
-import { BriefMarkets } from '../components/BriefMarkets';
-import { BriefMovers, BriefNumbers } from '../components/BriefNumbers';
-import { BriefSignup } from '../components/BriefSignup';
-import { BriefManage } from '../components/BriefSignupManage';
-import { BriefStories } from '../components/BriefStories';
-import { BriefSummary } from '../components/BriefSummary';
-import { NumbersTicker } from '../components/NumbersTicker';
-import { DetailSheet } from '../components/DetailSheet';
-import { ScreenShell } from '../components/ScreenShell';
-import { Shell, Wordmark } from '../components/Shell';
-import { ErrorState, LoadingState } from '../components/States';
+} from '../lib/brief/briefLogic';
+import { userMessage } from '../lib/api/errors';
+import { isRenderableKind, noticesFor } from '../lib/shared/labels';
+import { withoutHiddenSources } from '../lib/sources/sourceKeys';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { MOBILE_HEADER_HEIGHT, fonts, space } from '../lib/theme/theme';
+import { BriefEmpty, BriefMeta, BriefTabs } from '../components/brief/BriefChrome';
+import { BriefMarkets } from '../components/numbers/BriefMarkets';
+import { BriefMovers, BriefNumbers } from '../components/numbers/BriefNumbers';
+import { BriefSignup } from '../components/account/BriefSignup';
+import { BriefManage } from '../components/account/BriefSignupManage';
+import { BriefStories } from '../components/brief/BriefStories';
+import { BriefSummary } from '../components/brief/BriefSummary';
+import { NumbersTicker } from '../components/numbers/NumbersTicker';
+import { DetailSheet } from '../components/card/DetailSheet';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { Shell, Wordmark } from '../components/shell/Shell';
+import { ErrorState, LoadingState } from '../components/shell/States';
 
 // A brief older than this is fetched again when the reader comes back to the tab.
 const STALE_MS = 10 * 60_000;

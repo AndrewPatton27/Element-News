@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isBlurbCard, isHttpUrl, parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../types.ts';
+import { isBlurbCard, isHttpUrl, parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 import { card, config, dataCard, fact } from './helpers.ts';
 
 test('isHttpUrl accepts only https URLs (matches the DB CHECK)', () => {

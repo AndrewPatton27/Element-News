@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RANK, localScore, rankLocal } from '../localRank.ts';
-import { EMPTY_LOCAL, withHiddenSources, withReaction, withTopics } from '../localPrefs.ts';
+import { RANK, localScore, rankLocal } from '../feed/localRank.ts';
+import { EMPTY_LOCAL, withHiddenSources, withReaction, withTopics } from '../storage/localPrefs.ts';
 import { card, dataCard } from './helpers.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 

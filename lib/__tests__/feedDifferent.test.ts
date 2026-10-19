@@ -4,12 +4,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { BlurbCard } from '../../contract/types.ts';
-import { diversifyFeed } from '../diversify.ts';
-import { localScore } from '../localRank.ts';
-import { mockRankScore } from '../feedLogic.ts';
-import { cardSourceKey } from '../sourceKeys.ts';
-import { capTopics, mergePool, rankForYou, spreadFromTrending } from '../forYouRank.ts';
-import { sortLatest, trendingOrder } from '../feedOrder.ts';
+import { diversifyFeed } from '../feed/diversify.ts';
+import { localScore } from '../feed/localRank.ts';
+import { mockRankScore } from '../feed/feedLogic.ts';
+import { cardSourceKey } from '../sources/sourceKeys.ts';
+import { capTopics, mergePool, rankForYou, spreadFromTrending } from '../feed/forYouRank.ts';
+import { sortLatest, trendingOrder } from '../feed/feedOrder.ts';
 
 type Prefs = Parameters<typeof rankForYou>[1];
 

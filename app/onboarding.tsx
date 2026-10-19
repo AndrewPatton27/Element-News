@@ -4,14 +4,14 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useAccount } from '../lib/accountContext';
-import { useAppData } from '../lib/appData';
-import { usePalette, useWide } from '../lib/useTheme';
-import { userMessage } from '../lib/errors';
-import { fonts, font } from '../lib/theme';
-import { PrimaryButton, SectionLabel } from '../components/FormParts';
-import { ScreenShell } from '../components/ScreenShell';
-import { TopicPicker } from '../components/TopicPicker';
+import { useAccount } from '../lib/account/accountContext';
+import { useAppData } from '../lib/shared/appData';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { userMessage } from '../lib/api/errors';
+import { fonts, font } from '../lib/theme/theme';
+import { PrimaryButton, SectionLabel } from '../components/account/FormParts';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { TopicPicker } from '../components/feed/TopicPicker';
 
 export default function OnboardingScreen() {
   const p = usePalette();

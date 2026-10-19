@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dedupeCards, isAirworthinessCard, latestOrder, sortLatest, trendingOrder, trendingScore } from '../feedOrder.ts';
-import { mockFeedPage, mockRankScore } from '../feedLogic.ts';
+import { dedupeCards, isAirworthinessCard, latestOrder, sortLatest, trendingOrder, trendingScore } from '../feed/feedOrder.ts';
+import { mockFeedPage, mockRankScore } from '../feed/feedLogic.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BlurbCard } from '../../contract/types.ts';
@@ -78,7 +78,7 @@ test('overlap@10 of trending vs latest on the sample fixtures is reported and <=
 });
 
 test('addedLabel shows when the card was added (published_at), not the event time', async () => {
-  const { addedLabel } = await import('../format.ts');
+  const { addedLabel } = await import('../shared/format.ts');
   const now = new Date('2026-10-18T12:00:00Z');
   assert.equal(addedLabel({ published_at: '2026-10-18T07:00:00Z' }, now), 'Added 5 h ago');
   assert.equal(addedLabel({ published_at: '2026-10-18T11:59:30Z' }, now), 'Added just now');

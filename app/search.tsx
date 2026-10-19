@@ -7,11 +7,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BlurbCard, CategorySlug } from '../contract/types.ts';
-import { useAppData } from '../lib/appData';
-import { useAccount } from '../lib/accountContext';
-import { withoutHidden } from '../lib/accountLogic';
-import { withoutHiddenSources } from '../lib/sourceKeys';
-import { normalizeTicker } from '../lib/followingLogic';
+import { useAppData } from '../lib/shared/appData';
+import { useAccount } from '../lib/account/accountContext';
+import { withoutHidden } from '../lib/account/accountLogic';
+import { withoutHiddenSources } from '../lib/sources/sourceKeys';
+import { normalizeTicker } from '../lib/following/followingLogic';
 import {
   RECENT_KEY,
   SEARCH_DEBOUNCE_MS,
@@ -25,22 +25,22 @@ import {
   searchTarget,
   serializeRecents,
   suggestedTopics,
-} from '../lib/searchLogic';
-import { defaultStore } from '../lib/storage';
-import { useFollows } from '../lib/useFollows';
-import { usePagedCards } from '../lib/usePagedCards';
-import { usePalette, useWide } from '../lib/useTheme';
-import { fonts, font, space } from '../lib/theme';
-import { DetailSheet } from '../components/DetailSheet';
-import { FollowingButton } from '../components/FollowingButton';
-import { Disclaimer } from '../components/Labels';
-import { ScreenShell } from '../components/ScreenShell';
-import { SearchBox } from '../components/SearchBox';
-import { SearchIdle } from '../components/SearchIdle';
-import { SearchResults } from '../components/SearchResults';
-import { Shell } from '../components/Shell';
-import { SourcesSheet } from '../components/SourcesSheet';
-import { disclaimerText } from '../lib/labels';
+} from '../lib/search/searchLogic';
+import { defaultStore } from '../lib/storage/storage';
+import { useFollows } from '../lib/following/useFollows';
+import { usePagedCards } from '../lib/feed/usePagedCards';
+import { usePalette, useWide } from '../lib/theme/useTheme';
+import { fonts, font, space } from '../lib/theme/theme';
+import { DetailSheet } from '../components/card/DetailSheet';
+import { FollowingButton } from '../components/following/FollowingButton';
+import { Disclaimer } from '../components/card/Labels';
+import { ScreenShell } from '../components/shell/ScreenShell';
+import { SearchBox } from '../components/search/SearchBox';
+import { SearchIdle } from '../components/search/SearchIdle';
+import { SearchResults } from '../components/search/SearchResults';
+import { Shell } from '../components/shell/Shell';
+import { SourcesSheet } from '../components/card/SourcesSheet';
+import { disclaimerText } from '../lib/shared/labels';
 
 const store = defaultStore();
 

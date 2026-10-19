@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendPage, canLoadMore, clampLimit, feedKey, feedReducer, initialFeedState, mockFeedPage } from '../feedLogic.ts';
+import { appendPage, canLoadMore, clampLimit, feedKey, feedReducer, initialFeedState, mockFeedPage } from '../feed/feedLogic.ts';
 import { card, dataCard } from './helpers.ts';
 
 test('appendPage dedupes by id and drops invalid cards', () => {

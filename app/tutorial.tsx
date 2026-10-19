@@ -2,9 +2,9 @@
 // About. Finishing or skipping marks the tour seen and goes to the feed (or sign-up).
 
 import { router } from 'expo-router';
-import { Tutorial } from '../components/Tutorial';
-import { markTutorialSeen } from '../lib/tutorialLogic';
-import { defaultStore } from '../lib/storage';
+import { Tutorial } from '../components/tutorial/Tutorial';
+import { markTutorialSeen } from '../lib/tutorial/tutorialLogic';
+import { defaultStore } from '../lib/storage/storage';
 
 export default function TutorialScreen() {
   return (
