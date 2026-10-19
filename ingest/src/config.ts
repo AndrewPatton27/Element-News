@@ -66,20 +66,6 @@ export const config = {
   templateVersion: 'tpl-v5',
   providerOrder: ['gemini', 'groq', 'template'] as const, // a list on purpose: adding a provider is one entry
 
-  // Pick-the-best-cards step (post-contest): runOnce first collects candidates from ALL sources (fetch, dedupe,
-  // topic filter, already-handled check, no AI), scores each without AI, then spends the run's AI budget on the
-  // top-scored candidates. score = weights.importance x normalized importance (src/ranking.ts policy: event
-  // weight x source authority) + weights.freshness x 0.5^(age / halfLifeHours). One source is soft-capped at
-  // softCapShare x budget while other sources still have candidates; the share it does not use is handed back.
-  // enabled false = old behavior (sources run one after another; the first ones can use the whole budget).
-  scheduler: {
-    enabled: true,
-    weights: { importance: 0.6, freshness: 0.4 },
-    halfLifeHours: 24,
-    importanceCeiling: 16,                    // importance at which the normalized importance reaches 1
-    softCapShare: 0.4,
-  },
-
   // Deterministic editorial gate, before any model call. Per-run narrow-source diversity cap.
   reportCard: {
     // The write -> Groq score -> revise-once -> publish protocol in the pipeline. OFF for the scheduled
