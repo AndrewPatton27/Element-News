@@ -1,6 +1,8 @@
 // Following page, stories section (Mobile-Following / Web-Following): one card per
 // followed story with a badge, its category, the title, a timeline of updates (newest
-// strong), "Open story ›" and a Following toggle. Updates come from api.relatedCards.
+// strong), "Open story ›" and a Following toggle, then the same one-line bar as the feed
+// cards for the newest update (source and time, opening the original; like, dislike, follow,
+// share). Updates come from api.relatedCards.
 
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -12,6 +14,10 @@ import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { PulseIcon } from '../shell/Icons';
 import { CardActionRow } from '../card/CardActionRow';
+import { CardBar } from '../card/CardBar';
+import { openUrl } from '../../lib/shared/openUrl';
+import { primarySource } from '../../lib/shared/labels';
+import { isHttpUrl } from '../../lib/shared/types';
 
 const updateListeners = new Set<() => void>();
 
@@ -112,7 +118,17 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                 <Text style={[styles.openText, wide && { fontSize: 15 }, { color: p.accent }]}>Following</Text>
               </Pressable>
             </View>
-            <CardActionRow card={latest} />
+            <CardBar
+              card={latest}
+              link
+              onPress={() => {
+                const url = primarySource(latest)?.url;
+                if (isHttpUrl(url)) openUrl(url, latest.id);
+              }}
+              size={wide ? 'wide' : 'phone'}
+            >
+              <CardActionRow card={latest} />
+            </CardBar>
           </View>
         );
       })}

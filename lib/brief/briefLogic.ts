@@ -5,7 +5,7 @@
 
 import type { AppConfig, BlurbCard, Brief, BriefKind, BriefMarkets, BriefSubscribeStatus, BriefSummary, Category, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { categoryName, clampText, relativeTime } from '../shared/format.ts';
-import { cardLabels, cardNotices, disclaimerText, primarySource, shareAlikeCredit, type ShareAlikeCredit } from '../shared/labels.ts';
+import { cardNotices, disclaimerText, primarySource, shareAlikeCredit, type ShareAlikeCredit } from '../shared/labels.ts';
 import type { KeyValueStore } from '../storage/storage.ts';
 import { isHttpUrl } from '../shared/types.ts';
 
@@ -262,15 +262,6 @@ export function teaser(body: string | null | undefined, max = 110): string {
   return clampText(m ? m[0] : text, max);
 }
 
-/**
- * The page footer. Every story row carries its own labels (see briefRowLabels), so the
- * footer only shows the disclaimer when no row does (a brief of numbers alone), and never
- * a second time right under a row. null = no footer.
- */
-export function briefFooter(cards: BlurbCard[], config: AppConfig | null | undefined): string | null {
-  return cards.length === 0 ? disclaimerText(config) : null;
-}
-
 export interface BriefRowSource {
   label: string; // "SEC · 8-K"
   url: string; // https only
@@ -279,16 +270,16 @@ export interface BriefRowSource {
 
 export interface BriefRowLabels {
   source: BriefRowSource | null;
-  line: string; // "AI label · disclaimer" (AI label only for AI-written cards), then required notices
+  line: string; // required notices only (FRED); "" when none. The AI notice and disclaimer are the screen's strip (D-80)
   credit: ShareAlikeCredit | null; // Wikipedia CC BY-SA credit, when the card needs it
 }
 
 /**
  * What one Brief row must show next to its headline (rule 5): a link to the primary
- * source (https only) and one muted labels line. The disclaimer appears once per row.
+ * source (https only) and, when the card needs one, its required notice (FRED, rule 8).
+ * The AI notice and the disclaimer sit once in the Brief screen's persistent strip (D-80).
  */
 export function briefRowLabels(card: BlurbCard, config: AppConfig | null | undefined): BriefRowLabels {
-  const labels = cardLabels(card, config);
   const primary = primarySource(card);
   const source =
     primary && isHttpUrl(primary.url)
@@ -298,7 +289,7 @@ export function briefRowLabels(card: BlurbCard, config: AppConfig | null | undef
           count: Math.max(card.source_count, card.sources.length),
         }
       : null;
-  const line = [labels.aiLabel, labels.disclaimer, ...cardNotices(card, config).map((n) => n.text)].filter(Boolean).join(' · ');
+  const line = cardNotices(card, config).map((n) => n.text).filter(Boolean).join(' · ');
   return { source, line, credit: shareAlikeCredit(card, config) };
 }
 
