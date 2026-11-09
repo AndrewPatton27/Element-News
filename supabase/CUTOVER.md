@@ -24,6 +24,7 @@ Paste each file in the SQL editor (or `supabase db push`). Each is re-runnable. 
 | 6 | `migrations/20261114000000_search_v5.sql` | Replaces only `api.search` (same signature). Live as soon as it runs; an older app needs no change. Check: `supabase/tests/search_v5_check.sql`. |
 | 7 | `migrations/20261115000000_companies.sql` | Company directory, card tags (`core.card_companies`, backfills the last 365 days), `api.search_companies`, `api.company_cards`, `api.companies_directory`, `api.card_companies`. Apply before deploying the app that shows company rows, chips and pages. Check: `supabase/tests/companies_check.sql`. |
 | 8 | `migrations/20261115000100_search_company_boost.sql` | Needs steps 6 and 7: recreates `api.search` from v5 plus the company-cards-first tier. Must come after both. Check: `supabase/tests/search_company_boost_check.sql`. Rollback: re-run step 6's file. |
+| 9 | `migrations/20261117000000_v3_extra_cold.sql` | Needs step 4. Sets `v3_step_extra_cold` to 1 (Drew's decision: the extra topic step also for cold readers). Changes nothing readers see while `foryou_ml_mode` stays 0 (v3 OFF); it does not touch the mode. Check: `supabase/tests/ranking_v3_check.sql`. Rollback: `update core.rank_params set value = 0 where key = 'v3_step_extra_cold';`. |
 
 Checks after the steps:
 
