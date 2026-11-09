@@ -12,6 +12,10 @@ test('step order and optional e2e', () => {
   assert.ok(base.indexOf('python tests (ml)') < base.indexOf('secret scan'));
   assert.ok(!base.includes('test:e2e'));
   assert.equal(names(buildSteps({ e2e: true, env: {} })).at(-1), 'test:e2e');
+  assert.ok(!base.includes('security gate (prod)'));
+  const prod = buildSteps({ prod: true, env: {} });
+  assert.equal(names(prod).at(-1), 'security gate (prod)');
+  assert.deepEqual(prod.at(-1).args, ['scripts/security-gate.mjs', '--require-build']);
 });
 
 test('python skipped when absent or ml/tests missing; SQL skipped without runner', () => {
