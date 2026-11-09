@@ -27,16 +27,18 @@ create publication supabase_realtime;`);
 const migs = fs.readdirSync(path.join(repo, 'supabase/migrations'))
   .filter((f) => f.endsWith('.sql') && !f.includes('cron')).sort();      // pg_cron is not in PGlite
 for (const f of migs) await db.exec(fs.readFileSync(path.join(repo, 'supabase/migrations', f), 'utf8'));
+// Parity is about the v3 score and v5/v7 order, so later feed filters are switched off here (each has its own SQL
+// check): seen-card exclusion (20261113000000; the fixture reader's 'view' events would remove cards from the
+// scroll) and the macro-focus recall gate and micro page cap (20261116000000). Missing rows are simply not updated.
+await q(`update core.rank_params set value = 0 where key = 'seen_exclude_mode'`);
+await q(`update core.rank_params set value = 10 where key = 'micro_max_per_10'`);
+await q(`update core.rank_params set value = 0 where starts_with(key, 'micro_category:')`);
 
 const params = {};
 for (const r of await q(`select key, value::float8 as value from core.rank_params where key like 'v3\\_%'`)) params[r.key] = r.value;
 for (const [k, v] of Object.entries(fx.params || {})) {
   await q('insert into core.rank_params (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [k, v]);
 }
-// Seen-card exclusion (20261113000000) is a separate layer that the Python mirror does not model; it would
-// drop the fixture's viewed cards from the v5/v7 scrolls. Parity is about the scores and order, so it is off here
-// (its own check is supabase/tests/seen_exclusion_check.sql).
-await q(`update core.rank_params set value = 0 where key = 'seen_exclude_mode'`);
 await q('insert into auth.users (id, email) values ($1, $2)', [fx.user, 'parity@example.com']);
 await q('insert into core.user_prefs (user_id, followed_categories, hidden_categories, hidden_sources) values ($1, $2, $3, $4)',
   [fx.user, fx.prefs.followed, fx.prefs.hidden_categories, fx.prefs.hidden_sources]);

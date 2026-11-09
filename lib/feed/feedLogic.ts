@@ -4,6 +4,7 @@ import type { BlurbCard, CategorySlug, FeedMode, FeedPage } from '../../contract
 import { isBlurbCard } from '../shared/types.ts';
 import { diversifyFeed } from './diversify.ts';
 import { pulledAt } from './feedOrder.ts';
+import { applyMicroFocus } from './microFocus.ts';
 
 // The feed tabs. 'for_you' is the signed-in personal feed (api.feed_for_you).
 export type FeedTab = FeedMode | 'for_you';
@@ -187,9 +188,10 @@ function byDescThenId(score: (c: BlurbCard) => number) {
 export function mockFeedPage(all: BlurbCard[], p: MockFeedParams): FeedPage {
   const limit = clampLimit(p.limit);
   const filtered = all.filter((c) => p.category === null || c.category === p.category);
-  const sorted = filtered.slice().sort(p.mode === 'latest'
+  // same rules as the server (20261116000000_macro_focus.sql): recalls gated, micro cards capped, chips unchanged
+  const sorted = applyMicroFocus(filtered.slice().sort(p.mode === 'latest'
     ? (a, b) => pulledAt(b) - pulledAt(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
-    : byDescThenId(mockRankScore));
+    : byDescThenId(mockRankScore)), p.category);
   const offset = p.cursor ? Math.max(0, parseInt(p.cursor, 10) || 0) : 0;
   const items = sorted.slice(offset, offset + limit);
   const end = offset + items.length;

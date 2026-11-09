@@ -16,6 +16,76 @@ export interface CpscRecall {
   URL?: string;
   Hazards?: { Name?: string }[];
   Remedies?: { Name?: string }[];
+  Products?: { Name?: string; NumberOfUnits?: string }[];
+  Injuries?: { Name?: string }[];
+  Manufacturers?: { Name?: string }[];
+  Importers?: { Name?: string }[];
+  Distributors?: { Name?: string }[];
+  Retailers?: { Name?: string }[];
+}
+
+/** Deterministic "material" verdict for a recall (see config.cpsc.materialMinUnits and the notes there). */
+export interface RecallMaterial {
+  material: boolean;
+  /** Stable codes, logged and stored (core.card_material.reasons): units_<n>, value_usd_<n>, deaths, serious_injuries, stop_sale, watch_company_<T>; 'minor' when none. */
+  reasons: string[];
+  /** Watch-list tickers of the recalling firm (same key as core.companies.ticker). */
+  tickers: string[];
+  units: number;
+  value_usd: number;
+}
+
+/** Units in one NumberOfUnits text: the first number ("About 42,860 (In addition, about 340 ...)" -> 42860; "1.2 million" -> 1200000). */
+export function parseUnits(text: string | undefined): number {
+  const m = /(\d[\d,]*(?:\.\d+)?)\s*(million|thousand)?/i.exec(text ?? '');
+  if (!m) return 0;
+  const n = Number(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(n)) return 0;
+  const mult = /million/i.test(m[2] ?? '') ? 1_000_000 : /thousand/i.test(m[2] ?? '') ? 1_000 : 1;
+  return Math.round(n * mult);
+}
+
+/** Highest dollar price in the retailer text ("for between $44 and $56" -> 56), 0 when none. */
+export function maxPrice(text: string): number {
+  let best = 0;
+  for (const m of text.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)/g)) {
+    const n = Number(m[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && n > best) best = n;
+  }
+  return best;
+}
+
+/** Injuries text without its "No injuries have been reported." style sentences. */
+function reportedHarm(text: string): string {
+  return text.split(/(?<=[.;])\s+/).filter((s) => !/^\s*(no|none)\b/i.test(s) && !/\bno (injuries|deaths|incidents)\b/i.test(s)).join(' ');
+}
+
+const DEATH = /\b(deaths?|died|fatal(?:ity|ities)?|killed)\b/i;
+const SERIOUS = /\b(serious(?:ly)? injur\w*|hospitali[sz]\w*|fractur\w*|amputat\w*|concussions?|head injur\w*|(?:second|third)[- ]degree burns?|emergency room|surgery)\b/i;
+const STOP_SALE = /\bstop[- ]sale\b|\bstop(?:ped)? selling\b/i;
+
+/** The recalling firm's text: title before " Recall", manufacturers, importers, distributors (not retailers). */
+function firmText(r: CpscRecall): string {
+  const title = (r.Title ?? '').split(/\s+Recall/i)[0] ?? '';
+  return [title, ...[...(r.Manufacturers ?? []), ...(r.Importers ?? []), ...(r.Distributors ?? [])].map((x) => x.Name ?? '')].join(' | ');
+}
+
+/** Material recall (shown in the feeds) or not (Recalls & Safety topic, company page and search only). Pure. */
+export function classifyRecall(r: CpscRecall, c = config.cpsc): RecallMaterial {
+  const units = (r.Products ?? []).reduce((n, p) => n + parseUnits(p.NumberOfUnits), 0);
+  const price = maxPrice((r.Retailers ?? []).map((x) => x.Name ?? '').join(' '));
+  const value = Math.round(units * price);
+  const harm = reportedHarm((r.Injuries ?? []).map((x) => x.Name ?? '').join(' '));
+  const firm = firmText(r);
+  const tickers = [...new Set(c.watchNames.filter(([pat]) => new RegExp(`\\b(?:${pat})\\b`, 'i').test(firm)).map(([, t]) => t))].slice(0, 5);
+  const reasons: string[] = [];
+  if (units >= c.materialMinUnits) reasons.push(`units_${units}`);
+  if (value >= c.materialMinValueUsd) reasons.push(`value_usd_${value}`);
+  if (DEATH.test(harm)) reasons.push('deaths');
+  if (SERIOUS.test(harm)) reasons.push('serious_injuries');
+  if (STOP_SALE.test([r.Title, r.Description, ...(r.Remedies ?? []).map((x) => x.Name)].join(' '))) reasons.push('stop_sale');
+  if (c.watchCompanyMaterial) for (const t of tickers) reasons.push(`watch_company_${t}`);
+  return { material: reasons.length > 0, reasons: reasons.length ? reasons : ['minor'], tickers, units, value_usd: value };
 }
 
 /** Recalls API URL starting `lookbackDays` before `now`. */
@@ -79,6 +149,7 @@ export function cpscToItem(r: CpscRecall, now: Date): { item: RawItem } | { skip
       doc_label: 'Recall',
       summary_text: text.slice(0, config.sourceTextMaxChars),    // the ONLY text the AI sees
       attribution: config.cpsc.attribution,
+      material: (({ material, reasons, tickers }) => ({ material, reasons, tickers }))(classifyRecall(r)),
     },
   };
 }

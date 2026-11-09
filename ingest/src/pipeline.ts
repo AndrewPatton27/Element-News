@@ -27,7 +27,7 @@ import { secFilingPageText } from './sec-text.ts';
 import { createChainState, summarizeWithChain, type ChainState, type UsageCounter } from './summarizer/chain.ts';
 import type { RawItem, Summarizer } from './types.ts';
 import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
-import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState } from './topicFilter.ts';
+import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, type TopicFilterState } from './topicFilter.ts';
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
@@ -72,6 +72,8 @@ export interface RunStats {
   report_unscored: number;
   report_scored: number;
   report_provider_groq: number;
+  recall_material: number;        // CPSC cards published as material (shown in the feeds)
+  recall_not_material: number;    // CPSC cards published as not material (Recalls & Safety topic only)
 }
 
 /** Per-run state passed to each source's runner (shared budget, dedupe guard and provider cooldowns). */
@@ -100,7 +102,7 @@ async function recentCards(deps: Deps) {
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
-  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0 };
+  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0, recall_material: 0, recall_not_material: 0 };
   const ctx: RunCtx = {
     stats,
     budget: { left: opts.limit ?? 20 },
@@ -260,7 +262,8 @@ async function runCpsc(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
     }
     await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, {
       total: config.cpsc.maxPerRun,
-      onDone: (p) => deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates, `
+      onDone: (p) => deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates `
+        + `(${items.filter((i) => i.material?.material).length} material), `
         + `${p.alreadyHandled} already handled, ${p.fresh} new processed (max ${config.cpsc.maxPerRun} new per run)`),
     });
   } catch (e) {
@@ -309,8 +312,11 @@ async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof cre
       const cand = { url: it.url, tickers: [], sortAt: new Date(it.published_at) };
       const d = guard.check(cand);
       if (!d.ok) { stats.skipped++; deps.log(`skip ${d.reason}: ${it.title}`); continue; }
+      // narrow-source cap (config.reportCard.narrowSourceCaps.usgs_quake = 1 new card per run); the rest wait for the next run
+      if (narrowCapReached(it, topicFilterState)) { stats.skipped++; deps.log(`skip report_card_variety_cap: ${it.title}`); continue; }
       const row = await deps.publisher.upsertItem(it);
       if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
+      recordTopic(it, topicFilterState);
       try {
         const payload = buildPublishPayload(it, usgsDraft(it), { itemId: row.id, aiGenerated: false, model: null });
         const v = validatePublish(payload);
@@ -645,6 +651,13 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
         await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
       if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
+      if (it.material && res.id) {
+        // Recall gate (20261116000000_macro_focus.sql): no row = not material, so a failure here fails closed.
+        stats[it.material.material ? 'recall_material' : 'recall_not_material']++;
+        deps.log(`recall ${it.material.material ? 'material' : 'not material (Safety topic only)'}: ${it.material.reasons.join(', ')}: ${it.title.slice(0, 80)}`);
+        await Promise.resolve(deps.publisher.setCardMaterial?.(res.id, it.material))
+          .catch((e) => deps.log(`set_card_material failed (card stays out of the feeds): ${(e as Error).message}`));
+      }
     }
     const notes = r.log.length > 1 ? [...r.log] : [];
     if (r.relevance !== null) notes.push(`relevance ${r.relevance}`);
