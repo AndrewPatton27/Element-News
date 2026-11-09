@@ -18,6 +18,37 @@ from .bandit_eval import eval_task, train_model
 from .harness import WORLDS
 
 REF = "a1_current_server"
+
+
+def ts_v2_ablation(method: str, cat, model, P):
+    """Diagnosis only. "ts_v2:lam=1,lean=0,explore=0,onformula=1": the trained v2 model with its prior strength
+    forced to lam, the macro lean set to lean, the draw width set, and (onformula=1) its hours added on top
+    of the full formula score instead of replacing the formula's personal terms."""
+    from ..bandit.policy import BanditPolicy
+    from ..ranking.baselines import CurrentServer
+    kw = dict(p.split("=") for p in method.split(":", 1)[1].split(",") if p)
+    P = dict(P)
+    if "lam" in kw:
+        model.lam = {g: float(kw["lam"]) for g in ("c", "t", "s", "g")}
+    if "lean" in kw:
+        P["v2_prior_lean"] = float(kw["lean"])
+    if "explore" in kw:
+        P["v2_explore"] = float(kw["explore"])
+    if "mu0" in kw and float(kw["mu0"]) == 0:
+        model.mu0 = {}
+    pol = BanditPolicy(cat, model, P)
+    pol.name = method
+    if kw.get("onformula") == "1":
+        srv = CurrentServer(cat)
+
+        class OnFormula:
+            name = method
+
+            def rank(self, state, rows, now, crowd):
+                return srv.rank(state, rows, now, crowd,
+                                extra=lambda rr: pol.scores(state, rr, now) - (cat.base[rr] - now))
+        return OnFormula()
+    return pol
 EMPTY_MODEL = {"rows": [], "version": "none"}
 
 
