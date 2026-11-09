@@ -5,7 +5,7 @@
 export const STALE_HOURS = 3;
 export const QUIET_HOURS = 24;
 export const QUIET_HOURS_WEEKEND = 48;
-export const EXPECTED_JOBS = 10;
+export const EXPECTED_JOBS = 15;
 export const AI_WARN_FRACTION = 0.8;
 export const DB_WARN_MB = 400;
 export const RETRIGGER_EVERY_HOURS = 6;
@@ -82,7 +82,7 @@ export function evaluate(feed: FeedStatus | null, ops: OpsStatus | null, now: Da
   }
   if (ops) {
     if (ops.jobs !== null && ops.jobs !== EXPECTED_JOBS) {
-      out.push({ kind: 'jobs', title: `Cron jobs: ${ops.jobs} of ${EXPECTED_JOBS}`, detail: 'Re-apply supabase/migrations/20261019050000_cron_schedule.sql.' });
+      out.push({ kind: 'jobs', title: `Cron jobs: ${ops.jobs} of ${EXPECTED_JOBS}`, detail: 'Re-apply the cron migrations (20261019050000_cron_schedule.sql, 20261111000000_finance_sources_cron.sql, 20261112000000_ranking_v3.sql), or update EXPECTED_JOBS if a job was added on purpose.' });
     }
     const cron = ops.cron_failures_24h ?? 0, http = ops.http_non2xx_24h ?? 0;
     if (cron > 0 || http > 0) {
