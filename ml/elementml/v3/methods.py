@@ -31,3 +31,7 @@ def parse(method: str) -> V3Config:
 
 def make_v3(method: str, cat) -> ResidualPolicy:
     return ResidualPolicy(cat, parse(method), name=method)
+
+
+# The setting chosen on tuning seeds 101-102 and evaluated once on seeds 1-5 (v3-findings.md, "Final run").
+FINAL = "v3:H=36,cap=30,step_extra=2.5"
