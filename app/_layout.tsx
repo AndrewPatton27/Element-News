@@ -7,7 +7,7 @@
 import { lazy, Suspense } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 // Per-weight imports so the web build ships only these 4 font files, not all 22.
@@ -20,8 +20,14 @@ import { AppDataProvider } from '../lib/shared/appData';
 import { AccountProvider } from '../lib/account/accountContext';
 import { light, paletteFor } from '../lib/theme/theme';
 import { ConfigErrorScreen } from '../components/shell/States';
-import { AppErrorBoundary } from '../components/shell/ErrorBoundary';
+import { AppErrorBoundary, ErrorBoundary } from '../components/shell/ErrorBoundary';
+import { installChunkReload, type WindowLike } from '../lib/shared/crashReport';
 const TutorialGate = lazy(() => import('../components/tutorial/Tutorial').then((module) => ({ default: module.TutorialGate })));
+
+// Web: a screen file from an older deploy that fails to load outside React also reloads once
+// (lib/shared/crashReport.ts explains the stale-chunk crash).
+if (Platform.OS === 'web' && typeof window !== 'undefined') installChunkReload(window as unknown as WindowLike);
+const noTour = () => null;
 
 export default function RootLayout() {
   const scheme = useColorScheme();
@@ -58,7 +64,8 @@ export default function RootLayout() {
                 <Stack.Screen name="tutorial" />
               </Stack>
               {/* First-run tour over every screen, once per device (also at /tutorial). */}
-              <Suspense fallback={null}><TutorialGate /></Suspense>
+              {/* Its own boundary: if the tour cannot load, the app still works without it. */}
+              <ErrorBoundary where="tutorial" fallback={noTour}><Suspense fallback={null}><TutorialGate /></Suspense></ErrorBoundary>
             </AccountProvider>
           </AppDataProvider>
         </AppErrorBoundary>
