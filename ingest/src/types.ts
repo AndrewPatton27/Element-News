@@ -25,6 +25,8 @@ export interface RawItem {
   items?: { number: string; title: string }[];   // SEC 8-K items
   summary_text: string;              // short licensed text from the feed itself
   attribution?: string;              // credit line shown on the card (BEA: "Source: U.S. Bureau of Economic Analysis")
+  /** CPSC only: deterministic "material" verdict, stored after publish (api.set_card_material). Not shown on the card. */
+  material?: { material: boolean; reasons: string[]; tickers: string[] };
 }
 
 export interface TickerRef {

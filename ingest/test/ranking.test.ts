@@ -25,7 +25,7 @@ const SIX = [
 
 test('importance matches the worked example', () => {
   const got = Object.fromEntries(SIX.map((c) => [c.id, Math.round(importance(c) * 100) / 100]));
-  assert.deepEqual(got, { A: 16.6, B: 7.24, C: 12.75, D: 2, E: 3.52, F: 6.08 });
+  assert.deepEqual(got, { A: 16.6, B: 8.69, C: 12.75, D: 2, E: 3.52, F: 6.08 });   // B: earnings weight 6 (macro focus; was 7.24 at 5)
 });
 
 test("'top' order is A, B, E, F, D, C", () => {

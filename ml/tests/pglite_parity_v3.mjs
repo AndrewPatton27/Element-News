@@ -27,6 +27,12 @@ create publication supabase_realtime;`);
 const migs = fs.readdirSync(path.join(repo, 'supabase/migrations'))
   .filter((f) => f.endsWith('.sql') && !f.includes('cron')).sort();      // pg_cron is not in PGlite
 for (const f of migs) await db.exec(fs.readFileSync(path.join(repo, 'supabase/migrations', f), 'utf8'));
+// Parity is about the v3 score and v5/v7 order, so later feed filters are switched off here (each has its own SQL
+// check): seen-card exclusion (20261113000000; the fixture reader's 'view' events would remove cards from the
+// scroll) and the macro-focus recall gate and micro page cap (20261116000000). Missing rows are simply not updated.
+await q(`update core.rank_params set value = 0 where key = 'seen_exclude_mode'`);
+await q(`update core.rank_params set value = 10 where key = 'micro_max_per_10'`);
+await q(`update core.rank_params set value = 0 where starts_with(key, 'micro_category:')`);
 
 const params = {};
 for (const r of await q(`select key, value::float8 as value from core.rank_params where key like 'v3\\_%'`)) params[r.key] = r.value;

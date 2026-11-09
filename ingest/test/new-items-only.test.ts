@@ -75,7 +75,7 @@ test('cpsc: recalls already handled by an earlier run do not use up the 5-per-ru
   assert.deepEqual(t.dry.cards.map((c) => c.dedupe_key), recallUrls.slice(5, 10), 'recalls 6 to 10, newest first');
   assert.equal(t.titles.length, 5, 'one AI call per new recall, none for the handled ones');
   assert.equal(t.upserted.length, 10, 'the 4 recalls after the cap are not even recorded');
-  assert.ok(t.lines.some((l) => /^cpsc: 14 recalls in the last 14 days, 14 candidates, 5 already handled, 5 new processed \(max 5 new per run\)$/.test(l)), t.lines.join('\n'));
+  assert.ok(t.lines.some((l) => /^cpsc: 14 recalls in the last 14 days, 14 candidates \(4 material\), 5 already handled, 5 new processed \(max 5 new per run\)$/.test(l)), t.lines.join('\n'));
   assert.ok(t.lines.includes('new-item limit reached (5 new per run)'));
 });
 
@@ -222,7 +222,7 @@ test('nasa: window is 14 days; only real news releases count (image articles, AP
 
 test('nasa pipeline (feedPages 2): reads feed page 1 and page 2, publishes both recent news releases, skips ones an earlier run handled', async () => {
   const t = setup(new Set());
-  const s = await withConfig(config.nasa, 'feedPages', 2, () => runOnce(t.deps, { only: ['nasa'] }));
+  const s = await withConfig(config.reportCard.narrowSourceCaps, 'nasa_release', 2, () => withConfig(config.nasa, 'feedPages', 2, () => runOnce(t.deps, { only: ['nasa'] })));
   assert.deepEqual(t.requests, [nasaFeedUrl(1), nasaFeedUrl(2)]);
   assert.equal(s.published, 2, t.lines.join('\n'));
   assert.ok(t.dry.cards.every((c) => c.category === 'science' && c.sources[0].name === 'NASA'));

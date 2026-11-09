@@ -244,7 +244,7 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/383fbdd7-f8a5-5353-b04d-6a132d4c55a8",
-      "importance": 5,
+      "importance": 6,
       "detail": null
     },
     {
@@ -344,58 +344,6 @@
       "detail": null
     },
     {
-      "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
-      "kind": "summary",
-      "headline": "[SAMPLE] Contoso recalls desk heaters after reports of fires",
-      "body": "Contoso is recalling about 12,000 desk heaters because they can overheat and start a fire. Stop using them and contact the company for a free refund.",
-      "category": "safety",
-      "event_type": "recall",
-      "tickers": [],
-      "macro": [],
-      "sources": [
-        {
-          "name": "U.S. Consumer Product Safety Commission",
-          "kind": "government",
-          "doc_label": "Recall",
-          "url": "https://www.cpsc.gov/Recalls/2027/Contoso-Recalls-Desk-Heaters",
-          "published_at": "2026-10-15T16:00:00Z",
-          "license_class": "public_domain",
-          "attribution": "Source: U.S. Consumer Product Safety Commission",
-          "is_primary": true
-        }
-      ],
-      "source_count": 1,
-      "as_of": "2026-10-15T16:00:00Z",
-      "published_at": "2026-10-15T16:00:00Z",
-      "sort_at": "2026-10-15T16:00:00Z",
-      "updated_at": null,
-      "revision": 1,
-      "freshness": {
-        "delayed_hours": null
-      },
-      "ai": {
-        "generated": true,
-        "label": "AI-generated summary · may contain errors"
-      },
-      "attribution": "Source: U.S. Consumer Product Safety Commission",
-      "image": null,
-      "is_saved": false,
-      "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
-      "importance": 6.25,
-      "detail": {
-        "paragraphs": [
-          "Contoso is recalling about 12,000 desk heaters. They can overheat and start a fire.",
-          "A recall means the company asks people to stop using a product and offers a fix or refund. Here, Contoso offers a free refund.",
-          "The recall was announced with the U.S. Consumer Product Safety Commission, the agency that watches over product safety."
-        ],
-        "key_points": [
-          "About 12,000 Contoso desk heaters recalled",
-          "Risk: overheating and fire",
-          "Stop using them; free refund from the company"
-        ]
-      }
-    },
-    {
       "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e01",
       "kind": "summary",
       "headline": "[SAMPLE] Voters on Northwind Island pick a new president",
@@ -474,7 +422,7 @@
       "image": null,
       "is_saved": false,
       "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e03",
-      "importance": 3.75,
+      "importance": 1.875,
       "detail": {
         "paragraphs": [
           "A magnitude 6.1 earthquake struck 40 km SW of Northwind Island at 16:00 UTC on Oct 15.",
@@ -486,6 +434,58 @@
           "Location: 40 km SW of Northwind Island",
           "Time: 16:00 UTC on Oct 15",
           "USGS alert level: green"
+        ]
+      }
+    },
+    {
+      "id": "b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
+      "kind": "summary",
+      "headline": "[SAMPLE] Contoso recalls desk heaters after reports of fires",
+      "body": "Contoso is recalling about 12,000 desk heaters because they can overheat and start a fire. Stop using them and contact the company for a free refund.",
+      "category": "safety",
+      "event_type": "recall",
+      "tickers": [],
+      "macro": [],
+      "sources": [
+        {
+          "name": "U.S. Consumer Product Safety Commission",
+          "kind": "government",
+          "doc_label": "Recall",
+          "url": "https://www.cpsc.gov/Recalls/2027/Contoso-Recalls-Desk-Heaters",
+          "published_at": "2026-10-15T16:00:00Z",
+          "license_class": "public_domain",
+          "attribution": "Source: U.S. Consumer Product Safety Commission",
+          "is_primary": true
+        }
+      ],
+      "source_count": 1,
+      "as_of": "2026-10-15T16:00:00Z",
+      "published_at": "2026-10-15T16:00:00Z",
+      "sort_at": "2026-10-15T16:00:00Z",
+      "updated_at": null,
+      "revision": 1,
+      "freshness": {
+        "delayed_hours": null
+      },
+      "ai": {
+        "generated": true,
+        "label": "AI-generated summary · may contain errors"
+      },
+      "attribution": "Source: U.S. Consumer Product Safety Commission",
+      "image": null,
+      "is_saved": false,
+      "share_path": "/b/b1a7c2d0-5e11-5c3a-9f40-0a1b2c3d4e02",
+      "importance": 1.875,
+      "detail": {
+        "paragraphs": [
+          "Contoso is recalling about 12,000 desk heaters. They can overheat and start a fire.",
+          "A recall means the company asks people to stop using a product and offers a fix or refund. Here, Contoso offers a free refund.",
+          "The recall was announced with the U.S. Consumer Product Safety Commission, the agency that watches over product safety."
+        ],
+        "key_points": [
+          "About 12,000 Contoso desk heaters recalled",
+          "Risk: overheating and fire",
+          "Stop using them; free refund from the company"
         ]
       }
     }
