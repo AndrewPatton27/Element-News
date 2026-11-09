@@ -24,6 +24,7 @@ import { FollowingManager } from '../components/following/FollowingManager';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { clearStoryUpdates, FollowedStories, useStoryRows } from '../components/following/FollowedStories';
 import { UndoToast } from '../components/feed/UndoToast';
+import { cornerToastText } from '../lib/feed/toastPlacement';
 import { storiesHeader } from '../lib/following/followedStories';
 import { useFollowedStories } from '../lib/following/useFollowedStories';
 import { FollowingFeed } from '../components/following/FollowingFeed';
@@ -46,7 +47,9 @@ export default function FollowingScreen() {
 
   const followedStories = useFollowedStories();
   const { rows, loading: storiesLoading } = useStoryRows(api, followedStories.stories);
-  const [undo, setUndo] = useState<BlurbCard | null>(null);
+  const [undo, setUndoCard] = useState<{ card: BlurbCard; seq: number } | null>(null);
+  const undoSeq = useRef(0);
+  const setUndo = (c: BlurbCard | null) => setUndoCard(c ? { card: c, seq: ++undoSeq.current } : null);
   const hdr = storiesHeader(rows.filter((r) => r.updates.length > 0).length, rows.length);
   const countLine = rows.length ? [hdr.left, hdr.right].filter(Boolean).join(' · ') : undefined;
 
@@ -184,9 +187,13 @@ export default function FollowingScreen() {
       <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} · {disclaimerText(config)}</Text>
 
       <UndoToast
-        message={undo ? 'Stopped following this story' : null}
+        message={undo ? cornerToastText('unfollowStory').text : null}
+        label={cornerToastText('unfollowStory').label}
+        token={undo?.seq}
+        placement="corner"
+        wide={wide}
         onUndo={() => {
-          if (undo) followedStories.toggle(undo.id, undo);
+          if (undo) followedStories.toggle(undo.card.id, undo.card);
           setUndo(null);
         }}
         onDone={() => setUndo(null)}
