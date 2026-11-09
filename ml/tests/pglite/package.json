@@ -1,0 +1,10 @@
+{
+  "name": "element-ml-pglite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PGlite (in-memory Postgres) for the ranking v2 SQL parity test only (ml/tests/test_bandit.py)",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.10"
+  }
+}
