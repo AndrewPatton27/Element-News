@@ -59,7 +59,8 @@ jobs:
           node-version: 24
 
       - name: Install pinned, hash-checked Python libraries
-        run: python -m pip install --disable-pip-version-check --no-cache-dir -q --require-hashes --only-binary=:all: -r requirements-ranker.txt
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir -q --require-hashes --only-binary=:all: -r requirements-ranker.txt
 
       - name: Install PGlite for the SQL parity test (lockfile with integrity hash, no install scripts)
         working-directory: ml/tests/pglite

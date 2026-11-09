@@ -90,6 +90,56 @@ The leakage rule: nothing in `data/`, `features/`, `ranking/` or `serving/` impo
 - One metric got worse when hardening: recovery after a reader's taste changes completely is slower.
 - Heads trained on simulated logs must not be used for real readers; they are retrained on real events before any go-live review.
 
+## Ranking v2 (`elementml/bandit/`): Thompson sampling in plain SQL
+
+A second, much smaller approach that can run inside Postgres on the free tier. It is written and tested but **switched off**: the SQL (`supabase/migrations/20261109000000_ranking_v2.sql`) only serves it when `core.rank_params.foryou_ml_mode = 2` (set by hand, ships at 0) and a model in `core.ml_models` has passed the gate.
+
+In plain words: a card is a few features (topic, story type, source and tags such as `rates`, `inflation`, `jobs`, `markets`, set by `core.tag_rules`). For each feature a reader has a belief: an average reward and how sure we are. The belief starts at the population average (trained weekly) and moves toward the reader's own likes, detail opens, long looks, quick skips and dislikes. Each scroll takes one random draw from those beliefs and adds it, in hours, to the usual importance-and-freshness score. Unsure topics get wide draws and sometimes win (built-in exploration, which fades as evidence grows). The draw is fixed by reader, feature and a seed kept in the cursor, so paging is exact.
+
+```
+n_j = sum w x^2     mu_j = (lambda_g mu0_j + sum w x r) / (lambda_g + n_j)     sigma_j = tau / sqrt(lambda_g + n_j)
+theta_j = mu_j + v2_explore sigma_j z_j          hours = clamp(12 x sum_j x theta_j, -18, 18)
+score = rank_score + hours - seen penalty, then the topic step and core.diversify (as today)
+```
+
+| File | What happens there |
+|---|---|
+| `bandit/params.py` | Every setting, same keys as the `core.rank_params` rows (`v2_*`, plus the reused signal weights). |
+| `bandit/features.py` | Card features; `TAG_RULES` is the exact `core.tag_rules` seed (a test compares them). |
+| `bandit/policy.py` | The math, `score_reference` (line-by-line mirror of `core.v2_scores`), the md5 normal draw shared with SQL, `BanditPolicy` for the simulator. |
+| `bandit/prior.py` | Weekly empirical-Bayes fit: slot propensities, population mean per feature (reader weight capped, at least 20 readers per feature, else the hand prior), tau, prior strength per group picked by next-week likelihood. |
+| `bandit/gate.py` | Go/no-go: synthetic criteria per world, the real-data replay (inverse propensity, needs 14 days and 200 readers, 90% bootstrap lower bound > 0). |
+| `bandit/supa.py`, `bandit/job.py` | Service-role REST client (standard library) and the weekly steps: export, train, gate, publish. They print counts and pass/fail only. |
+| `simulator/bandit_personas.py` | Six reader types: rates-and-markets student, tech reader, everything skimmer, anti-macro reader (no sports topic exists in the synthetic catalog, so: world/science/safety fan who dislikes macro), taste changer, new reader with two follows. |
+| `evaluation/bandit_eval.py` | ts_v2 vs today's server formula over normal / stress / wild worlds and 5 seeds; trains the prior on separate simulated logs first, exactly like the weekly job. |
+| `tests/test_bandit.py`, `tests/pglite_parity.mjs` | Update direction, shrinkage, follows, lean, draws, paging stability, training (fallback, privacy floor, reader cap, determinism), gate logic, the offline job, and SQL parity in PGlite. |
+
+```
+$PY -m pytest tests/test_bandit.py -q                       # parity runs only with PGLITE_PACKAGE_JSON set (else skipped)
+PGLITE_PACKAGE_JSON=<path to a package.json with @electric-sql/pglite installed> $PY -m pytest tests/test_bandit.py -q
+$PY -m elementml.cli eval-bandit --seeds 5                  # -> results/bandit_eval.json + printed tables and gate
+$PY -m elementml.cli bandit-export --data <folder>          # needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment
+$PY -m elementml.cli train-bandit --data <folder>
+$PY -m elementml.cli bandit-gate --data <folder> --synthetic results/bandit_eval.json
+$PY -m elementml.cli bandit-publish --data <folder>
+```
+
+The weekly GitHub workflow `.github/workflows/train-ranker.yml` runs these steps (Mondays, or by hand), uploads nothing and deletes the data folder at the end. Actions are pinned by commit SHA, Python wheels by sha256 (`requirements-ranker.txt`, `--require-hashes`) and PGlite by its lockfile (`tests/pglite/`); CI sets `REQUIRE_PGLITE=1` so the SQL parity test cannot silently skip. GitHub turns scheduled workflows off after 60 idle days: the last passed weights then stay in use, and `api.ml_v2_check()` (daily via pg_cron) reports `stale` after `v2_model_stale_days` (21) so it can be noticed and re-run by hand.
+
+**The real-data gate needs logged pages.** `core.ml_pages` is only written while `foryou_ml_mode` is 1 or 2, so the replay part of the gate can pass only after mode 1 (logging only, readers see exactly today's feed) has run for at least 14 days with at least 200 signed-in readers. Until then `gate_passed` is always false and v2 cannot serve anyone, even in mode 2.
+
+**Offline result (2026-11-09): the synthetic gate FAILS in every world.** See `results/bandit_eval.json` (regenerate with `eval-bandit`). Do not switch v2 on. Means over 5 seeds, 60 simulated readers (10 per type), 14 days (formula -> ts_v2):
+
+| world | NDCG@10 | P@10 | dislike@10 | topics@10 | recovery days | anti-macro reader: macro share (true interest) |
+|---|---|---|---|---|---|---|
+| normal | 0.454 -> 0.296 (0/5 seeds better) | 0.464 -> 0.271 | 0.060 -> 0.088 | 4.77 -> 5.89 | 4.4 -> 0.4 | 0.058 -> 0.415 (0.003) |
+| stress | 0.332 -> 0.270 (0/5) | 0.392 -> 0.248 | 0.080 -> 0.094 | 4.90 -> 5.60 | 4.0 -> 0.0 | 0.130 -> 0.450 (0.040) |
+| wild | 0.323 -> 0.264 (0/5) | 0.283 -> 0.178 | 0.080 -> 0.092 | 5.26 -> 5.64 | 1.6 -> 0.0 | 0.208 -> 0.473 (0.055) |
+
+Paging held: 600 frozen scrolls, 0 repeats, 0 same-cursor mismatches. Per type (normal), P@10: rates-and-markets 0.523 -> 0.459, tech reader 0.351 -> 0.079, anti-macro 0.570 -> 0.136, new reader with two follows 0.416 -> 0.272. Why: the weekly fit picked the strongest prior strength on the grid (lambda = 34) for almost every group, so a reader's own signals barely move the beliefs. Almost every feature has a positive population mean (most views end in a long look), and macro cards carry more tags plus the lean. The result is roughly "importance + population taste": macro for everyone and very little personal taste. Two diagnostics (not adopted, normal world): averaging features instead of summing them gave NDCG 0.276. A fixed lambda of 5 gave 0.367, still below 0.454, with a 22% macro share for the anti-macro reader. The formula needs a redesign, not tuning (for example per-reader deviations from the population, a joint fit instead of per-feature beliefs, and keeping v5's follow and dislike terms).
+
+Its limits: the simulator that grades ts_v2 is the same family of simulator its prior is trained on (the gate also needs the real replay), simulated readers carry no slot on their per-card record (so the simulated feed uses propensity 1), and the anti-macro reader stands in for a sports fan.
+
 ## Rules this prototype keeps
 
 - Free and local: scikit-learn, LightGBM, numpy. No embedding API, no hosted model.
