@@ -11,10 +11,47 @@ import type { SummarizeInput, Summarizer, SummaryDraft } from '../types.ts';
 
 /** A provider answered 429; the chain puts it in a cooldown and moves on. */
 export class RateLimitedError extends Error {
-  constructor(provider: string) {
-    super(`${provider}: rate limited`);
+  /** true when the 429 says the DAILY quota is used up (not just a per-minute limit) */
+  readonly daily: boolean;
+  constructor(provider: string, daily = false) {
+    super(`${provider}: rate limited${daily ? ' (daily quota)' : ''}`);
     this.name = 'RateLimitedError';
+    this.daily = daily;
   }
+}
+
+/** True if a 429 body says the per-day quota (requests or tokens) is exhausted. */
+export function isDailyQuota(text: string): boolean {
+  return /per\s*day|perday|\bRPD\b|\bTPD\b|daily (quota|limit)/i.test(text ?? '');
+}
+
+/** A retired or unknown model: HTTP 404, or HTTP 400 saying the model was not found / decommissioned. */
+export function isModelMissing(status: number, text: string): boolean {
+  if (status === 404) return true;
+  return status === 400 && /model[^.]{0,80}(not found|does not exist|decommission|deprecat|no longer|not supported)|(not found|does not exist)[^.]{0,40}model|model_not_found|model_decommissioned/i.test(text ?? '');
+}
+
+/**
+ * Retired-model fallback. `call(fn)` runs fn with the current model; if the reply says the model is gone and a
+ * fallback exists, the SAME call is repeated once with the fallback, which then stays active and `missing`
+ * turns true (the run summary reports stats.model_missing; the watchdog opens an alert).
+ */
+export function modelFallback(primary: string, fallback: string | undefined | null) {
+  let active = primary;
+  let missing = false;
+  return {
+    get model() { return active; },
+    get missing() { return missing; },
+    async call<R extends { status: number; text: string }>(fn: (model: string) => Promise<R>): Promise<R> {
+      const res = await fn(active);
+      if (!missing && fallback && fallback !== active && isModelMissing(res.status, res.text)) {
+        missing = true;
+        active = fallback;
+        return fn(active);
+      }
+      return res;
+    },
+  };
 }
 
 /** Any other provider failure (HTTP error, non-JSON or empty reply); the chain moves on. */
@@ -143,20 +180,23 @@ export function createGeminiSummarizer(opts: {
   fetchImpl?: FetchLike;
   minIntervalMs?: number;
   dailyCap?: number;
+  timeoutMs?: number;
+  fallbackModel?: string | null;
 }): Summarizer {
-  const model = opts.model ?? config.gemini.model;
+  const mf = modelFallback(opts.model ?? config.gemini.model, opts.fallbackModel === undefined ? config.gemini.fallbackModel : opts.fallbackModel);
   return {
     name: 'gemini',
     usesAi: true,
-    model,
+    get model() { return mf.model; },
+    get modelMissing() { return mf.missing; },
     dailyCap: opts.dailyCap ?? aiDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? minIntervalMs(config.gemini.freeRpm, 5000),
     async summarize(input): Promise<SummaryDraft> {
-      const url = config.gemini.endpoint.replace('{model}', model);
-      const res = await fetchAllowed(url, {
+      const res = await mf.call((model) => fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
         kind: 'api',
         method: 'POST',
         fetchImpl: opts.fetchImpl,
+        timeoutMs: opts.timeoutMs,
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },  // key in a header, never in the URL
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: buildPrompt(input) }] }],
@@ -167,8 +207,8 @@ export function createGeminiSummarizer(opts: {
             responseSchema: RESPONSE_SCHEMA,
           },
         }),
-      });
-      if (res.status === 429) throw new RateLimitedError('gemini');
+      }));
+      if (res.status === 429) throw new RateLimitedError('gemini', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) {
         throw new ProviderError(`gemini: HTTP ${res.status}: ${res.text.slice(0, 200)}`);
       }

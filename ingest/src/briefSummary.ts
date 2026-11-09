@@ -11,7 +11,7 @@
 import { fetchAllowed, type FetchLike } from './allowlist.ts';
 import { aiDailyCap, config, groqDailyCap } from './config.ts';
 import { summaryDate, summaryIsCurrent } from './briefTime.ts';
-import { ProviderError, RateLimitedError } from './summarizer/gemini.ts';
+import { isDailyQuota, modelFallback, ProviderError, RateLimitedError } from './summarizer/gemini.ts';
 import type { UsageCounter } from './summarizer/chain.ts';
 import { checkRepetition, countWords, extractNumbers, findAdvice, longestCopiedRun, splitSentences } from './validate.ts';
 import type { Brief, BlurbCard, MacroFact } from '../../contract/types.ts';
@@ -196,24 +196,26 @@ export function templateBriefSummary(kind: BriefKind, brief: BriefInput): string
 export interface TextModel {
   name: 'gemini' | 'groq';
   model: string;
+  /** true once the primary model was reported retired and the fallback took over */
+  modelMissing?: boolean;
   dailyCap: number;
   generate(prompt: string): Promise<string>;
 }
 
 export function createGeminiTextModel(opts: { apiKey: string; model?: string; fetchImpl?: FetchLike }): TextModel {
-  const model = opts.model ?? config.gemini.model;
+  const mf = modelFallback(opts.model ?? config.gemini.model, config.gemini.fallbackModel);
   return {
-    name: 'gemini', model, dailyCap: aiDailyCap(),
+    name: 'gemini', get model() { return mf.model; }, get modelMissing() { return mf.missing; }, dailyCap: aiDailyCap(),
     async generate(prompt) {
-      const res = await fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
+      const res = await mf.call((model) => fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
         kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },   // key in a header, never in the URL
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: config.mail.summaryMaxTokens },
         }),
-      });
-      if (res.status === 429) throw new RateLimitedError('gemini');
+      }));
+      if (res.status === 429) throw new RateLimitedError('gemini', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) throw new ProviderError(`gemini: HTTP ${res.status}: ${res.text.slice(0, 200)}`);
       let text: string | undefined;
       try { text = JSON.parse(res.text)?.candidates?.[0]?.content?.parts?.[0]?.text; } catch { throw new ProviderError('gemini: response is not JSON'); }
@@ -224,20 +226,20 @@ export function createGeminiTextModel(opts: { apiKey: string; model?: string; fe
 }
 
 export function createGroqTextModel(opts: { apiKey: string; model?: string; fetchImpl?: FetchLike }): TextModel {
-  const model = opts.model ?? config.groq.model;
+  const mf = modelFallback(opts.model ?? config.groq.model, config.groq.alternativeModel);
   return {
-    name: 'groq', model, dailyCap: groqDailyCap(),
+    name: 'groq', get model() { return mf.model; }, get modelMissing() { return mf.missing; }, dailyCap: groqDailyCap(),
     async generate(prompt) {
-      const body: Record<string, unknown> = {
+      const body = (model: string): Record<string, unknown> => ({
         model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_completion_tokens: Math.max(config.mail.summaryMaxTokens, 1024),
-      };
-      if (config.groq.reasoningEffort) body.reasoning_effort = config.groq.reasoningEffort;
-      const res = await fetchAllowed(config.groq.endpoint, {
+        ...(config.groq.reasoningEffort ? { reasoning_effort: config.groq.reasoningEffort } : {}),
+      });
+      const res = await mf.call((model) => fetchAllowed(config.groq.endpoint, {
         kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },   // key in a header, never in the URL
-        body: JSON.stringify(body),
-      });
-      if (res.status === 429) throw new RateLimitedError('groq');
+        body: JSON.stringify(body(model)),
+      }));
+      if (res.status === 429) throw new RateLimitedError('groq', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) throw new ProviderError(`groq: HTTP ${res.status}: ${res.text.slice(0, 200)}`);
       let text: string | null | undefined;
       try { text = JSON.parse(res.text)?.choices?.[0]?.message?.content; } catch { throw new ProviderError('groq: response is not JSON'); }

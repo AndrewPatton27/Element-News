@@ -24,6 +24,8 @@ import type { Palette } from '../../lib/theme/theme';
 import { InfoIcon } from './Icons';
 import { NumbersTicker } from '../numbers/NumbersTicker';
 import { SampleBanner } from './SampleBanner';
+import { DelayedBanner } from './DelayedBanner';
+import { useFeedStatus } from '../../lib/status/useFeedStatus';
 import { SortToggle } from '../feed/SortToggle';
 import { go, TabBar, TopNavLinks, type Tab } from './TabBar';
 
@@ -119,11 +121,13 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
   const { api, config } = useAppData();
   const { user } = useAccount();
   const signedIn = user !== null;
+  const feedStatus = useFeedStatus(api);
 
   if (wide) {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: p.bg }]}>
         {api.sample ? <SampleBanner /> : null}
+      <DelayedBanner status={feedStatus} />
         <TopBar active={active} p={p} email={user ? user.email : null} signedIn={signedIn} feedTab={feedTab} />
         <View style={[styles.strip, { backgroundColor: p.bg, borderBottomColor: p.border }]}>
           <NumbersTicker api={api} config={config} />
@@ -174,6 +178,7 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: p.bg }]} edges={['top', 'bottom']}>
       {api.sample ? <SampleBanner /> : null}
+      <DelayedBanner status={feedStatus} />
       {content}
       <TabBar active={active} signedIn={signedIn} />
       {active !== 'about' && !noFab ? (
