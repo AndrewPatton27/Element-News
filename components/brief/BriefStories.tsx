@@ -115,7 +115,7 @@ function RowLabels({ card, config }: { card: BlurbCard; config: AppConfig | null
           onPress={() => openUrl(source.url, card.id)}
           accessibilityRole="link"
           accessibilityLabel={`Source: ${source.label}${source.count > 1 ? `, ${source.count} sources` : ''}. Opens the original.`}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          hitSlop={{ top: 11, bottom: 11, left: 4, right: 4 }}
           style={({ pressed }) => [styles.chip, { backgroundColor: p.surfaceMuted, opacity: pressed ? 0.75 : 1 }]}
         >
           <LinkIcon color={p.ink} size={12} />
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   rank: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 26, minWidth: 20 },
   rankWide: { fontSize: 34, lineHeight: 34, minWidth: 28 },
   text: { flex: 1, gap: 6 },
-  open: { gap: 4 },
+  open: { gap: 4, minHeight: 44 },
   labels: { gap: 4, alignItems: 'flex-start' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 },
   chipText: { flexShrink: 1, fontFamily: fonts.sansSemi, fontSize: 12 },
