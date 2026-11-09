@@ -6,6 +6,7 @@ import type { BlurbCard, Brief, FeedPage } from '../../contract/types.ts';
 import type { Api } from './api.ts';
 import { MOCK_DELAY_MS } from './config.ts';
 import { mockFeedPage } from '../feed/feedLogic.ts';
+import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
@@ -31,7 +32,7 @@ export function allCards(): BlurbCard[] {
       }
     }
   }
-  return out;
+  return rebaseCards(out); // fixture dates are fixed; keep them fresh so windows never go empty
 }
 
 export function createMockApi(): Api {
