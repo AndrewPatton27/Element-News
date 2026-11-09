@@ -13,7 +13,7 @@ What it does, in one paragraph: every card gets a 32-number vector from its text
 
 ## Run it
 
-Use a Python 3.13 environment with numpy, scipy, pandas, scikit-learn, lightgbm and pytest (nothing else). From this folder (`ml/`):
+Use a Python 3.13 environment (`pip install -r requirements.txt`: numpy, scipy, pandas, scikit-learn, lightgbm, pytest; nothing else). From this folder (`ml/`):
 
 ```
 PY=<path to that python.exe>
