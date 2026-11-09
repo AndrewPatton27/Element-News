@@ -52,9 +52,11 @@ export function dedupeCards(cards: BlurbCard[]): BlurbCard[] {
 
 /** Latest = newest published first. Cards the reader has already reached (index <= position)
  *  stay where they are; everything after them is sorted by published time. */
-export function latestOrder(cards: BlurbCard[], position = 0): BlurbCard[] {
+export function latestOrder(cards: BlurbCard[], position = 0, lastIds: ReadonlySet<string> = new Set()): BlurbCard[] {
   const keep = position > 0 ? Math.min(cards.length, position + 1) : 0;
-  return [...cards.slice(0, keep), ...sortLatest(dedupeCards(cards.slice(keep)))];
+  const rest = dedupeCards(cards.slice(keep));
+  // Cards re-shown because the reader had already seen them stay after the unseen ones.
+  return [...cards.slice(0, keep), ...sortLatest(rest.filter((c) => !lastIds.has(c.id))), ...sortLatest(rest.filter((c) => lastIds.has(c.id)))];
 }
 
 /** FAA-style aircraft orders: Federal Register source AND an aircraft/flight headline. Mirrors the server cap

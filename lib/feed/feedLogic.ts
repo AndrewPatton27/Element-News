@@ -21,6 +21,7 @@ export interface FeedState {
   done: boolean; // server said there is nothing more
   loading: boolean;
   error: string | null;
+  seenIds: string[]; // cards re-shown at the end because the reader had already seen them ("all caught up")
 }
 
 export type FeedAction =
@@ -35,7 +36,7 @@ export function feedKey(q: FeedQuery): string {
 }
 
 export function initialFeedState(key: string): FeedState {
-  return { key, items: [], cursor: null, done: false, loading: false, error: null };
+  return { key, items: [], cursor: null, done: false, loading: false, error: null, seenIds: [] };
 }
 
 // Appends a page: drops cards already shown (by id) and cards that fail the guard.
@@ -65,6 +66,7 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
         cursor: action.page.next_cursor,
         done: action.page.next_cursor === null,
         loading: false,
+        seenIds: typeof action.page.seen_from === 'number' ? [...state.seenIds, ...action.page.items.slice(action.page.seen_from).map((c) => c.id)] : state.seenIds,
       };
     case 'rerank':
       return { ...state, items: action.items };
