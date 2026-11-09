@@ -14,7 +14,13 @@ declare
   sample jsonb := '[]'::jsonb;
   s24 int; s48 int; want int; n int;
 begin
-  select array_agg(slug order by sort_order) into cats from (select slug, sort_order from core.categories order by sort_order limit 10) q;
+  -- markets, earnings and deals are served in the separate markets pack, not as sections, so use other topics;
+  -- if the seed has fewer than 10, add test topics (rolled back with everything else)
+  insert into core.categories (slug, name, sort_order)
+    select 'depthtest' || g, 'Depth test ' || g, 900 + g from generate_series(1, 10) g
+    where (select count(*) from core.categories where slug not in ('markets','earnings','deals')) < 10
+      and g <= 10 - (select count(*) from core.categories where slug not in ('markets','earnings','deals'));
+  select array_agg(slug order by sort_order) into cats from (select slug, sort_order from core.categories where slug not in ('markets','earnings','deals') order by sort_order limit 10) q;
   if cardinality(cats) < 10 then raise exception 'SETUP: need at least 10 categories'; end if;
 
   for k in 1..10 loop

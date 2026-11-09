@@ -24,13 +24,13 @@ export function buildSteps({ e2e = false, exists = existsSync, pythonCmd = null,
     { name: 'test:functions', cmd: npm, args: ['run', 'test:functions'] },
     { name: 'test:worker', cmd: npm, args: ['run', 'test:worker'] },
     { name: 'test:scripts', cmd: npm, args: ['run', 'test:scripts'] },
-    // The PGlite harness is not committed to the repo. Point RELEASE_SQL_RUNNER at a script that runs
-    // supabase/tests/*_check.sql in PGlite (exit 0 = all passed), or add supabase/tests/run-pglite.mjs.
+    // supabase/tests/run-pglite.mjs runs every *_check.sql in PGlite (exit 0 = all passed). RELEASE_SQL_RUNNER
+    // can point at a different runner.
     {
       name: 'SQL checks (PGlite)',
       cmd: process.execPath,
       args: [sqlRunner],
-      skip: () => (exists(sqlRunner) ? null : 'no PGlite runner found (set RELEASE_SQL_RUNNER or add supabase/tests/run-pglite.mjs)'),
+      skip: () => (exists(sqlRunner) ? null : 'no PGlite runner found (set RELEASE_SQL_RUNNER)'),
     },
     {
       name: 'python tests (ml)',
