@@ -6,7 +6,7 @@
 //              (--limit = max cards; with --dry-run: the cards in src/fixtures/rewrite-cards.json)
 //   --backfill-macro  one-off: FRED history for the Trends charts via api.upsert_macro (no data cards);
 //              --weeks N = weeks of history (default 16); with --dry-run: DGS10 fixture only
-//   --only     comma-separated subset of sources (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
+//   --only     comma-separated subset of sources (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
 //   --fix-category <card-id> <slug>   re-file one card (service role; api.set_card_category)
@@ -33,6 +33,7 @@ import { fileCounter, memoryCounter } from './summarizer/chain.ts';
 import { buildProviders } from './summarizer/providers.ts';
 import { templateSummarizer } from './summarizer/template.ts';
 import { cpscUrl } from './sources/cpsc.ts';
+import { avgRatesUrl, debtUrl } from './sources/fiscaldata.ts';
 import { nasaFeedUrl } from './sources/nasa.ts';
 import { wikimediaUserAgent, wikiFeedUrl } from './sources/wiki.ts';
 
@@ -91,6 +92,10 @@ export function fixtureFetcher(): Deps['fetchText'] {
     if (url === config.secSubmissionsUrl.replace('{cik}', '0000320193')) return fixture('sec-submissions-CIK0000320193.json');
     if ((config.feeds.fedRss as readonly string[]).includes(url)) return fixture('fed-press-monetary.rss.xml');
     if (url === config.feeds.beaRss) return fixture('bea-releases.rss.xml');
+    if (url === config.feeds.fedSpeechRss) return fixture('fed-speeches.rss.xml');
+    if (url === config.feeds.secPressRss) return fixture('sec-press.rss.xml');
+    if (url === avgRatesUrl()) return fixture('fiscaldata-avg-interest-rates.json');
+    if (url === debtUrl()) return fixture('fiscaldata-debt.json');
     if (url === wikiFeedUrl(DRY_NOW)) return fixture('wiki-featured-2026-10-17.json');
     if (url === wikiFeedUrl(DRY_NOW, 1)) return fixture('wiki-featured-2026-10-16.json');
     if (url === wikiFeedUrl(DRY_NOW, 2)) return '{"tfa":{},"mostread":{}}';          // a past day without a `news` list = no items

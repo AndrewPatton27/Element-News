@@ -28,12 +28,16 @@ interface SeriesInfo {
   source_short: string;
   sort_order: number;
   agency: { name: string; url: string; doc_label: string };   // primary source link on a data card
+  provider?: 'treasury';             // fetched from Treasury FiscalData, not FRED (fact links to the agency page)
+  derived?: string;                  // computed by Element from other series (what from, in words)
 }
 
 const FED = 'Board of Governors of the Federal Reserve System (US) via FRED';
 const H15 = { name: 'Federal Reserve Board', url: 'https://www.federalreserve.gov/releases/h15/', doc_label: 'H.15 release' };
 const BLS = 'U.S. Bureau of Labor Statistics via FRED';
 const EIA = 'U.S. Energy Information Administration via FRED';
+const TREASURY = 'U.S. Department of the Treasury, Fiscal Service';
+const AVG_RATES = { name: TREASURY, url: 'https://fiscaldata.treasury.gov/datasets/average-interest-rates-treasury-securities/', doc_label: 'Average interest rates' };
 
 // Never add MORTGAGE30US (Freddie Mac copyright, not public domain): see config.forbiddenSeries.
 export const SERIES: Record<string, SeriesInfo> = {
@@ -63,6 +67,23 @@ export const SERIES: Record<string, SeriesInfo> = {
   A191RL1Q225SBEA: { label: 'GDP growth (annual rate)', noun: 'Real GDP growth rate', about: 'how fast the U.S. economy grew, at a yearly pace', unit: 'percent', decimals: 1, frequency: 'quarterly', category: 'economy',
     source_name: 'U.S. Bureau of Economic Analysis via FRED', source_short: 'BEA via FRED', sort_order: 12,
     agency: { name: 'U.S. Bureau of Economic Analysis', url: 'https://www.bea.gov/data/gdp/gross-domestic-product', doc_label: 'GDP' } },
+  // Added 2026-11-08 (finance and rates): Federal Reserve Board H.15 series via FRED, a derived spread and
+  // Treasury FiscalData series (provider 'treasury'). None of them is in the Numbers panel (in_numbers false).
+  DGS3MO: { label: '3-mo Treasury', noun: '3-month Treasury yield', about: 'the interest rate the U.S. government pays to borrow for 3 months', unit: 'percent', decimals: 2, frequency: 'daily', category: 'markets', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 13, agency: H15 },
+  DGS5: { label: '5-yr Treasury', noun: '5-year Treasury yield', about: 'the interest rate the U.S. government pays to borrow for 5 years', unit: 'percent', decimals: 2, frequency: 'daily', category: 'markets', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 14, agency: H15 },
+  DGS30: { label: '30-yr Treasury', noun: '30-year Treasury yield', about: 'the interest rate the U.S. government pays to borrow for 30 years, a guide for long-term loans', unit: 'percent', decimals: 2, frequency: 'daily', category: 'markets', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 15, agency: H15 },
+  EFFR: { label: 'Effective fed funds (EFFR)', noun: 'Effective federal funds rate', about: 'the rate banks pay each other for overnight loans', unit: 'percent', decimals: 2, frequency: 'daily', category: 'policy', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 16, agency: H15 },
+  DFEDTARU: { label: 'Fed rate target (upper)', noun: 'Fed target rate upper limit', about: 'the top of the range the Federal Reserve aims for with its main short-term interest rate', unit: 'percent', decimals: 2, frequency: 'daily', category: 'policy', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 17,
+    agency: { name: 'Federal Reserve Board', url: 'https://www.federalreserve.gov/monetarypolicy/openmarket.htm', doc_label: 'Open market operations' } },
+  DFEDTARL: { label: 'Fed rate target (lower)', noun: 'Fed target rate lower limit', about: 'the bottom of the range the Federal Reserve aims for with its main short-term interest rate', unit: 'percent', decimals: 2, frequency: 'daily', category: 'policy', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 18,
+    agency: { name: 'Federal Reserve Board', url: 'https://www.federalreserve.gov/monetarypolicy/openmarket.htm', doc_label: 'Open market operations' } },
+  SPREAD_10Y2Y: { label: '10-yr minus 2-yr', noun: '10-year minus 2-year Treasury yield gap', about: 'the gap between long and short government borrowing rates', unit: 'percent', decimals: 2, frequency: 'daily', category: 'markets', source_name: FED, source_short: 'Federal Reserve via FRED', sort_order: 19, agency: H15,
+    derived: 'the 10-year and 2-year Treasury yields' },
+  TREAS_AVG_BILLS: { label: 'Avg rate on T-bills', noun: 'Average interest rate on Treasury bills', about: 'what the government pays on its short-term borrowing, averaged over all bills outstanding', unit: 'percent', decimals: 2, frequency: 'monthly', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 20, agency: AVG_RATES },
+  TREAS_AVG_NOTES: { label: 'Avg rate on T-notes', noun: 'Average interest rate on Treasury notes', about: 'what the government pays on its medium-term borrowing, averaged over all notes outstanding', unit: 'percent', decimals: 2, frequency: 'monthly', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 21, agency: AVG_RATES },
+  TREAS_AVG_BONDS: { label: 'Avg rate on T-bonds', noun: 'Average interest rate on Treasury bonds', about: 'what the government pays on its long-term borrowing, averaged over all bonds outstanding', unit: 'percent', decimals: 2, frequency: 'monthly', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 22, agency: AVG_RATES },
+  TREAS_DEBT: { label: 'National debt', noun: 'Total U.S. national debt', about: 'everything the federal government owes', unit: 'usd', decimals: 2, frequency: 'daily', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 23,
+    agency: { name: TREASURY, url: 'https://fiscaldata.treasury.gov/datasets/debt-to-the-penny/', doc_label: 'Debt to the Penny' } },
 };
 
 export interface Point { date: string; value: number }   // date YYYY-MM-DD
@@ -106,6 +127,7 @@ const signed = (x: number, d: number) => (x > 0 ? '+' : x < 0 ? '-' : '') + Math
 /** 745021000000 -> "745.0B", 1275000 -> "1.28M" (decimals 2), 199000 -> "199,000", 4.331 -> "4.33". */
 export function formatAmount(x: number, decimals: number): string {
   const a = Math.abs(x);
+  if (a >= 1e12) return fixed(x / 1e12, decimals) + 'T';
   if (a >= 1e9) return fixed(x / 1e9, decimals) + 'B';
   if (a >= 1e6) return fixed(x / 1e6, decimals) + 'M';
   if (a >= 1000) return Math.round(x).toLocaleString('en-US');
@@ -190,7 +212,7 @@ function toMacroFact(o: MacroObservation): MacroFact {
     series_id: o.series_id, label: s.label, value: o.display_value, change: o.change_text,
     direction: o.direction, period: o.period_label, as_of: o.obs_date,
     source_name: s.source_name, source_short: s.source_short,
-    source_url: `https://fred.stlouisfed.org/series/${o.series_id}`, sort_order: s.sort_order,
+    source_url: s.provider === 'treasury' ? s.agency.url : `https://fred.stlouisfed.org/series/${o.series_id}`, sort_order: s.sort_order,
   };
 }
 
@@ -260,7 +282,9 @@ export function buildDataCard(o: MacroObservation, extra: MacroObservation[] = [
     paragraphs: [
       `${reading} ${changeSentence}`,
       `What this number measures: ${s.about}.`,
-      `The number comes from the ${s.agency.name}, shared through FRED.`,
+      s.provider === 'treasury' ? `The number comes from the ${s.agency.name}.`
+        : s.derived ? `Element worked this out from ${s.derived}, from the ${s.agency.name} through FRED.`
+        : `The number comes from the ${s.agency.name}, shared through FRED.`,
     ],
     key_points: [
       `${s.label}: ${value}`,
@@ -318,4 +342,10 @@ export function fredUrl(seriesId: string, start: string): string {
   u.searchParams.set('file_type', 'json');
   u.searchParams.set('observation_start', start);
   return u.toString();
+}
+
+/** Derived series: a minus b on dates both have, rounded to 4 places, oldest first. */
+export function differenceSeries(a: Point[], b: Point[]): Point[] {
+  const bm = new Map(b.map((p) => [p.date, p.value]));
+  return a.filter((p) => bm.has(p.date)).map((p) => ({ date: p.date, value: round(p.value - bm.get(p.date)!, 4) }));
 }

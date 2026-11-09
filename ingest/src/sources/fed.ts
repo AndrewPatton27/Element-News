@@ -45,8 +45,10 @@ export function fedItemToItem(i: RssItem): RawItem {
     tickers: [],
     source_name: 'Federal Reserve Board',
     source_kind: 'government',
-    doc_label: 'Press release',
+    doc_label: /minutes of the federal open market committee|fomc minutes/i.test(i.title) ? 'FOMC minutes'
+      : /fomc statement/i.test(i.title) ? 'FOMC statement' : 'Press release',
     summary_text: i.description && i.description !== i.title ? `${i.title}. ${i.description}` : i.title,
+    ...(/fomc|federal open market committee/i.test(i.title) ? { attribution: config.fedSpeechAttribution } : {}),   // cite the Board on FOMC statements and minutes
   };
 }
 
