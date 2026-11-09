@@ -29,7 +29,9 @@
 -- core.user_events. core.ml_weights holds population averages only (no user ids; a feature row needs
 -- v2_min_readers readers). delete_my_data / delete_account are unchanged and reset a reader to cold start.
 --
---   A  tables core.tag_rules, core.ml_models, core.ml_weights (RLS on, no policies)
+--   A  tables core.tag_rules, core.ml_models, core.ml_weights, core.card_features (RLS on, no policies)
+--   D2 core.card_features kept current by triggers (features worked out at publish, not per request)
+--   I5 pg_cron job element-ml-v2-check (daily kill switch), skipped where pg_cron is missing
 --   B  settings (core.rank_params, on conflict do nothing)
 --   C  tag rule seed
 --   D  helpers: core.v2_features, core.v2_uniforms, core.v2_normal, core.v2_holdout, core.v2_active_model,
@@ -85,6 +87,15 @@ create table if not exists core.ml_weights (
   primary key (model_id, kind, key)
 );
 
+-- each card's features, precomputed (section D2); no user data
+create table if not exists core.card_features (
+  blurb_id   uuid primary key references core.blurbs (id) on delete cascade,
+  features   text[] not null,
+  updated_at timestamptz not null default now()
+);
+alter table core.card_features enable row level security;
+revoke all on table core.card_features from public, anon, authenticated;
+
 alter table core.tag_rules  enable row level security;
 alter table core.ml_models  enable row level security;
 alter table core.ml_weights enable row level security;
@@ -112,12 +123,20 @@ insert into core.rank_params (key, value) values
   ('v2_reader_weight_cap',         20),    -- training: one reader adds at most this weight to a population mean
   ('v2_trend_prior_n',             10),    -- Trending v2: prior strength m (readers)
   ('v2_trend_points_per_reward',    3),    -- Trending v2: one reward unit = 3 buzz points
+  ('v2_max_candidates',          3000),    -- more candidate cards than this: serve v5 (request cost guard)
+  ('v2_model_stale_days',          21),    -- api.ml_v2_check reports stale = true when the newest model is older
   ('v2_lean_tag_rates',             1),
   ('v2_lean_tag_inflation',         1),
   ('v2_lean_tag_jobs',              1),
   ('v2_lean_tag_growth',            1),
   ('v2_lean_tag_markets',           1)
 on conflict (key) do nothing;
+
+-- values that must stay positive (a zero would divide by zero or switch a guard off)
+alter table core.rank_params drop constraint if exists rank_params_v2_positive;
+alter table core.rank_params add constraint rank_params_v2_positive
+  check (key not in ('v2_lambda_default', 'v2_tau_default', 'v2_kill_min_cards', 'v2_kill_ratio',
+                     'v2_propensity_cap', 'v2_max_candidates', 'v2_model_stale_days') or value > 0);
 
 
 -- =============================================================================
@@ -239,9 +258,10 @@ security definer
 set search_path = ''
 as $$
   with f as (
-    select core.v2_features(b.category, coalesce(b.event_type, b.kind),
-                            case when b.kind = 'data' then 'fred' else core.source_key_of(b.kind, b.id) end,
-                            b.headline, b.macro) as f
+    select coalesce((select cf.features from core.card_features cf where cf.blurb_id = b.id),
+                    core.v2_features(b.category, coalesce(b.event_type, b.kind),
+                                     case when b.kind = 'data' then 'fred' else core.source_key_of(b.kind, b.id) end,
+                                     b.headline, b.macro)) as f
       from core.blurbs b where b.id = p_blurb
   ), lean as (
     select substr(r.key, length('v2_lean_tag_') + 1) as tag from core.rank_params r
@@ -255,6 +275,72 @@ as $$
     left join core.ml_weights w on w.model_id = p_model and w.kind = 'feature' and w.key = u.j;
 $$;
 
+-- D2. core.card_features: each card's features worked out once (at publish / edit / source change), so a
+--     feed request reads an array instead of running the ~60 tag rules per card. Kept current by triggers
+--     on core.blurbs, core.blurb_sources and core.tag_rules; core.v2_scores falls back to core.v2_features
+--     for a card that has no row (same result).
+--     (table in section A)
+create or replace function core.v2_refresh_card_features(p_ids uuid[])
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare v_n int;
+begin
+  insert into core.card_features (blurb_id, features, updated_at)
+  select b.id,
+         core.v2_features(b.category, coalesce(b.event_type, b.kind),
+                          case when b.kind = 'data' then 'fred' else core.source_key_of(b.kind, b.id) end,
+                          b.headline, b.macro),
+         now()
+    from core.blurbs b
+   where p_ids is null or b.id = any (p_ids)
+  on conflict (blurb_id) do update set features = excluded.features, updated_at = excluded.updated_at;
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+create or replace function core.v2_card_features_trg()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_table_name = 'blurbs' then
+    perform core.v2_refresh_card_features(array[new.id]);
+  elsif tg_table_name = 'blurb_sources' then
+    if tg_op in ('INSERT', 'UPDATE') then perform core.v2_refresh_card_features(array[new.blurb_id]); end if;
+    if tg_op in ('UPDATE', 'DELETE') and exists (select 1 from core.blurbs where id = old.blurb_id) then
+      perform core.v2_refresh_card_features(array[old.blurb_id]);
+    end if;
+  else                                                     -- tag_rules changed: every card
+    perform core.v2_refresh_card_features(null);
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists v2_card_features_blurbs on core.blurbs;
+create trigger v2_card_features_blurbs
+  after insert or update of category, event_type, kind, headline, macro on core.blurbs
+  for each row execute function core.v2_card_features_trg();
+drop trigger if exists v2_card_features_sources on core.blurb_sources;
+create trigger v2_card_features_sources
+  after insert or update or delete on core.blurb_sources
+  for each row execute function core.v2_card_features_trg();
+drop trigger if exists v2_card_features_rules on core.tag_rules;
+create trigger v2_card_features_rules
+  after insert or update or delete on core.tag_rules
+  for each statement execute function core.v2_card_features_trg();
+
+select core.v2_refresh_card_features(null);                -- backfill (re-runnable)
+
+revoke all on function core.v2_refresh_card_features(uuid[]) from public, anon, authenticated;
+revoke all on function core.v2_card_features_trg()           from public, anon, authenticated;
 revoke all on function core.v2_features(text, text, text, text, jsonb) from public, anon, authenticated;
 revoke all on function core.v2_uniforms(text)                         from public, anon, authenticated;
 revoke all on function core.v2_normal(uuid, text, bigint)              from public, anon, authenticated;
@@ -363,10 +449,12 @@ begin
   ), allc as materialized (                               -- candidates plus the reader's event cards
     select b.id, b.category, b.rank_score, b.status, b.published_at, b.sort_at, b.word_count,
            case when b.kind = 'data' then 'fred' else sk.key end as skey,
-           core.v2_features(b.category, coalesce(b.event_type, b.kind),
-                            case when b.kind = 'data' then 'fred' else sk.key end, b.headline, b.macro) as f
+           coalesce(cf.features,                              -- precomputed; computed only if missing
+                    core.v2_features(b.category, coalesce(b.event_type, b.kind),
+                                     case when b.kind = 'data' then 'fred' else sk.key end, b.headline, b.macro)) as f
       from core.blurbs b
       left join srckey sk on sk.blurb_id = b.id
+      left join core.card_features cf on cf.blurb_id = b.id
      where (b.status = 'published' and b.published_at <= p_asof
             and b.sort_at > p_asof - make_interval(days => p.win::int))
         or b.id in (select ev.blurb_id from ev)
@@ -384,7 +472,7 @@ begin
              p.cpos), p.cneg) as r
       from ev
       join allc a on a.id = ev.blurb_id
-      left join mw sl on sl.kind = 'slot' and sl.key = least(ev.slot, 20)::text
+      left join mw sl on sl.kind = 'slot' and ev.slot is not null and sl.key = least(ev.slot, 20)::text   -- no slot = weight 1
      where cardinality(a.f) > 0
   ), st as (                                              -- the reader's evidence per feature (+ follows)
     select u.j, sum(u.n) as n, sum(u.sxr) as sxr from (
@@ -566,9 +654,11 @@ revoke all on function core.feed_for_you_v6(text, int, bigint, bigint) from publ
 -- G. api.feed_for_you (same signature and grants). Modes 0 and 1: exactly 20261019010000's wrapper.
 --   Mode 2 + a passed model + reader not in the holdout: a new scroll gets a random seed and the newest
 --   passed model; its pages are served by core.feed_for_you_v6 and logged as ranker 'fy-ts-v6',
---   ml_mode 2, ml_run = model id. A v6 cursor keeps its model and seed while the mode stays 2 (if the mode
---   is switched off mid-scroll, the next page comes from the formula). Holdout readers get v5, logged
---   with holdout = true and ml_mode 2. Mode 2 without a passed model: exactly like mode 1.
+--   ml_mode 2, ml_run = model id. A v6 cursor keeps v6, its model and its seed to the end of the scroll
+--   even if the mode or the gate changes meanwhile (no repeats or gaps mid-scroll); a change applies from
+--   the next new scroll. Holdout readers get v5, logged with holdout = true and ml_mode 2. Mode 2 without
+--   a passed model: exactly like mode 1. Cost guard: more than v2_max_candidates cards in the window, or
+--   any error in v6 (including a statement timeout), serves v5 for that page instead of failing.
 -- =============================================================================
 
 create or replace function api.feed_for_you(p_cursor text default null, p_limit int default 20)
@@ -619,24 +709,43 @@ begin
     end;
   end if;
 
-  if v_raw = 2 then
+  -- a v6 cursor keeps its algorithm, model and seed to the end of its scroll (whatever the mode is now), so
+  -- switching off never repeats or skips cards mid-scroll; the switch applies from the next new scroll
+  if p_cursor is not null and v_tmp = 2 and v_crun is not null and v_cseed is not null
+     and exists (select 1 from core.ml_models m where m.model_id = v_crun) then
+    v_v6 := true; v_model := v_crun; v_seed := v_cseed;
+  elsif p_cursor is null and v_raw = 2 then
     v_model := core.v2_active_model();
     if v_model is not null and core.v2_holdout(v_uid) then
       v_hold := true;
-    elsif p_cursor is null and v_model is not null then
+    elsif v_model is not null then
       v_v6 := true; v_seed := floor(random() * 2147483647)::bigint;
-    elsif p_cursor is not null and v_tmp = 2 and v_crun is not null and v_cseed is not null
-          and exists (select 1 from core.ml_models m where m.model_id = v_crun and m.gate_passed) then
-      v_v6 := true; v_model := v_crun; v_seed := v_cseed;
     end if;
+  elsif v_raw = 2 and core.v2_active_model() is not null and core.v2_holdout(v_uid) then
+    v_hold := true;                                                      -- later pages of a holdout scroll
+  end if;
+
+  if v_v6 and (select count(*) from core.blurbs b
+                where b.status = 'published'
+                  and b.sort_at > clock_timestamp() - make_interval(days => coalesce(
+                        (select r.value from core.rank_params r where r.key = 'for_you_window_days'), 30)::int))
+              > coalesce((select r.value from core.rank_params r where r.key = 'v2_max_candidates'), 3000) then
+    v_v6 := false;                                                       -- cost guard: too many cards for v6
+  end if;
+  if v_v6 then
+    begin
+      v_r := core.feed_for_you_v6(p_cursor, p_limit, v_model, v_seed);
+    exception when others then                                           -- includes query_canceled (statement timeout)
+      v_v6 := false; v_r := null;
+    end;
   end if;
 
   if v_v6 then
-    v_r := core.feed_for_you_v6(p_cursor, p_limit, v_model, v_seed);
     if v_r ->> 'next_cursor' is not null then
       v_r := jsonb_set(v_r, '{next_cursor}', to_jsonb((v_r ->> 'next_cursor') || '|' || v_model || '|' || (v_pno + 1) || '|2|' || v_seed));
     end if;
   else
+    if v_tmp = 2 then v_cmode := v_mode; end if;                         -- a v6 cursor that fell back: current mode
     v_r := core.feed_for_you_v5(p_cursor, p_limit);
     if v_r ->> 'next_cursor' is not null then                            -- field 7 (ml_run) stays empty
       v_r := jsonb_set(v_r, '{next_cursor}', to_jsonb((v_r ->> 'next_cursor') || '||' || (v_pno + 1) || '|' || v_cmode));
@@ -954,15 +1063,15 @@ begin
 
   insert into core.ml_models (version, n_readers, n_events, gate_passed, gate, report)
   values (p_model ->> 'version',
-          greatest(coalesce((p_model ->> 'n_readers')::int, 0), 0),
-          greatest(coalesce((p_model ->> 'n_events')::int, 0), 0),
+          least(greatest(coalesce((p_model ->> 'n_readers')::bigint, 0), 0), 2000000000)::int,
+          least(greatest(coalesce((p_model ->> 'n_events')::bigint, 0), 0), 2000000000)::int,
           coalesce((p_model ->> 'gate_passed')::boolean, false),
           coalesce(case when jsonb_typeof(p_model -> 'gate') = 'object' then p_model -> 'gate' end, '{}'),
           coalesce(case when jsonb_typeof(p_model -> 'report') = 'object' then p_model -> 'report' end, '{}'))
   returning model_id into v_id;
 
   insert into core.ml_weights (model_id, kind, key, value, n_readers)
-  select v_id, x.kind, x.key, x.value, coalesce(x.n_readers, 0)
+  select v_id, x.kind, x.key, x.value, least(greatest(coalesce(x.n_readers, 0), 0), 100000000)
     from jsonb_to_recordset(p_rows) as x(kind text, key text, value double precision, n_readers int)
    where x.key is not null and char_length(x.key) between 1 and 100
      and x.value is not null and x.value <> 'NaN'::double precision
@@ -994,6 +1103,7 @@ declare
   v_min   numeric;
   v_tc    bigint; v_td bigint; v_hc bigint; v_hd bigint;
   v_drop  boolean := false;
+  v_age   numeric;
 begin
   select coalesce(max(value) filter (where key = 'v2_kill_ratio'), 1.2),
          coalesce(max(value) filter (where key = 'v2_kill_min_cards'), 500)
@@ -1019,9 +1129,14 @@ begin
     update core.rank_params set value = 1 where key = 'foryou_ml_mode' and value = 2;
     v_drop := found;
   end if;
+  -- training freshness: the weekly GitHub job stops when the repo is idle for 60 days (GitHub disables
+  -- scheduled workflows); weights then stay frozen. stale = no model for v2_model_stale_days (21).
+  select extract(epoch from (now() - max(m.created_at))) / 86400.0 into v_age from core.ml_models m;
   return jsonb_build_object('treat_cards', v_tc, 'treat_rate', case when v_tc > 0 then round(v_td::numeric / v_tc, 5) end,
                             'hold_cards', v_hc, 'hold_rate', case when v_hc > 0 then round(v_hd::numeric / v_hc, 5) end,
-                            'dropped', v_drop);
+                            'dropped', v_drop,
+                            'model_age_days', round(v_age, 2),
+                            'stale', v_age is null or v_age > coalesce((select r.value from core.rank_params r where r.key = 'v2_model_stale_days'), 21));
 end;
 $$;
 
@@ -1033,6 +1148,21 @@ grant execute on function api.ml_export_cards(timestamptz, text, int) to service
 grant execute on function api.ml_v2_params()                          to service_role;
 grant execute on function api.ml_write_weights(jsonb, jsonb)          to service_role;
 grant execute on function api.ml_v2_check()                           to service_role;
+
+-- I5. Schedule: api.ml_v2_check() daily at 06:17 UTC through pg_cron (the automatic rollback of mode 2).
+--     Skipped with a notice where pg_cron is not installed (offline PGlite checks); then run
+--     select api.ml_v2_check(); by hand daily while mode 2 is on. Unschedule:
+--     select cron.unschedule('element-ml-v2-check');
+do $cron$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobname) from cron.job where jobname = 'element-ml-v2-check';
+    perform cron.schedule('element-ml-v2-check', '17 6 * * *', 'select api.ml_v2_check()');
+  else
+    raise notice 'pg_cron not installed: element-ml-v2-check not scheduled (run api.ml_v2_check() daily by hand)';
+  end if;
+end
+$cron$;
 
 -- HOW TO CHECK: paste this file twice (expected "Success. No rows returned" both times), then run
 -- supabase/tests/ranking_v2_check.sql, ml_shadow_check.sql and every older check (they must still pass).
