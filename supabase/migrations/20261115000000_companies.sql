@@ -1,5 +1,5 @@
 -- =============================================================================
--- Element: companies (todo item 18, R-221). Search by company and cards grouped by company.
+-- Element: companies (todo item 18, R-222). Search by company and cards grouped by company.
 --
 --   A  core.companies (directory), core.card_companies (card -> company tags), core.company_params
 --   B  text helpers: normalize, regex escape, alternation, trigrams, trigram similarity
