@@ -1,6 +1,8 @@
 # supabase
 
 The Postgres database behind Element (Supabase free tier). The SQL files here are the only source of truth for the schema. The ingest script (`ingest/`) writes through service-role RPCs. It runs on a laptop today; the cloud version (Edge Functions `brief-summary` and `ingest-source`, scheduled by pg_cron) is in `functions/` (see `functions/functions.md`), written but not deployed.
+**Cloud cutover:** the apply order for the pending migrations, secrets, deploy commands, the 24-hour comparison, rollback and laptop shutdown are in [`CUTOVER.md`](CUTOVER.md). Apply `20261110000000_watchdog.sql` (3-argument `api.ai_usage_take`) before redeploying the functions.
+
 
 ## Schemas
 
@@ -61,6 +63,7 @@ Every migration is written to be re-runnable (`if not exists`, `create or replac
 | `ml_shadow_check.sql` | Modes ship at 0; ML tables and RPCs closed to anon/authenticated (42501); wrappers return exactly the core output in modes 0, 1 and 2; one page row per signed-in page, none for guests, Latest or topic pages; new and old cursors; a failing log insert still returns the page; 60-page cap and 60-card limit; `api.track` positions only in mode >= 1; paged export; shadow/appeal writes; purge after 21 days, runs beyond 3, events only when switched on; storage stop rule; deletion. | `ERROR: ALL ML_SHADOW CHECKS PASSED (test data rolled back on purpose)` |
 | `ai_usage_run_log_check.sql` | AI usage take stops exactly at the cap (cap 0 refuses), today's counts, old-row purge, bad input; run-log insert, defaults, 30-day purge, unknown source and negative counts refused; service role only, RLS on, security definer with empty search_path. | `ERROR: ALL AI_USAGE RUN_LOG CHECKS PASSED (test rows rolled back on purpose)` |
 | `watchdog_check.sql` | `feed_status` (empty, 2 h 59 min vs 3 h 1 min edge, failed and brief-summary runs do not count, a quiet weekend is not delayed); `run_start` then `log_run` with id finishes the same row, without id inserts; hung runs (open over 10 minutes) counted by `ops_status`, then marked killed by the next `log_run`, fresh runs untouched; `ops_status` refuses a wrong, null or short token (it stands in a Vault table, since PGlite has none); `ai_caps` seed, reserve held back for non-reserve takes, table cap wins, `ai_usage_exhaust`, 3 days at the cap; grants (anon may call `feed_status` and `ops_status` only), RLS, security definer. | `ERROR: ALL WATCHDOG CHECKS PASSED (test rows rolled back on purpose)` |
+| `cutover_compare.sql` | Not a pass/fail test: read-only report for the cloud cutover (cards per hour per source, cloud runs per source from `ingest.run_log`, AI use against `core.ai_caps`, duplicate URLs/headlines/ticker-cap breaches, hung or killed runs, last published time per source, recent errors). Run in the SQL editor; select statements only. Parses and runs in PGlite with the migrations applied. | (result tabs, no error) |
 
 Each test ends with a deliberate error so that all test rows are rolled back. The account tests need two test users, `element-test-a@example.com` and `element-test-b@example.com` (Authentication → Users → Add user, "Auto Confirm User"); delete them afterwards. They simulate a signed-in user by switching to the `authenticated` role and setting `request.jwt.claims`, which is what `auth.uid()` reads.
 
