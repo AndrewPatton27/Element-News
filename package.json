@@ -48,7 +48,10 @@
     "test:ingest": "npm --prefix ingest test",
     "test:functions": "node --experimental-strip-types --test \"supabase/functions/**/*.test.ts\"",
     "test:worker": "npm --prefix workers/watchdog test",
+    "test:scripts": "node --test \"scripts/__tests__/*.test.mjs\"",
     "scan:secrets": "node scripts/secret-scan.mjs",
+    "release:check": "node scripts/release-check.mjs",
+    "smoke:prod": "node scripts/prod-smoke.mjs",
     "deploy": "npm run export:web && wrangler deploy",
     "preview": "npm run export:web && wrangler dev"
   },

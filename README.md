@@ -95,6 +95,9 @@ Element includes end-to-end unit, contract, and parsing test suites across the e
 npm run test:app        # app logic, contract and formatting tests (349 tests)
 npm run test:ingest     # ingestion pipeline, validator and allowlist (321 tests)
 npm run test:functions  # Edge Functions: budget, usage caps, run log, deadline (39 tests)
+npm run test:scripts    # release-check and prod-smoke logic
+npm run release:check   # everything above plus tsc, SQL, Python and secret scan in one table (add -- --e2e)
+npm run smoke:prod      # live site + API check (needs SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in env)
 npm run test:e2e        # browser smoke test on sample data, phone and desktop viewports
                         # first time: `npx playwright install chromium` (or PW_CHANNEL=chrome)
 ```
