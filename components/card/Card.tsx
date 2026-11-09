@@ -35,7 +35,7 @@ interface Props {
   categories: Category[];
   onShowSources: (card: BlurbCard) => void;
   onOpenDetail?: (card: BlurbCard) => void; // tap on the card body
-  onMore?: (card: BlurbCard) => void; // "â‹¯" options (signed in only)
+  onMore?: (card: BlurbCard) => void; // "⋯" options (signed in only)
   onNext?: () => void;
   wide?: boolean;
   compact?: boolean; // short screens: smaller type so the card fits
@@ -82,7 +82,7 @@ function factsFor(card: BlurbCard): { label: string; value: string }[] {
   return out;
 }
 
-// "World Â· 2 h ago", or "Recalls & Safety Â· Recall Â· 2 h ago" when the event adds something.
+// "World · 2 h ago", or "Recalls & Safety · Recall · 2 h ago" when the event adds something.
 function metaLine(card: BlurbCard, categories: Category[], timeLabel?: 'added'): string {
   const category = categoryName(card.category, categories);
   if (card.kind === 'link_out') return [category, linkOutDelay(card.freshness?.delayed_hours)].filter(Boolean).join(' · ');
