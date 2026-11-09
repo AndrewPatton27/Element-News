@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { FOLLOWED_IDS_MAX } from '../account/account.ts';
 import {
   INVALID_RESET_LINK_MESSAGE,
   authErrorMessage,
@@ -136,6 +137,30 @@ function fakeFetch(handler: (url: string, init: RequestInit) => { status: number
   }) as unknown as typeof fetch;
   return { fn, calls };
 }
+
+test('For you sends the followed story ids only when there are some, valid and capped; an old server is asked again without them', async () => {
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  assert.deepEqual(ACCOUNT_RPC.feedForYou.args(null, 20, []), { p_cursor: null, p_limit: 20 });
+  assert.deepEqual(ACCOUNT_RPC.feedForYou.args(null, 20, ['nope', id(1)]), { p_cursor: null, p_limit: 20, p_followed: [id(1)] });
+  const many = Array.from({ length: 250 }, (_, i) => id(i + 1));
+  assert.equal(ACCOUNT_RPC.feedForYou.args(null, 20, many).p_followed?.length, FOLLOWED_IDS_MAX);
+  assert.equal(FOLLOWED_IDS_MAX, 200);
+  // a server that does not know p_followed (migration not applied) answers 404: retry once without, then stop sending it
+  const store = memoryStore();
+  const { fn, calls } = fakeFetch((url, init) => {
+    if (url.includes('/auth/v1/token?grant_type=password')) return { status: 200, body: tokenResponse() };
+    if (url.endsWith('/rpc/feed_for_you')) {
+      return 'p_followed' in JSON.parse(init.body as string) ? { status: 404, body: { message: 'Could not find the function', code: 'PGRST202' } } : { status: 200, body: { items: [card()], next_cursor: null } };
+    }
+    return { status: 200, body: null };
+  });
+  const acct = createSupabaseAccount({ url: 'https://p.supabase.co', key: 'sb_publishable_x', fetchFn: fn, store, now: () => NOW });
+  await acct.signIn('a@b.co', 'longenough');
+  assert.equal((await acct.feedForYou(null, 10, [id(1)])).items.length, 1);
+  assert.equal((await acct.feedForYou('x', 10, [id(1)])).items.length, 1);
+  const bodies = calls.filter((c) => c.url.endsWith('/rpc/feed_for_you')).map((c) => 'p_followed' in JSON.parse(c.init.body as string));
+  assert.deepEqual(bodies, [true, false, false]);
+});
 
 test('supabase account: sign in, RPC with bearer token, session persisted, sign out', async () => {
   const store = memoryStore();

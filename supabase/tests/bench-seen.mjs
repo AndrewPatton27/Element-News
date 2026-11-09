@@ -3,7 +3,8 @@
 //   node supabase/tests/bench-seen.mjs [events ...]      default: 10000 100000 1000000
 // One reader owns all the events (the worst case: a long-lived heavy reader), spread over 400 days:
 // 60 % views, 35 % dwells, 3 % opens, 2 % likes. 2000 published cards (under the 3000-candidate guard).
-// Compares: seen_exclude_mode 0 (the old cost) against 1, for Trending, For you v5 (foryou_ml_mode 0) and
+// Compares: seen_exclude_mode 0 (the old cost) against 1. Only For you pays (Trending is listed to show it does not).
+// For you v5 (foryou_ml_mode 0) and
 // For you v3 (foryou_ml_mode 3, no holdout). WebAssembly Postgres on one core: read the ratios, not the
 // absolute milliseconds.
 import { PGlite } from '@electric-sql/pglite';
@@ -56,7 +57,7 @@ async function abTime(sql, runs = 7) {
 }
 async function setParam(key, value) { await db.query(`update core.rank_params set value = $2 where key = $1`, [key, value]); }
 
-console.log('events      surface        old(ms)  new(ms)  ratio   (median of 7 alternating runs, first page of 20)');
+console.log('events      surface                  old(ms)  new(ms)  ratio   (median of 7 alternating runs, first page of 20)');
 for (const n of sizes) {
   await db.exec('delete from core.user_events');
   await db.query(`
@@ -69,14 +70,14 @@ for (const n of sizes) {
   await db.exec('analyze core.user_events');
   const have = (await db.query('select count(*)::int as n from core.user_events')).rows[0].n;
   const cases = [
-    ['Trending', `select api.feed('top', null, 20)`, 0],
+    ['Trending (not filtered)', `select api.feed('top', null, 20)`, 0],
     ['For you v5', `select api.feed_for_you(null, 20)`, 0],
     ['For you v3', `select api.feed_for_you(null, 20)`, 3],
   ];
   for (const [name, sql, mode] of cases) {
     await setParam('foryou_ml_mode', mode); await setParam('v3_holdout_pct', 0);
     const [old, cur] = await abTime(sql);
-    console.log(`${String(have).padEnd(11)} ${name.padEnd(13)} ${old.toFixed(0).padStart(8)} ${cur.toFixed(0).padStart(8)} ${(cur / old).toFixed(2).padStart(6)}`);
+    console.log(`${String(have).padEnd(11)} ${name.padEnd(24)} ${old.toFixed(0).padStart(8)} ${cur.toFixed(0).padStart(8)} ${(cur / old).toFixed(2).padStart(6)}`);
   }
   const t0 = performance.now();
   await db.query(`select core.seen_ids($1, clock_timestamp())`, [uid]);
