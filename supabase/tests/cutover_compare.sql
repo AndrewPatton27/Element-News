@@ -106,6 +106,8 @@ select started_at, source, left(error, 200) as error
 
 -- 9. Macro/finance focus (needs 20261116000000_macro_focus.sql; skip this block before it is applied).
 --    Pass: trending.top10.macro_share >= 0.8 and trending.top50.macro_share >= 0.85; micro <= 1 per 10.
+--    Macro/finance = data cards, the macro topics, Federal Reserve cards, and Federal Register cards only when
+--    economic (economic agency or an economic word in the headline: core.fedreg_economic). Measuring only.
 --    gated_14d = recalls in the last 14 days and how many of them are left out of the feeds (not material).
 select api.macro_share() as macro_share;
 
