@@ -103,7 +103,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       fredApiKey: env.fredApiKey,
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
-      reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed } : undefined,
+      reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed, scorerMaxPerRun: config.reportCard.scorerMaxPerRun } : undefined,
       // Cross-source candidate selection is off here: each call has one source, and with selection on the
       // spend phase starts items without an upsertItem call, so the soft deadline (guardPublisher) could
       // not stop it. Off = the source's own order, every item start passes through the guard.

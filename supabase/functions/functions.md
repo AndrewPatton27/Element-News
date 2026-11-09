@@ -35,7 +35,7 @@ lines; never keys or source text).
   numbers in `ingest/src/config.ts` are the fallback; UTC days). A daily-quota 429 (`RPD`/`TPD`/"per day" in the reply) sets
   today's use to the cap (`api.ai_usage_exhaust`), so the rest of the day skips that provider. Order: Gemini, then Groq, then
   the template card. The Groq report-card scorer switches off once Groq has been used 50 times that day
-  (`config.reportCard.cloudScorerMaxGroqUsed`); cards then publish unscored.
+  (`config.reportCard.cloudScorerMaxGroqUsed`); cards then publish unscored. At most `config.reportCard.scorerMaxPerRun` (3) cards are scored per run; the rest publish unscored. A scorer error (rate limit, bad JSON) also publishes the card unscored (it already passed the validator) instead of leaving it for an hourly retry; DUPLICATE/ABANDON and a failed revision still reject.
 - **Retired model:** a 404, or a 400 "model not found", repeats the same call with `config.gemini.fallbackModel` /
   `config.groq.alternativeModel` and sets `stats.model_missing` in the run summary (the watchdog opens `wd:model`).
   At the cap, or if the counter cannot be read, no AI call is made. The Groq report-card scorer counts

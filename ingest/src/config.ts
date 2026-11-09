@@ -91,6 +91,10 @@ export const config = {
     // Edge Functions only (deps.reportCard.scorerMaxGroqUsed): the Groq scorer switches off once Groq's calls
     // today reach this number, so the writer fallback and brief-summary keep Groq calls (cap 74; watchdog design 5.3).
     cloudScorerMaxGroqUsed: 50,
+    // Edge Functions only (deps.reportCard.scorerMaxPerRun): at most this many cards are scored per run; the rest
+    // publish unscored (validator still runs, AI label kept). A scorer error also publishes unscored (fail open).
+    // The scorer is Groq only: the Gemini adapter has no generate() and Gemini is the writer.
+    scorerMaxPerRun: 3,
     recentCardDays: 7,
     auditBatchSize: 3,
     auditHideMaxFraction: 0.4,
