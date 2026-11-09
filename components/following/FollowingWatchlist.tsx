@@ -9,6 +9,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import { fonts, font, radius } from '../../lib/theme/theme';
 import { CloseIcon } from '../shell/Icons';
 import { SectionLabel } from '../account/FormParts';
+import { go } from '../shell/TabBar';
 
 export function FollowingWatchlist({ tickers, onToggle }: { tickers: string[]; onToggle: (symbol: string) => void }) {
   const p = usePalette();
@@ -84,6 +85,9 @@ export function FollowingWatchlist({ tickers, onToggle }: { tickers: string[]; o
           Enter a ticker of 1 to 5 letters, like AAPL.
         </Text>
       ) : null}
+      <Pressable onPress={() => go('/companies' as never)} accessibilityRole="link" style={styles.browse}>
+        <Text style={{ color: p.accentInk, fontFamily: fonts.sansSemi, fontSize: 14 }}>Browse companies by sector →</Text>
+      </Pressable>
     </View>
   );
 }
@@ -96,4 +100,5 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: { flex: 1, minWidth: 0, height: 44, borderRadius: 22, borderWidth: 1, paddingHorizontal: 16, fontFamily: fonts.sans, fontSize: 16 },
   add: { minHeight: 44, paddingHorizontal: 20, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  browse: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 });

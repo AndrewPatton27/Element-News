@@ -7,6 +7,7 @@ import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../c
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
 import { takeEarlyFeed, type EarlyFeed } from '../feed/earlyFeed.ts';
+import { createSupabaseCompanyApi } from '../companies/companyApi.ts';
 import { isBlurbCard, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
 export interface SupabaseOptions {
@@ -141,6 +142,20 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       return e instanceof ApiError && e.status === 404 ? { missing: true } : { error: true };
     }
   }
+  // Company RPCs (migration 20261115000000_companies.sql): the reader's token when signed in (my_reaction on cards).
+  async function companyRpc(name: string, body: Record<string, unknown>): Promise<unknown> {
+    const token = opts.getToken ? await opts.getToken() : null;
+    const headers: Record<string, string> = { apikey: opts.key, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const plan = (h: Record<string, string>): PlannedRequest => ({ url: `${opts.url}/rest/v1/rpc/${name}`, init: { method: 'POST', headers: h, body: JSON.stringify(body) } });
+    try {
+      return await call(plan(headers));
+    } catch (e) {
+      // a rejected token: read as a guest, like api.feed
+      if (e instanceof ApiError && e.status === 401 && token) { const { Authorization: _a, ...guest } = headers; return call(plan(guest)); }
+      throw e;
+    }
+  }
   const mineFail = (r: { missing: true } | { error: true }) => ({ ok: false, changed: false, ...('missing' in r ? { status: 'unavailable' as const } : {}) });
   const unavailable = { ok: false, status: 'unavailable' as const };
   const tokenCall = async (name: string, token: string, extra: Record<string, unknown> = {}) => {
@@ -240,6 +255,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const r = await authedRpc('update_my_brief_time', { p_kind: kind, p_send_hour: hour, p_timezone: tz });
       return 'data' in r ? parseMyBriefChange(r.data) : mineFail(r);
     },
+    companies: createSupabaseCompanyApi(companyRpc),
   };
 }
 

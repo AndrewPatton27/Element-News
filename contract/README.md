@@ -9,6 +9,10 @@ The shared data contract between the back end (Supabase, `api` schema) and the a
 | `types.ts` | TypeScript types for every response the app reads: `BlurbCard`, `FeedPage`, `MacroFact`, `NumberTrend` (a 12-week series for the web Trends card), `AppConfig`, `RequiredNotice`, `Category`, `Source`, `Ticker`, `FeedMode`, `FeedParams`. Erasable TypeScript only (no enums or namespaces), so it can be imported with `import type` from Node scripts and the Expo app. |
 | `account.ts` | Types and RPC bodies for signed-in users (`UserPrefs`, `ForYouPage`, `TrackParams`, ...). Described in `account.md`. |
 | `account.md` | The accounts contract: sign-in calls, account RPCs, For you behaviour and scoring, account security and dashboard settings. |
+| `companies.ts` | The company directory (ticker, name, sector, industry, aliases, ambiguous names, cue and negative words) and the sector list. Source of the `core.companies` seed. No prices. |
+| `companyMatch.ts` | Which companies a card is about (deterministic; the TypeScript twin of `core.match_companies`), plus the search scoring and trigram helpers shared with `api.search_companies`. |
+| `companiesSql.ts` | Builds the generated SQL blocks (directory seed, shared test cases) for `scripts/gen-companies-sql.mjs`. |
+| `fixtures/company_tagging_cases.json` | Tagging cases (false positives such as "apple pie", "Harrison Ford", "Chevron deference" and real mentions) run by both the ingest test and the SQL check. |
 | `fixtures/feed.page1.json` | `FeedPage`: first page of the `top` (Trending) feed (22 cards, all 9 original categories, summary and data cards) with a `next_cursor`. |
 | `fixtures/feed.page2.json` | `FeedPage`: the following page, `next_cursor: null` (end of feed). Includes one sample card each for World (a Wikipedia-style `cc_by_sa` card with its attribution), Recalls & Safety and Science & Space. |
 | `fixtures/feed.empty.json` | `FeedPage` with no cards. |
