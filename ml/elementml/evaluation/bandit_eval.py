@@ -234,6 +234,9 @@ def eval_task(args) -> dict:
     model = Model.from_rows(model_rows["rows"], model_rows["version"])
     if method == "ts_v2":
         base = BanditPolicy(cat, model, P)
+    elif method.startswith("ts_v2:"):
+        from .v3_eval import ts_v2_ablation
+        base = ts_v2_ablation(method, cat, model, P)
     elif method.startswith("v3"):
         from ..v3.methods import make_v3
         base = make_v3(method, cat)

@@ -140,6 +140,25 @@ Paging held: 600 frozen scrolls, 0 repeats, 0 same-cursor mismatches. Per type (
 
 Its limits: the simulator that grades ts_v2 is the same family of simulator its prior is trained on (the gate also needs the real replay), simulated readers carry no slot on their per-card record (so the simulated feed uses propensity 1), and the anti-macro reader stands in for a sports fan.
 
+## Ranking v3 (`elementml/v3/`): the formula plus a per-reader residual (prototype, Python only)
+
+The live formula stays the base. On top of it, each reader gets a bounded personal term in hours. It is built from their own rewards, centered on that reader's usual reward, per card feature (topic, type, source, tag, the same features as v2), with prior mean 0, so there is no pull toward the population average. A new reader gets the formula. In the simulator it beats the formula in 15 of 15 world-seed pairs (NDCG@10 0.454 -> 0.530 normal, 0.332 -> 0.349 stress, 0.323 -> 0.339 wild). It still fails two synthetic-gate checks: topics@10 in normal, and the macro check, which even the formula cannot pass. There is no SQL yet. The numbers, the reasons v2 lost and the simulator audit are in `v3-findings.md`.
+
+| File | What happens there |
+|---|---|
+| `v3/policy.py` | `V3Config` (every v3 setting), `reader_weights` (diag or ridge), `residual_hours`, `ResidualPolicy` for the simulator. |
+| `v3/methods.py` | Method names for the harness: `v3`, `v3:H=36,cap=30,step_extra=1.5`, `v3:solver=ridge`, ... |
+| `evaluation/v3_eval.py` | Formula vs v3 (and ts_v2 or its ablations `ts_v2:lam=1,onformula=1`) over worlds and seeds, with the gate per method. |
+| `evaluation/v3_curves.py` | NDCG by explicit actions and by day, and paired differences, from `results/v3_eval.json`. |
+| `evaluation/sim_audit.py` | Does the ground truth favour the formula? Fixed-order NDCG ceilings, variance shares, importance-taste correlation. |
+
+```
+$PY -m elementml.cli eval-v3 --methods "ts_v2;v3;v3:H=36,cap=30,step_extra=1.5"   # about 8 min, 7 workers
+$PY -m elementml.cli sim-audit
+$PY -m elementml.evaluation.v3_curves
+$PY -m pytest tests/test_v3.py -q
+```
+
 ## Rules this prototype keeps
 
 - Free and local: scikit-learn, LightGBM, numpy. No embedding API, no hosted model.
