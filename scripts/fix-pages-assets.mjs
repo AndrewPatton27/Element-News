@@ -8,13 +8,13 @@
 // so a post-build injection is the only place the tag can go for every deploy.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildHeadersFile } from './security-headers.mjs';
 
 const dist = process.argv[2] ?? 'dist';
 
 injectCloudflareBeacon(dist);
 injectSplash(dist);
 injectEarlyLoad(dist);
-writeHeaders(dist);
 
 const assets = join(dist, 'assets');
 const vendor = join(assets, 'vendor');
@@ -49,6 +49,7 @@ const walk = (dir) => {
 };
 walk(dist);
 injectFontPreloads(dist);
+writeHeaders(dist);   // last: the CSP hashes the final inline scripts in index.html
 console.log(`fix-pages-assets: moved ${nodeModules.length} node_modules asset folder(s) -> assets/vendor, rewrote ${files} file(s)`);
 
 function injectSplash(outDir) {
@@ -63,8 +64,10 @@ function injectSplash(outDir) {
 }
 
 function writeHeaders(outDir) {
-  const headers = `/_expo/static/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: public, max-age=0, must-revalidate\n\n/index.html\n  Cache-Control: public, max-age=0, must-revalidate\n`;
-  writeFileSync(join(outDir, '_headers'), headers);
+  const htmlPath = join(outDir, 'index.html');
+  const html = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : '';
+  const supabaseUrl = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
+  writeFileSync(join(outDir, '_headers'), buildHeadersFile({ html, supabaseUrl }));
 }
 
 function injectFontPreloads(outDir) {

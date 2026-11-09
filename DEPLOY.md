@@ -32,7 +32,11 @@ Run these from the repo root.
    ```bash
    npm run export:web
    ```
-5. Make sure no server-side key ended up in the build. Only `EXPO_PUBLIC_*` values are bundled, but check anyway: search `dist-pages/` for the values of `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` and `FRED_API_KEY`. There must be no matches.
+5. Run the security gate on the build (read-only; prints names only, never values). It checks that no private file is tracked, that no key shape or server secret value (`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `FRED_API_KEY`, `CRON_SECRET`, ...) is in `dist-pages/`, and that `dist-pages/_headers` carries the security headers with a hash for every inline script:
+   ```bash
+   npm run release:check -- --prod
+   ```
+   After the upload, check the live headers and the database grants too: `node scripts/security-gate.mjs --url https://element-news.pages.dev --db`.
 6. Upload to Cloudflare Pages:
    ```bash
    npx wrangler@4 pages deploy dist-pages --project-name element-news --branch main --commit-dirty=true
