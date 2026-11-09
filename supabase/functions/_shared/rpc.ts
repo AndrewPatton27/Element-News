@@ -1,5 +1,5 @@
 // Small service-role PostgREST client for the RPCs the functions add (api.ai_usage_take,
-// api.ai_usage_get, api.log_run). Same headers and allowlist as ingest/src/publish.ts: the request
+// api.ai_usage_exhaust, api.ai_usage_get, api.run_start, api.log_run). Same headers and allowlist as ingest/src/publish.ts: the request
 // goes through fetchAllowed with the Supabase host as the only extra host.
 // Inputs: Supabase URL + service-role key (never logged), optional fake fetch for tests.
 // Outputs: the parsed JSON reply; a non-2xx reply throws an Error with the PostgREST message (no key).

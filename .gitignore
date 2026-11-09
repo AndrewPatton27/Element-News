@@ -2,6 +2,7 @@
 CLAUDE.md
 context/
 docs/
+/tests/
 
 # Secrets
 .env
@@ -41,3 +42,5 @@ expo-env.d.ts
 .dev.vars*
 !.dev.vars.example
 .pgtmp/
+test-results/
+playwright-report/

@@ -7,10 +7,10 @@ import { fonts, space } from '../../lib/theme/theme';
 export function SampleBanner() {
   const p = usePalette();
   return (
-    <Text style={[styles.banner, { backgroundColor: p.dataSoft, color: p.dataInk }]}>SAMPLE DATA · fictional cards for testing, not real news</Text>
+    <Text style={[styles.banner, { backgroundColor: p.dataSoft, color: p.dataInk }]}>SAMPLE DATA · fictional cards, not real news</Text>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: { fontFamily: fonts.sansSemi, textAlign: 'center', fontSize: 13, letterSpacing: 0.3, paddingVertical: 6, paddingHorizontal: space.lg },
+  banner: { fontFamily: fonts.sansSemi, textAlign: 'center', fontSize: 12, letterSpacing: 0.3, paddingVertical: 5, paddingHorizontal: space.lg },
 });

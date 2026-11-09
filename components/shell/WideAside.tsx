@@ -79,22 +79,24 @@ function TopStories({ stories, categories, onOpen }: { stories: BlurbCard[]; cat
     <View accessibilityRole="list" accessibilityLabel="Top stories of the last week">
       <Text style={[styles.label, { color: p.muted }]}>Top stories · last week</Text>
       {stories.map((c, i) => (
-        <Pressable
-          key={c.id}
-          onPress={() => onOpen(c)}
-          accessibilityRole="button"
-          accessibilityLabel={`${i + 1}. ${c.headline}. Opens more detail`}
-          style={({ pressed }) => [styles.story, { borderTopColor: p.border, opacity: pressed ? 0.7 : 1 }]}
-        >
+        <View key={c.id} style={[styles.story, { borderTopColor: p.border }]}>
           <Text style={[styles.rank, { color: p.accent }]}>{i + 1}</Text>
           <View style={styles.storyText}>
-            <Text style={[styles.meta, { color: p.muted }]}>
-              {[badgeLabel(c), categoryName(c.category, categories), cardTime(c)].filter(Boolean).join(' · ')}
-            </Text>
-            <Text style={[styles.storyTitle, { color: p.ink }]}>{c.headline}</Text>
+            {/* the open target and the action buttons are siblings: a button may not contain buttons */}
+            <Pressable
+              onPress={() => onOpen(c)}
+              accessibilityRole="button"
+              accessibilityLabel={`${i + 1}. ${c.headline}. Opens more detail`}
+              style={({ pressed }) => [styles.storyOpen, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.meta, { color: p.muted }]}>
+                {[badgeLabel(c), categoryName(c.category, categories), cardTime(c)].filter(Boolean).join(' · ')}
+              </Text>
+              <Text style={[styles.storyTitle, { color: p.ink }]}>{c.headline}</Text>
+            </Pressable>
             <CardActionRow card={c} compact />
           </View>
-        </Pressable>
+        </View>
       ))}
     </View>
   );
@@ -205,6 +207,7 @@ const styles = StyleSheet.create({
   story: { flexDirection: 'row', gap: 14, paddingVertical: 14, borderTopWidth: 1, minHeight: 44 },
   rank: { fontFamily: fonts.serif, fontSize: 22, lineHeight: 24, minWidth: 22 },
   storyText: { flex: 1, gap: 4 },
+  storyOpen: { gap: 4 },
   meta: { fontFamily: fonts.sans, fontSize: 12 },
   storyTitle: { fontFamily: fonts.serif, fontSize: 19, lineHeight: 23 },
   trends: { marginTop: 20, borderRadius: 20, borderWidth: 1, paddingTop: 16, paddingHorizontal: 18, paddingBottom: 8, gap: 8 },

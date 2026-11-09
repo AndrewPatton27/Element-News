@@ -6,8 +6,10 @@ import type { BlurbCard, Brief, FeedPage } from '../../contract/types.ts';
 import type { Api } from './api.ts';
 import { MOCK_DELAY_MS } from './config.ts';
 import { mockFeedPage } from '../feed/feedLogic.ts';
+import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
+import { mockFeedStatus } from './mockStatus.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 
 import page1 from '../../contract/fixtures/feed.page1.json';
@@ -31,7 +33,7 @@ export function allCards(): BlurbCard[] {
       }
     }
   }
-  return out;
+  return rebaseCards(out); // fixture dates are fixed; keep them fresh so windows never go empty
 }
 
 export function createMockApi(): Api {
@@ -52,6 +54,7 @@ export function createMockApi(): Api {
     categories: () => wait(parseCategories(categories)),
     numbersToKnow: () => wait(parseMacroFacts(numbers)),
     appConfig: () => wait(parseAppConfig(appConfig)),
+    feedStatus: () => wait(mockFeedStatus()),
     topStories: () => wait(mockFeedPage(cards, { mode: 'top', category: null, cursor: null, limit: 30 }).items.slice(0, 5)),
     numberTrends: () => wait(trends.map((t) => ({ ...t, points: [...t.points] }))),
     search: (q, cursor, limit) => wait(features.search(q, cursor, limit)),

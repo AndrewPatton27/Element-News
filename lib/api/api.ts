@@ -1,6 +1,7 @@
 // One data interface, two implementations: sample fixtures (mock, the default) and
 // the Supabase `api` schema over plain fetch. Screens only talk to this interface.
 
+import type { FeedStatus } from '../shared/types.ts';
 import type { AppConfig, BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, Category, MyBriefChangeResult, MyBriefSubscription, CategorySlug, FeedMode, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
@@ -21,6 +22,8 @@ export interface Api {
   categories(): Promise<Category[]>;
   numbersToKnow(): Promise<MacroFact[]>;
   appConfig(): Promise<AppConfig>;
+  /** Freshness flag for the "Updates delayed" banner. Never throws: a missing RPC means not delayed. */
+  feedStatus(): Promise<FeedStatus>;
   /** The 5 highest-ranked cards of the last 7 days, one per story. [] when unavailable. */
   topStories(): Promise<BlurbCard[]>;
   /** 10-yr Treasury, CPI, unemployment, WTI crude with a 12-point history. [] when unavailable. */

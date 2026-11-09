@@ -71,7 +71,7 @@ test('backfill writes history through upsertMacro: daily weeks, CPI year-over-ye
   assert.equal(cpi[cpi.length - 1].display_value, '3.0%');                    // 1.0025^12 - 1 = 3.04% -> 3.0
   assert.equal(cpi[cpi.length - 1].period_label, 'Sep 2026');
 
-  assert.equal(stats.failed, 10, 'the other ten series fail and are logged, not fatal');
+  assert.equal(stats.failed, config.macroSeries.length - 2, "every series without a fixture fails and is logged, not fatal");
   assert.equal(dry.cards.length, 0, 'backfill never publishes data cards');
   assert.ok(requested.every((u) => new URL(u).hostname === 'api.stlouisfed.org'));
   assert.ok(requested.every((u) => new URL(u).searchParams.get('observation_start')! <= '2026-10-18'));
