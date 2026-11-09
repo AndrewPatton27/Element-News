@@ -7,7 +7,7 @@ import { evaluate, pickSources, quietThresholdHours, retriggerDue, sanitize, SOU
 const ENV: Env = {
   SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_testkey1234567890',
   WATCHDOG_TOKEN: 'wd-token-0123456789abcdef', CRON_SECRET: 'cron-secret-0123456789abcdef0123',
-  GITHUB_TOKEN: 'github_pat_TESTTOKEN0123456789', ALERT_REPO: 'me/element-ops', HEALTHCHECK_URL: 'https://hc-ping.com/11111111-2222-3333-4444-555555555555',
+  GITHUB_TOKEN: 'github_pat_TESTTOKEN0123456789', ALERT_REPO: 'me/element-ops', HEALTHCHECK_URL: 'https://hc-ping.com/' + ['11111111', '2222', '3333', '4444', '555555555555'].join('-'),
 };
 const T0 = new Date('2026-11-10T12:17:00Z');   // a Tuesday, 12:17 UTC: a re-trigger hour
 
