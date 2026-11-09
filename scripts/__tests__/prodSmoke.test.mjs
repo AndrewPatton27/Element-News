@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { maxAgeHours, checkTitle, findBundle, checkFreshness, checkFeedStatus, checkCards, runSmoke } from '../prod-smoke.mjs';
+import { maxAgeHours, checkTitle, findBundle, checkFreshness, checkFeedStatus, checkCards, checkNotice, FEED_NOTICE_MARKER, runSmoke } from '../prod-smoke.mjs';
 
 const NOW = new Date('2026-11-10T12:00:00Z'); // Tuesday
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
@@ -41,7 +41,13 @@ test('card contract rules', () => {
   assert.equal(bad.length, 3);
 });
 
-function fakeFetch({ status = 200, cards = [card()], delayed = false, statusCode = 200, cfg = { disclaimer: 'Informational only' }, body = 'x'.repeat(2000) } = {}) {
+test('feed notice strip text must ship in the bundle (D-80)', () => {
+  assert.equal(checkNotice(`x ${FEED_NOTICE_MARKER} · Informational only`), null);
+  assert.match(checkNotice('x'.repeat(2000)), /notice strip/);
+  assert.match(checkNotice(undefined), /notice strip/);
+});
+
+function fakeFetch({ status = 200, cards = [card()], delayed = false, statusCode = 200, cfg = { disclaimer: 'Informational only' }, body = 'x'.repeat(2000) + FEED_NOTICE_MARKER } = {}) {
   const json = (data, s = 200) => ({ ok: s < 400, status: s, json: async () => data, text: async () => JSON.stringify(data) });
   return async (url) => {
     const u = String(url);
@@ -65,6 +71,7 @@ test('runSmoke reports each failure', async () => {
   assert.equal((await run(fakeFetch({ delayed: true }))).find((x) => x.name.includes('feed_status')).ok, false);
   assert.equal((await run(fakeFetch({ cards: [card({ sources: [] })] }))).at(-1).ok, false);
   assert.equal((await run(fakeFetch({ body: 'tiny' }))).find((x) => x.name.includes('bundle')).ok, false);
+  assert.equal((await run(fakeFetch({ body: 'x'.repeat(2000) }))).at(-1).ok, false);
 });
 
 test('missing feed_status is skipped, network error is a failure not a crash', async () => {

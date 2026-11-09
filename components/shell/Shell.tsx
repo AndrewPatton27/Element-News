@@ -28,6 +28,7 @@ import { DelayedBanner } from './DelayedBanner';
 import { useFeedStatus } from '../../lib/status/useFeedStatus';
 import { SortToggle } from '../feed/SortToggle';
 import { go, TabBar, TopNavLinks, type Tab } from './TabBar';
+import { FeedNotice } from './FeedNotice';
 
 export type { Tab } from './TabBar';
 
@@ -113,9 +114,10 @@ interface ShellProps {
   noFab?: boolean; // phones: leave out the floating About button (sign-in pages)
   bare?: boolean; // children fill the area under the bars as-is (ScreenShell does its own layout)
   feedTab?: { mode: FeedTab; onChange: (m: FeedTab) => void }; // wide only: top bar tabs (feed screen)
+  notice?: boolean; // D-80: the persistent AI notice + disclaimer line under the card area (feed-style screens)
 }
 
-export function Shell({ active, children, left, aside, scroll, bare, noFab, feedTab }: ShellProps) {
+export function Shell({ active, children, left, aside, scroll, bare, noFab, feedTab, notice }: ShellProps) {
   const p = usePalette();
   const wide = useWide();
   const { api, config } = useAppData();
@@ -133,7 +135,10 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
           <NumbersTicker api={api} config={config} />
         </View>
         {bare ? (
-          <View style={styles.fill}>{children}</View>
+          <View style={styles.fill}>
+            {children}
+            {notice ? <FeedNotice wide /> : null}
+          </View>
         ) : scroll ? (
           <ScrollView style={styles.fill} contentContainerStyle={styles.scrollWide}>
             {children}
@@ -145,7 +150,10 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
                 {left}
               </ScrollView>
             ) : null}
-            <View style={styles.main}>{children}</View>
+            <View style={styles.main}>
+              {children}
+              {notice ? <FeedNotice wide /> : null}
+            </View>
             {aside ? (
               <ScrollView style={styles.aside} contentContainerStyle={styles.asideContent}>
                 {aside}
@@ -180,6 +188,8 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
       {api.sample ? <SampleBanner /> : null}
       <DelayedBanner status={feedStatus} />
       {content}
+      {/* the feed's About button floats bottom-left over this strip: keep the text clear of it */}
+      {notice ? <FeedNotice wide={false} insetLeft={active === 'feed' && !noFab ? 52 : 0} /> : null}
       <TabBar active={active} signedIn={signedIn} />
       {active !== 'about' && !noFab ? (
         <Pressable

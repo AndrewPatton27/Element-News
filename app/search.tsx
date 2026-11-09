@@ -33,14 +33,12 @@ import { usePalette, useWide } from '../lib/theme/useTheme';
 import { fonts, font, space } from '../lib/theme/theme';
 import { DetailSheet } from '../components/card/DetailSheet';
 import { FollowingButton } from '../components/following/FollowingButton';
-import { Disclaimer } from '../components/card/Labels';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { SearchBox } from '../components/search/SearchBox';
 import { SearchIdle } from '../components/search/SearchIdle';
 import { SearchResults } from '../components/search/SearchResults';
 import { Shell } from '../components/shell/Shell';
 import { SourcesSheet } from '../components/card/SourcesSheet';
-import { disclaimerText } from '../lib/shared/labels';
 
 const store = defaultStore();
 
@@ -165,7 +163,6 @@ export default function SearchScreen() {
           }}
           onPickTicker={pickText}
         />
-        <Disclaimer text={disclaimerText(config)} center={!wide} />
       </>
     );
   } else if (target.kind === 'short') {
@@ -242,7 +239,7 @@ export default function SearchScreen() {
 
   if (wide) {
     return (
-      <ScreenShell tab="search" title="Search">
+      <ScreenShell tab="search" title="Search" notice>
         {box}
         {body}
         {sheets}
@@ -251,7 +248,7 @@ export default function SearchScreen() {
   }
   // Phones (Mobile-Search): the header is the search box itself, then the body scrolls.
   return (
-    <Shell active="search" bare>
+    <Shell active="search" bare notice>
       <View style={[styles.header, { backgroundColor: p.surface, borderBottomColor: p.border }]}>{box}</View>
       <ScrollView style={styles.fill} contentContainerStyle={styles.bodyNarrow} keyboardShouldPersistTaps="handled">
         {body}
