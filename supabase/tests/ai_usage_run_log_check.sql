@@ -55,7 +55,7 @@ begin
   exception when others then if sqlerrm not like 'log_run: payload%' then raise; end if; end;
 
   -- privileges: service role only; tables private with RLS on
-  foreach j in array array['"api.ai_usage_take(text,int)"', '"api.ai_usage_get(date)"', '"api.log_run(jsonb)"']::jsonb[] loop
+  foreach j in array array['"api.ai_usage_take(text,int,boolean)"', '"api.ai_usage_get(date)"', '"api.log_run(jsonb)"']::jsonb[] loop
     if has_function_privilege('service_role', j#>>'{}', 'execute') is not true then raise exception 'FAIL: service_role denied %', j; end if;
     if has_function_privilege('anon', j#>>'{}', 'execute') or has_function_privilege('authenticated', j#>>'{}', 'execute') then
       raise exception 'FAIL: app roles may call %', j;
