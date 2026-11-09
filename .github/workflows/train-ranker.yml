@@ -1,4 +1,4 @@
-# Weekly training of the For you ranking v2 model (ml/elementml/bandit).
+# Manual training of the For you ranking v2 model (ml/elementml/bandit); no schedule (see the trigger below).
 #
 # What it does: runs the bandit tests (including the SQL parity test in PGlite) and the synthetic
 # evaluation, then (only if both Supabase secrets are set) exports 60 days of events, pages and card
@@ -22,14 +22,15 @@
 name: train-ranker
 
 on:
-  schedule:
-    - cron: "23 7 * * 1"          # Mondays 07:23 UTC
+  # Manual only (Drew, 2026-11-09): ranking v2 failed its gate and ships off, and v3 needs no training job,
+  # so no high-privilege key sits in GitHub and nothing runs on a schedule. To train again, create the
+  # Environment "ranker-training", add SUPABASE_SERVICE_ROLE_KEY as an Environment secret, and run this by hand.
   workflow_dispatch:
     inputs:
       publish:
         description: "Write the model to Supabase (unchecked = dry run: export, train and gate only)"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -41,6 +42,7 @@ concurrency:
 jobs:
   train:
     runs-on: ubuntu-latest
+    environment: ranker-training
     timeout-minutes: 90
     defaults:
       run:
