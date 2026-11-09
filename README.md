@@ -92,8 +92,13 @@ npm run dry-run    # Process test fixtures through summarize & validate without 
 Element includes end-to-end unit, contract, and parsing test suites across the entire stack:
 
 ```bash
-# Run app logic, contract, and formatting tests (168 tests pass)
+# Run app logic, contract, and formatting tests (346 tests pass)
 npm run test:app
+
+# Browser smoke test on sample data, phone and desktop viewports (feed, next card,
+# like/dislike, sources sheet, share link, delayed banner). Starts the web app itself.
+# First time: `npx playwright install chromium` (or PW_CHANNEL=chrome to use installed Chrome).
+npm run test:e2e
 
 # Run ingestion pipeline, validator, and allowlist tests
 npm run test:ingest
