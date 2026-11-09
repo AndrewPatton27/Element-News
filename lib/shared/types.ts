@@ -64,6 +64,7 @@ export function parseFeedPage(x: unknown): FeedPage & { page_id?: string } {
   const next = isStr(x.next_cursor) && x.next_cursor !== '' ? x.next_cursor : null;
   const page: FeedPage & { page_id?: string } = { items: x.items.filter(isBlurbCard), next_cursor: next };
   if (isStr(x.page_id) && x.page_id !== '') page.page_id = x.page_id;
+  if (typeof x.seen_from === 'number' && Number.isInteger(x.seen_from) && x.seen_from >= 0) page.seen_from = x.seen_from;
   return page;
 }
 

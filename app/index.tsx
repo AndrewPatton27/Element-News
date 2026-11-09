@@ -4,7 +4,7 @@
 // top stories and trends on the right (Shell lays out the frame). Guests see a gentle
 // sign-in prompt; the feed never needs an account.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { DwellTimer } from '../lib/feed/dwell';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -153,7 +153,8 @@ export default function FeedScreen() {
   const queuePositions = useRef<Record<string, number>>({});
   const headId = mode === 'latest' ? null : heads?.[mode];
   const position = queuePositions.current[pagerKey] ?? 0;
-  const pagerItems = mode === 'latest' ? latestOrder(items, position) : position === 0 ? promoteHead(items, headId) : items;
+  const reshown = useMemo(() => new Set(state.seenIds), [state.seenIds]);
+  const pagerItems = mode === 'latest' ? latestOrder(items, position, reshown) : position === 0 ? promoteHead(items, headId) : items;
   shownRef.current = pagerItems;
   surfaceRef.current = surfaceForTab(locked ? 'top' : mode);
   const followed = acct.viewPrefs?.followed ?? [];
@@ -301,6 +302,7 @@ export default function FeedScreen() {
         categories={categories}
         loadingMore={state.loading}
         done={state.done}
+        reshownIds={reshown}
         onEndReached={loadMore}
         onShowSources={showSources}
         onOpenDetail={openDetail}

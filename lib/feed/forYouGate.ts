@@ -8,7 +8,7 @@ export const FOR_YOU_MIN_STORIES = 10;
 export const FOR_YOU_MIN_TOPICS = 4;
 export const FOR_YOU_SEEN_MS = 2000;
 export const SEEN_KEY = 'element.seen-stories';
-export const MAX_SEEN = 200;
+export const MAX_SEEN = 300; // newest ids kept on this device, oldest dropped (also the guest seen-card exclusion list)
 
 export interface StorySignal {
   id: string;
