@@ -1,0 +1,18 @@
+# Element watchdog Worker (Cloudflare Free: 5 cron triggers per account, this uses 1).
+# Deploy from this folder: npx wrangler deploy      (details in watchdog.md)
+# No secret is written here. Set them once with `npx wrangler secret put <NAME>`:
+#   SUPABASE_PUBLISHABLE_KEY, WATCHDOG_TOKEN, CRON_SECRET, GITHUB_TOKEN, HEALTHCHECK_URL
+name = "element-watchdog"
+main = "src/index.ts"
+compatibility_date = "2026-10-12"
+workers_dev = false
+
+[triggers]
+crons = ["17 * * * *"]
+
+[observability]
+enabled = true
+
+[vars]
+SUPABASE_URL = "https://mzfpelilxpbpcgskppxu.supabase.co"
+ALERT_REPO = "AndrewPatton27/element-ops"
