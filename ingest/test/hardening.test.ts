@@ -148,11 +148,20 @@ test('Groq scorer cutoff: at 50 Groq calls the scorer is not called and cards pu
   assert.ok(s.published >= 1, `published ${s.published}`);
 });
 
-test('Groq scorer cutoff: at 49 the scorer runs (here it fails, so nothing is published); without a cutoff (laptop) it always runs', async () => {
+test('Groq scorer cutoff: at 49 the scorer runs (it fails, so the card publishes unscored); without a cutoff (laptop) it always runs', async () => {
   const under = pipelineSetup(49, 50);
-  await runOnce(under.deps, { only: ['cpsc'], limit: 2 });
+  const su = await runOnce(under.deps, { only: ['cpsc'], limit: 2 });
   assert.ok(under.scored() >= 1);
+  assert.ok(su.published >= 1 && su.report_unscored >= 1, 'scorer error fails open');
   const laptop = pipelineSetup(60, undefined);
   await runOnce(laptop.deps, { only: ['cpsc'], limit: 2 });
   assert.ok(laptop.scored() >= 1);
+});
+
+test('per-run scorer cap: scorerMaxPerRun 1 scores one card, the others publish unscored', async () => {
+  const t = pipelineSetup(0, undefined);
+  t.deps.reportCard = { enabled: true, scorerMaxPerRun: 1 };
+  const s = await runOnce(t.deps, { only: ['cpsc'], limit: 3 });
+  assert.ok(t.scored() >= 1 && t.scored() <= 2, `scored ${t.scored()}`);   // 1 card, one score call
+  assert.equal(s.report_scored, 1);
 });
