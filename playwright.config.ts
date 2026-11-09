@@ -31,6 +31,6 @@ export default defineConfig({
     url: `http://localhost:${port}`,
     reuseExistingServer: true,
     timeout: 240_000,
-    env: { EXPO_PUBLIC_API_MODE: 'mock', CI: '' },
+    env: { EXPO_PUBLIC_API_MODE: 'mock', CI: process.env.CI ? '1' : '0' },
   },
 });
