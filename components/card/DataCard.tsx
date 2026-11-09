@@ -18,16 +18,16 @@ export function changeColor(p: Palette, f: Pick<MacroFact, 'series_id' | 'direct
   return changeToneColor(p, f.series_id, f.direction);
 }
 
-export function DataFacts({ card, config, compact }: { card: BlurbCard; config: AppConfig | null; compact?: boolean }) {
+export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean }) {
   const p = usePalette();
   const notices = cardNotices(card, config);
   // One number gets the design's 64 px. Two or more sit side by side, smaller,
   // with the change on its own line, so the card still fits a phone screen.
   const multi = card.macro.length > 1;
-  const valueSize = multi ? 34 : compact ? 44 : 64;
+  const valueSize = multi ? (dense ? 30 : 34) : compact ? 44 : 64;
   return (
     <View style={styles.wrap}>
-      <View style={[styles.panel, multi && styles.panelMulti, { backgroundColor: p.dataPanel }]}>
+      <View style={[styles.panel, multi && styles.panelMulti, dense && styles.panelDense, { backgroundColor: p.dataPanel }]}>
         {card.macro.map((f, i) => (
           <View
             key={f.series_id}
@@ -65,7 +65,8 @@ const styles = StyleSheet.create({
   // Feed-Data draft: cream panel, 18/20 padding, uppercase label, 64 px serif number.
   panel: { borderRadius: 18, paddingVertical: 18, paddingHorizontal: 20, gap: 10 },
   panelMulti: { flexDirection: 'row', gap: 14, paddingHorizontal: 16, paddingVertical: 16 },
-  fact: { gap: 6 },
+  panelDense: { paddingVertical: 12, paddingHorizontal: 14, gap: 8 },
+  fact: { gap: 4 },
   factMulti: { flex: 1, minWidth: 0 },
   valueCol: { flexDirection: 'column', alignItems: 'flex-start' },
   citeMulti: { fontSize: 13 },

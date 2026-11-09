@@ -118,6 +118,25 @@ export function isNumberTrend(x: unknown): x is NumberTrend {
   );
 }
 
+/** Freshness flag from api.feed_status(): `delayed` shows the "Updates delayed" banner. */
+export interface FeedStatus {
+  delayed: boolean;
+  last_updated: string | null;
+}
+
+/**
+ * Tolerant parse of api.feed_status(): an object (or a one-row list) with `delayed`
+ * (or `is_delayed`) and `last_updated` (or `updated_at`). Anything else means "not delayed".
+ */
+export function parseFeedStatus(x: unknown): FeedStatus {
+  const row = Array.isArray(x) ? x[0] : x;
+  if (!isObj(row)) return { delayed: false, last_updated: null };
+  const flag = row.delayed ?? row.is_delayed;
+  const at = row.last_updated ?? row.updated_at ?? row.last_success_at;
+  const last_updated = isStr(at) && !Number.isNaN(Date.parse(at)) ? at : null;
+  return { delayed: flag === true, last_updated };
+}
+
 /** Bad rows are skipped; points are cut to the last 12. */
 export function parseNumberTrends(x: unknown): NumberTrend[] {
   if (!Array.isArray(x)) throw new Error('number_trends response is not a list.');
