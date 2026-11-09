@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   prompt: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingLeft: 14, paddingRight: 8, minHeight: 40 },
   promptWide: { marginTop: 16, paddingLeft: 12, minHeight: 0 },
   promptNarrow: { marginHorizontal: 16, marginTop: 8 },
-  promptMain: { flex: 1, paddingVertical: 8 },
+  promptMain: { flex: 1, minHeight: 44, justifyContent: 'center' },
   promptText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   promptClose: { padding: 6 },
   forYouLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
