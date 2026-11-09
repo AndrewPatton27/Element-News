@@ -149,6 +149,8 @@ export interface BlurbCard {
   detail?: CardDetail | null;           // in-depth summary; null or missing = none (older servers omit it)
   story_link?: StoryLink;
   follow_reason?: string;               // present on cards returned by api.following_feed
+  follow_match?: 'topic' | 'source' | 'ticker' | 'company'; // following_feed direct matches: why it matched
+  follow_ticker?: string;               // the followed ticker for 'ticker' / 'company' matches
 }
 
 /** Response of `api.feed`. `next_cursor` null = end of feed. Treat the cursor as opaque. */
