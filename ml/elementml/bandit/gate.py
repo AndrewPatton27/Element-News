@@ -89,7 +89,12 @@ def replay_gains(pages: list[dict], events_by_user: dict[str, list[Event]], card
         t0 = pg["shown_at"]
         after = aggregate([e for e in evs if e.card in set(ids)], t0 + REWARD_WINDOW_H, P, REWARD_WINDOW_H / HOUR_PER_DAY)
         r = {c: card_reward(after[c], cards[c].words, P) if c in after else 0.0 for c in ids}
-        scored = score_reference(u, [cards[c] for c in ids], evs, follows.get(u, []), (), (), model, P, pg["as_of"], seed)
+        # v2 may only know what happened before the page (a later like or dislike must not leak in); its
+        # evidence is every card the reader acted on before then, as in SQL
+        before = [e for e in evs if e.t < pg["as_of"]]
+        ev_cards = [cards[e.card] for e in before if e.card in cards]
+        scored = score_reference(u, [cards[c] for c in ids], before, follows.get(u, []), (), (), model, P, pg["as_of"],
+                                 seed, evidence_cards=ev_cards)
         new_slot = {s.id: k for k, s in enumerate(scored)}
         old = sum(r.values())
         new = sum(r[c] * min(prop(new_slot.get(c, len(ids))) / prop(k), cap) for k, c in enumerate(ids))

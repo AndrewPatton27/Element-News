@@ -24,7 +24,7 @@ grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 create publication supabase_realtime;`);
 const migs = fs.readdirSync(path.join(repo, 'supabase/migrations'))
-  .filter((f) => f.endsWith('.sql') && !f.includes('cron_schedule')).sort();      // pg_cron is not in PGlite
+  .filter((f) => f.endsWith('.sql') && !f.includes('cron')).sort();      // pg_cron is not in PGlite (cron_schedule, finance_sources_cron)
 for (const f of migs) await db.exec(fs.readFileSync(path.join(repo, 'supabase/migrations', f), 'utf8'));
 
 for (const [k, v] of Object.entries(fx.params || {})) {

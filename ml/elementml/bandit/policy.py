@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Iterable, Optional
 
 import numpy as np
@@ -37,6 +38,11 @@ from . import features as FT
 from .params import LEAN_TAGS, SLOT_BUCKETS
 
 HOUR_PER_DAY = 24.0
+
+
+@lru_cache(maxsize=200000)
+def _features_cached(category, typ, skey, headline, series) -> list[str]:
+    return FT.card_features(category, typ, skey, headline, series)
 
 
 # ---- data records ----------------------------------------------------------------------
@@ -64,10 +70,13 @@ class RefCard:
     published_at: float = 0.0      # hours
     words: int = 0
     status: str = "published"
+    tags: Optional[tuple] = None   # features as the database worked them out (export); None = compute here
 
     @property
     def features(self) -> list[str]:
-        return FT.card_features(self.category, self.typ, self.skey, self.headline, self.series)
+        if self.tags is not None:
+            return sorted(self.tags)
+        return _features_cached(self.category, self.typ, self.skey, self.headline, tuple(self.series))
 
 
 @dataclass
@@ -291,13 +300,16 @@ class Scored:
 
 def score_reference(user_id: str, cards: list[RefCard], events: list[Event], follows: list[str],
                     hidden_cats: Iterable[str], hidden_srcs: Iterable[str], model: Model, P: dict,
-                    asof: float, seed: int) -> list[Scored]:
-    """Mirror of core.v2_scores(user, as_of, model, seed): every candidate, best first (ps desc, id desc)."""
+                    asof: float, seed: int, evidence_cards: Iterable[RefCard] = ()) -> list[Scored]:
+    """Mirror of core.v2_scores(user, as_of, model, seed): every candidate, best first (ps desc, id desc).
+    evidence_cards: more cards the reader has events on (any status, any age), used only as evidence, as the
+    SQL `allc` CTE does; candidates come from `cards` only."""
     hidden_cats, hidden_srcs = set(hidden_cats), set(hidden_srcs)
     lean = lean_tags_from(P)
-    by_id = {c.id: c for c in cards}
-    feats_of = {c.id: c.features for c in cards}
-    words_of = {c.id: c.words for c in cards}
+    by_id = {c.id: c for c in evidence_cards}
+    by_id.update({c.id: c for c in cards})
+    feats_of = {k: c.features for k, c in by_id.items()}
+    words_of = {k: c.words for k, c in by_id.items()}
     win = P["affinity_days"]
     aggs = aggregate(events, asof, P, win)
     stats = feature_stats(aggs, feats_of, words_of, follows, model, asof, P)

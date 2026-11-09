@@ -10,6 +10,12 @@ Commands (inputs -> outputs):
     value          every results file -> results/model_value.csv + model_value_summary.md
     diag           head AUC / calibration per world -> printed JSON
     demo           rank contract/fixtures for a made-up reader -> printed table
+  ranking v2 (Thompson sampling, elementml.bandit):
+    eval-bandit    ts_v2 vs the server formula on six reader types x worlds x seeds -> results/bandit_eval.json
+    bandit-export  Supabase (service key from the environment) -> --data folder (60 days of events, pages, cards)
+    train-bandit   --data folder -> <data>/model.json (core.ml_weights rows)
+    bandit-gate    --data folder + --synthetic results file -> <data>/gate.json (gate_passed)
+    bandit-publish <data>/model.json + gate.json -> api.ml_write_weights
 Heavy modules are imported inside each command so `--help` and `stats` start fast.
 """
 from __future__ import annotations
@@ -129,6 +135,31 @@ def cmd_demo(a):
         print(f"({len(cards) - len(ranked)} cards left out: already seen by this reader)")
 
 
+def cmd_eval_bandit(a):
+    """Offline evaluation of ranking v2 (see evaluation/bandit_eval.py)."""
+    from ..evaluation.bandit_eval import run
+    seeds = tuple(int(x) for x in a.seed_list.split(",")) if a.seed_list else tuple(range(1, a.seeds + 1))
+    out = run(seeds=seeds, worlds=tuple(a.worlds.split(",")), per_type=a.per_type, days=a.days, workers=a.workers,
+              out_name=a.out)
+    if a.require_pass and not out["gate"]["passed"]:
+        raise SystemExit(1)
+
+
+def cmd_bandit_step(a):
+    """One weekly-job step on a data folder (bandit/job.py). Prints counts and pass/fail only."""
+    from pathlib import Path
+    from ..bandit import job
+    data = Path(a.data)
+    if a.cmd == "bandit-export":
+        job.export(data)
+    elif a.cmd == "train-bandit":
+        job.train(data)
+    elif a.cmd == "bandit-gate":
+        job.gate(data, Path(a.synthetic))
+    elif a.cmd == "bandit-publish":
+        job.publish(data)
+
+
 def main(argv=None):
     """Parse the command line and run one command."""
     ap = argparse.ArgumentParser(prog="elementml")
@@ -168,5 +199,17 @@ def main(argv=None):
 
     d = sub.add_parser("demo"); d.add_argument("--follow", nargs="*", default=["tech"]); d.add_argument("--like", nargs="*", default=["tech"])
     d.add_argument("--n-likes", type=int, default=2); d.add_argument("--top", type=int, default=12); d.set_defaults(f=cmd_demo)
+
+    eb = sub.add_parser("eval-bandit", help="ranking v2 offline evaluation and synthetic gate")
+    eb.add_argument("--seeds", type=int, default=5); eb.add_argument("--seed-list", default="")
+    eb.add_argument("--worlds", default="normal,stress,wild"); eb.add_argument("--per-type", type=int, default=10)
+    eb.add_argument("--days", type=int, default=14); eb.add_argument("--workers", type=int, default=7)
+    eb.add_argument("--out", default="bandit_eval.json"); eb.add_argument("--require-pass", action="store_true")
+    eb.set_defaults(f=cmd_eval_bandit)
+    for name in ("bandit-export", "train-bandit", "bandit-gate", "bandit-publish"):
+        st = sub.add_parser(name); st.add_argument("--data", required=True)
+        if name == "bandit-gate":
+            st.add_argument("--synthetic", required=True, help="path of the eval-bandit results JSON")
+        st.set_defaults(f=cmd_bandit_step)
     a = ap.parse_args(argv)
     a.f(a)
