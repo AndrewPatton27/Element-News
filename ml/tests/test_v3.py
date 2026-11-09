@@ -104,3 +104,24 @@ def test_v3_never_imports_the_simulator():
                           "print(any(m.startswith('elementml.simulator') for m in sys.modules))" % ROOT.parent],
                          capture_output=True, text=True)
     assert out.stdout.strip() == "False", out.stderr
+
+
+def test_macro_gate_is_relative_to_the_formula():
+    from elementml.bandit.gate import synthetic_gate
+
+    def runs(macro):
+        out = []
+        for s in range(1, 6):
+            base = dict(world="normal", seed=s, ndcg10=0.4, exp_dis10=0.1, cats10=6.0, recovery_days=3.0,
+                        macro_anti=0.10, macro_anti_true=0.003)
+            out += [dict(base, method="a1_current_server"), dict(base, method="v3", ndcg10=0.45, macro_anti=macro)]
+        return out
+    assert synthetic_gate(runs(0.115), cand="v3")["passed"]              # formula + 0.015: allowed
+    assert not synthetic_gate(runs(0.125), cand="v3")["passed"]          # formula + 0.025: too much macro
+
+
+def test_real_headline_tag_check_finds_fixtures():
+    from elementml.evaluation.tag_coverage import coverage, real_headlines
+    heads = real_headlines()
+    assert len(heads) >= 30
+    assert 0.0 < coverage(heads)["share_with_tag"] < 1.0
