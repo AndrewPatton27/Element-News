@@ -1,0 +1,1 @@
+{"_comment":"SYNTHETIC: debt_to_penny shape per FiscalData docs (all values are strings, a missing value is the string \"null\"); fictional amounts.","data":[{"record_date":"2026-11-05","tot_pub_debt_out_amt":"38100000000000.00"},{"record_date":"2026-11-04","tot_pub_debt_out_amt":"38090000000000.00"},{"record_date":"2026-11-03","tot_pub_debt_out_amt":"null"}],"meta":{"count":3}}

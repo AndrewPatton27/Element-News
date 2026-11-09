@@ -38,7 +38,22 @@ export function createTimeBudget(opts: { softMs?: number; hardMs?: number; callT
   };
 }
 
-export type StopReason = 'done' | 'time' | 'work_cap';
+export type StopReason = 'done' | 'time' | 'work_cap' | 'timeout';
+
+/**
+ * Run deadline: resolves with `work`'s result, or rejects with a DeadlineError once `ms` have passed (the platform
+ * kills a call at 150 s; the handler gives up at 140 s so it can still write its run-log row). The timer is cleared
+ * as soon as `work` settles. Work still running afterwards cannot start new requests (guardFetch).
+ */
+export class DeadlineError extends Error {
+  constructor(ms: number) { super(`run deadline reached after ${Math.round(ms / 1000)} s`); this.name = 'DeadlineError'; }
+}
+export function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new DeadlineError(ms)), Math.max(0, ms));
+    work.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
 
 export interface PublisherGuardCounts {
   /** items worked on this call (new, or recorded earlier but still status 'new') */

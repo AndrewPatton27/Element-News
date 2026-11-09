@@ -4,6 +4,7 @@ import { resolveApiConfig } from '../api/config.ts';
 import { ApiError, createSupabaseApi, planRequest } from '../api/api.supabase.ts';
 import { card, config } from './helpers.ts';
 import { createMockFeatureApi } from '../api/api.mockFeatures.ts';
+import { rebaseCards } from '../feed/rebase.ts';
 
 const URL_ = 'https://abc123.supabase.co';
 const KEY = 'sb_publishable_testkey123';
@@ -124,7 +125,8 @@ test('topStories and numberTrends parse good rows and skip bad ones', async () =
 });
 
 test('new mock endpoints provide searchable, related, following and brief data', async () => {
-  const api = createMockFeatureApi([card(), card({ id: 'c2', headline: '[SAMPLE] Northwind raises outlook', category: 'markets' }), card({ id: 'c3', headline: '[SAMPLE] Another company beats estimates', category: 'earnings' })], [], []);
+  // rebased so the brief's time windows do not depend on today's date
+  const api = createMockFeatureApi(rebaseCards([card(), card({ id: 'c2', headline: '[SAMPLE] Northwind raises outlook', category: 'markets' }), card({ id: 'c3', headline: '[SAMPLE] Another company beats estimates', category: 'earnings' })]), [], []);
   assert.equal((await api.search('Northwind')).items.length, 3);
   assert.deepEqual(await api.search('x'), { items: [], next_cursor: null });
   assert.ok((await api.relatedCards('c1')).every((c) => c.id !== 'c1'));

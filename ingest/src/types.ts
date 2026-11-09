@@ -8,7 +8,7 @@ export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa';
 
 /** One collected item, ready for summarizing. */
 export interface RawItem {
-  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
+  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
   external_id: string;
   url: string;                       // the page we cite (and may fetch: allowlisted hosts only)
   title: string;
@@ -58,6 +58,8 @@ export interface Summarizer {
   usesAi: boolean;
   /** model ID this provider calls (recorded on the card); null/undefined for non-AI */
   model?: string | null;
+  /** true once the primary model was reported retired and the fallback model took over (stats.model_missing) */
+  modelMissing?: boolean;
   /** max calls per UTC day for this provider (AI providers) */
   dailyCap?: number;
   /** min gap between two calls to this provider, in ms (its requests-per-minute limit) */

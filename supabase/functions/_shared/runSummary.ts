@@ -24,7 +24,7 @@ export interface RunSummary {
   deferred: number;
   stopped_by: StopReason | 'error';
   error: string | null;
-  stats: Partial<RunStats>;
+  stats: Partial<RunStats> & { model_missing?: boolean };
   ai_denied: Record<string, number>;
   log_tail: string[];
 }
@@ -43,9 +43,13 @@ export function buildRunSummary(i: {
   aiCalls: number;
   aiDenied?: Record<string, number>;
   error?: string | null;
+  /** the run hit its own deadline (stopped_by 'timeout' instead of 'error') */
+  timedOut?: boolean;
+  /** a primary model was reported retired and the fallback model answered (the watchdog alerts on it) */
+  modelMissing?: boolean;
   log: string[];
 }): RunSummary {
-  const s = i.stats ?? {};
+  const s: RunSummary['stats'] = { ...(i.stats ?? {}), ...(i.modelMissing ? { model_missing: true } : {}) };
   const g = i.guard ?? { itemsNew: 0, deferredTime: 0, deferredCap: 0, stoppedBy: 'done' as StopReason };
   const deferred = g.deferredTime + g.deferredCap;
   const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -64,7 +68,7 @@ export function buildRunSummary(i: {
     failed: num(s.failed),
     ai_calls: i.aiCalls,
     deferred,
-    stopped_by: error ? 'error' : g.stoppedBy,
+    stopped_by: i.timedOut ? 'timeout' : error ? 'error' : g.stoppedBy,
     error,
     stats: s,
     ai_denied: i.aiDenied ?? {},
@@ -72,9 +76,21 @@ export function buildRunSummary(i: {
   };
 }
 
+/** Writes the run_log row before the work starts (finished_at null), so a run killed by the platform leaves a trace. Never throws. */
+export async function startRunLog(rpc: (name: string, body: unknown) => Promise<unknown>, source: string, startedAt: number): Promise<number | null> {
+  try {
+    const id = await rpc('run_start', { p: { source, started_at: new Date(startedAt).toISOString() } });
+    return typeof id === 'number' && id > 0 ? id : null;
+  } catch (e) {
+    console.log(`warning: run start not logged: ${(e as Error).message}`);
+    return null;
+  }
+}
+
 /** The api.log_run payload for a summary (same counts; the rest goes in `detail`). */
-export function runLogPayload(r: RunSummary): Record<string, unknown> {
+export function runLogPayload(r: RunSummary, id?: number | null): Record<string, unknown> {
   return {
+    ...(id ? { id } : {}),                 // finishes the row api.run_start wrote before the work
     source: r.source,
     started_at: r.started_at,
     finished_at: r.finished_at,
