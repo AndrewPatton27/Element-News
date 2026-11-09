@@ -103,3 +103,16 @@ select started_at, source, left(error, 200) as error
  where started_at > now() - interval '24 hours' and error is not null and error not like 'killed:%'
  order by started_at desc
  limit 30;
+
+-- 9. Macro/finance focus (needs 20261116000000_macro_focus.sql; skip this block before it is applied).
+--    Pass: trending.top10.macro_share >= 0.8 and trending.top50.macro_share >= 0.85; micro <= 1 per 10.
+--    gated_14d = recalls in the last 14 days and how many of them are left out of the feeds (not material).
+select api.macro_share() as macro_share;
+
+--    9b. recall verdicts by reason (material and left out), last 14 days
+select m.material, unnest(m.reasons) as reason, count(*) as cards
+  from core.card_material m
+  join core.blurbs b on b.id = m.blurb_id
+ where b.status = 'published' and b.sort_at > now() - interval '14 days'
+ group by 1, 2
+ order by 1 desc, 3 desc;

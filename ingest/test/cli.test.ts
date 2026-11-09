@@ -33,11 +33,12 @@ function dryDeps(providers: Summarizer[] = [templateSummarizer]) {
   return { deps, dry, lines, requested };
 }
 
-test('dry run end to end: 5 template cards (1 Fed, 2 BEA, 2 USGS), Federal Register, Wikipedia, CPSC and off-list SEC skipped, every card valid', async () => {
+test('dry run end to end: 4 template cards (1 Fed, 2 BEA, 1 USGS: narrow-source cap 1), Federal Register, Wikipedia, CPSC and off-list SEC skipped, every card valid', async () => {
   const { deps, dry, lines, requested } = dryDeps();
   const stats = await runOnce(deps);
-  assert.equal(stats.published, 5);
-  assert.equal(stats.template, 5);
+  assert.equal(stats.published, 4);
+  assert.equal(stats.template, 4);
+  assert.equal(lines.filter((l) => l.startsWith('skip report_card_variety_cap')).length, 1, 'the second USGS quake waits for the next run');
   assert.equal(dry.cards.filter((c) => c.sources[0].name === 'Federal Register').length, 0, 'no template Federal Register cards');
   assert.equal(lines.filter((l) => l.startsWith('skip template_not_allowed')).length, 17);   // 1 Fed speech, 1 SEC press release, 5 Federal Register, 4 Wikipedia (today only), 5 CPSC (new-only cap), 1 NASA (page 1 only)
   assert.equal(lines.filter((l) => l.startsWith('skip low_interest')).length, 3, 'green-alert quakes: 2 on the Mid-Atlantic Ridge, 1 small one in Panama');

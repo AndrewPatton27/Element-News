@@ -39,6 +39,9 @@ begin
   delete from core.user_events where user_id in (ua, ub);
   delete from core.user_prefs  where user_id in (ua, ub);
   update core.blurbs set status = 'hidden' where status = 'published';
+  -- the micro page cap and the recall gate (20261116000000_macro_focus.sql) are off here: these checks cover the breadth rules alone;
+  -- the cap has its own checks in macro_focus_check.sql (rolled back)
+  update core.rank_params set value = 10 where key = 'micro_max_per_10'; update core.rank_params set value = 1 where key = 'micro_category:safety';
 
   -- FED: importance 10, 2 h old; SMALL: importance 1.6, brand new (19.2 h behind FED);
   -- N1/N2: two close deals cards; F0..F25 fillers (markets/energy) far below

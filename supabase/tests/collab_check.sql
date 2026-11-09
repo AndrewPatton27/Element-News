@@ -57,6 +57,7 @@ begin
   delete from core.user_events where user_id in (ua, ub);
   delete from core.user_prefs  where user_id in (ua, ub);
   update core.blurbs set status = 'hidden' where status = 'published';   -- real cards out of the way (rolled back)
+  update core.rank_params set value = 10 where key = 'micro_max_per_10'; update core.rank_params set value = 1 where key = 'micro_category:safety';   -- micro page cap and recall gate off (macro_focus_check.sql covers them)
   update core.rank_params set value = 0 where key = 'trend_quality_hours';  -- quality is checked on its own in part 8
 
   for i in 1 .. 6 loop

@@ -19,6 +19,13 @@ import { templateSummarizer } from '../src/summarizer/template.ts';
 import { AI_CATEGORY_SLUGS, CATEGORY_SLUGS, validateDraft, validatePublish } from '../src/validate.ts';
 import type { RawItem, SummarizeInput, Summarizer } from '../src/types.ts';
 
+/** Runs fn with the USGS / NASA narrow-source caps lifted (these older checks cover the template and threshold rules; macro-focus.test.ts covers the caps). */
+async function noNarrowCap<T>(fn: () => Promise<T>): Promise<T> {
+  const caps = config.reportCard.narrowSourceCaps as Record<string, number>;
+  const was = { ...caps };
+  try { caps.usgs_quake = 99; caps.nasa_release = 99; return await fn(); } finally { Object.assign(caps, was); }
+}
+
 const fx = (n: string) => readFileSync(new URL(`../src/fixtures/${n}`, import.meta.url), 'utf8');
 const root = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const WIKI = fx('wiki-featured-2026-10-17.json');      // RECONSTRUCTED (news array verbatim)
@@ -221,7 +228,7 @@ test('usgs: template card from title/mag/place/time, event URL as the source, US
   let aiCalls = 0;
   const ai: Summarizer = { name: 'gemini', usesAi: true, async summarize() { aiCalls++; throw new Error('no'); } };
   const { d, dry } = deps([ai, templateSummarizer]);
-  const s = await runOnce(d, { only: ['usgs'] });
+  const s = await noNarrowCap(() => runOnce(d, { only: ['usgs'] }));
   assert.equal(aiCalls, 0);
   assert.equal(s.published, 2, 'Pakistan (yellow) and Russia (green but M6.9 on land)');
   assert.equal(s.skipped, 3, 'two green ridge quakes and the M6.1 Panama quake');
@@ -233,7 +240,7 @@ test('usgs: template card from title/mag/place/time, event URL as the source, US
     assert.equal(c.sources[0].name, 'U.S. Geological Survey');
     assert.deepEqual(validatePublish(c).errors, []);
   }
-  const again = await runOnce(d, { only: ['usgs'] });
+  const again = await noNarrowCap(() => runOnce(d, { only: ['usgs'] }));
   assert.equal(again.published, 0, 'dedupe on the event URL');
 });
 
@@ -267,7 +274,7 @@ test('usgs threshold: yellow/orange/red always publish; green or no alert is ski
 
 test('usgs pipeline: skipped quakes are counted and logged with the reason, nothing is published for them', async () => {
   const { d, dry, lines } = deps([templateSummarizer]);
-  const s = await runOnce(d, { only: ['usgs'] });
+  const s = await noNarrowCap(() => runOnce(d, { only: ['usgs'] }));
   assert.equal(s.published, 2);
   assert.equal(s.skipped, 3);
   assert.deepEqual(dry.cards.map((c) => c.headline).sort(), ['Magnitude 5.7 earthquake hits Pakistan', 'Magnitude 6.9 earthquake hits Russia']);
