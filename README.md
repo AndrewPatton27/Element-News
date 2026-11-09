@@ -92,32 +92,11 @@ npm run dry-run    # Process test fixtures through summarize & validate without 
 Element includes end-to-end unit, contract, and parsing test suites across the entire stack:
 
 ```bash
-# App logic, contract and formatting tests (343 tests)
-npm run test:app
-
-# Ingestion pipeline, validator and allowlist tests (301 tests)
-# Run app logic, contract, and formatting tests (346 tests pass)
-npm run test:app
-
-# Browser smoke test on sample data, phone and desktop viewports (feed, next card,
-# like/dislike, sources sheet, share link, delayed banner). Starts the web app itself.
-# First time: `npx playwright install chromium` (or PW_CHANNEL=chrome to use installed Chrome).
-npm run test:e2e
-
-# Run ingestion pipeline, validator, and allowlist tests
-npm run test:ingest
-
-# Edge Functions (budget, usage caps, run log, deadline) (39 tests)
-npm run test:functions
-
-# Watchdog Worker (10 tests)
-npm run test:worker
-
-# Secret scan of tracked files (add --staged before a commit)
-npm run scan:secrets
-
-# TypeScript typecheck (app; ingest, supabase/functions and workers/watchdog have their own tsconfig)
-npx tsc --noEmit
+npm run test:app        # app logic, contract and formatting tests (349 tests)
+npm run test:ingest     # ingestion pipeline, validator and allowlist (321 tests)
+npm run test:functions  # Edge Functions: budget, usage caps, run log, deadline (39 tests)
+npm run test:e2e        # browser smoke test on sample data, phone and desktop viewports
+                        # first time: `npx playwright install chromium` (or PW_CHANNEL=chrome)
 ```
 
 The SQL checks in `supabase/tests/` run in the Supabase SQL editor or an offline PGlite harness (see `supabase/supabase.md`).
