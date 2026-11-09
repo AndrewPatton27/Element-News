@@ -9,6 +9,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | `account/` | Sign-in session, account state and account labels |
 | `api/` | The `Api` interface, mock and Supabase implementations, error types and app config |
 | `brief/` | Daily and weekly brief logic |
+| `companies/` | Company directory answers, sector grouping, "About: Apple" chips, the company API (Supabase and sample) and batched card tag lookups |
 | `feed/` | Feed ordering, paging, ranking (For you, local), swipe and early first-page logic |
 | `following/` | Followed topics and stories, following re-rank |
 | `numbers/` | Number formatting, tone and trend sample data |
@@ -88,6 +89,10 @@ Files in `lib/__tests__/`: `account`, `api`, `detail`, `dwell`, `feedLogic`, `fi
 - `search/suggestions.ts` + `search/useSearchSuggestions.ts`: "Suggested for you" on the empty Search box. Signed in: one `account.feedForYou` page (the server's For you ranking); signed out, or if that fails: one Trending page (`api.feed`) re-ordered by `feed/localRank.ts` (device follows, likes, dislikes). Seen stories (`feed/forYouGate.ts` seen list plus reacted cards), hidden topics and hidden sources drop out; at most 5. Nothing new is stored or sent. Tests: `__tests__/searchSuggestions.test.ts`.
 - `shared/crashReport.ts`: what the error boundary keeps (sanitized: no tokens, keys, emails or query strings) in sessionStorage `element.last-error`, and the stale-chunk reload: a screen file from an older deploy (`Requiring unknown module`, `Loading module ... failed`, dynamic import failures) reloads the page at most once per 60 s (`element.chunk-reload-at`). `installChunkReload(window)` (from `app/_layout.tsx`) covers failures outside React. Tests: `__tests__/crashReport.test.ts`.
 - `followingLogic.ts`: the three follow lists (topics, sources, tickers), parse / toggle / ticker check, which topics come from the account, the "Because you follow X" text with topic slugs turned into names. Tests: `__tests__/followingLogic.test.ts` (includes the mock search and following feed).
+- `companyLogic.ts`: reads the company RPC answers (no prices kept), the Companies screen grouping (followed first, then sectors, most cards first, typo-tolerant filter), the "About: Apple" chips (server tags, else the card's tickers), card-count wording and the search helpers `companyRowsFor` / `companyCardsFirst`.
+- `companyApi.ts`: `CompanyApi` (search, cards, directory, tags) over the Supabase RPCs of `20261115000000_companies.sql`, and the sample version over the fixture cards with the same matcher (`SAMPLE_COMPANIES`).
+- `tagBatcher.ts`: collects card ids for ~25 ms and asks `api.card_companies` once (<= 50 ids); answers cached, failures cached as no tags.
+- `useCardCompanies.ts`: the hook the card chips use (one batcher per API).
 - `useFollows.ts`: the follow lists for the screens (account topics when signed in, device storage otherwise).
 - `usePagedCards.ts`: pages any card list by key (search, topic, follows) with the feed's rules: a new key starts over, late answers are dropped, hidden topics and sources are skipped.
 

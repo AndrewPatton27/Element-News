@@ -9,6 +9,7 @@ UI pieces used by the screens in `app/`. Plain React Native (works on web throug
 | `account/` | Sign-up and sign-in forms, password field, brief sign-up management |
 | `brief/` | Brief chrome, stories and summary |
 | `card/` | Feed card, card actions and menu, data card, detail sheet, source list and chips, labels, card footer, trend chart |
+| `companies/` | "About: <company>" chips on cards, a company row with Follow, and the company rows for the top of Search |
 | `feed/` | Feed pager, category chips, sort toggle, topic pickers, For you warm-up, undo toast |
 | `following/` | Followed stories, follow button and pill, following feed, manager and watchlist |
 | `numbers/` | Numbers panel and ticker, brief numbers and markets |
@@ -74,6 +75,9 @@ Card footer: the disclaimer is built once and placed by `disclaimerPlacement` (`
 | `SearchResults.tsx` | A list of tiles in one or two columns with loading, error, empty and "Show more" states. Shared by Search and Following. |
 | `FollowingManager.tsx` | The "You follow" panel: removable chips, plus topic and source pickers and a ticker box. |
 | `FollowingWatchlist.tsx` | "Watchlist" on the Me screen (designs `Mobile-Me` / `Web-Me`): followed company tickers as removable chips and "+ Add ticker". Stored on this device via `useFollows`. News only, no prices. |
+| `companies/AboutChips.tsx` | "About: Apple" chips on a feed card (at most two): the server's company tags (batched lookup), else the card's own tickers; a chip opens `/company/<ticker>` (ignored right after a swipe). |
+| `companies/CompanyRow.tsx` | One company in a list: short name, ticker, industry (or sector · industry), recent card count, Follow pill; tapping opens the company page. |
+| `companies/CompanySearchRows.tsx` | `<CompanySearchRows query={q} />` and `useCompanySearch(q)`: company rows for the top of Search results (exact ticker/name matches, else the best prefix/typo match; nothing when no company matches). Not mounted yet: the Search screen owner places it. |
 
 | `FollowingButton.tsx` | The Follow / "✓ Following" pill. |
 

@@ -1,5 +1,5 @@
 ﻿// One feed card (design Mobile-Final / Web-Final): badge and meta, headline,
-// (numbers), body, facts (Agency / Type / Published, on phones too), tickers, then
+// (numbers), body, facts (Agency / Type / Published, on phones too), "About: <company>" chips, then
 // the source row and a footer: small print on the left, like / dislike / share icon
 // buttons on the right. The disclaimer appears once per card: under the card on
 // phones, in the footer line on wide web (components/cardFooter.ts). No images,
@@ -22,6 +22,7 @@ import { ExternalIcon, InfoIcon, NumbersIcon, PulseIcon, ShareIcon, SparkleIcon,
 import type { Feedback } from '../../lib/account/accountLogic';
 import { Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceRow } from './SourceChip';
+import { AboutChips } from '../companies/AboutChips';
 import { useFollowedStories } from '../../lib/following/useFollowedStories';
 import { footerLabels, linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
 import { shareStory } from '../../lib/shared/useCardActions';
@@ -125,8 +126,6 @@ export function Card(props: Props) {
 
   const hasDetail = !linkOut && cardDetail(card) !== null;
   const opensDetail = !!onOpenDetail && hasDetail;
-  // A malformed ticker from the server is skipped, not shown as an empty chip.
-  const validTickers = card.tickers.filter((t) => t && typeof t.symbol === 'string' && t.symbol !== '');
   // Design size is 28 on phones (48 on wide); long headlines and short screens step down.
   // A narrow wide column (small desktop window) steps the wide headline down too.
   // A short desktop window (card under 660 px tall) tightens padding, gaps and type so
@@ -342,19 +341,8 @@ export function Card(props: Props) {
                 </View>
               ) : null}
 
-              {validTickers.length > 0 ? (
-                <View style={styles.tickers}>
-                  {validTickers.map((t, i) => (
-                    <Text
-                      key={`${t.symbol}-${i}`}
-                      style={[styles.ticker, { color: p.inkSoft, borderColor: p.borderStrong }]}
-                      accessibilityLabel={`${t.name}, ticker ${t.symbol}`}
-                    >
-                      {t.symbol}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
+              {/* Which companies the card is about; a chip opens the company page (components/companies/AboutChips). */}
+              <AboutChips card={card} wide={wide} />
             </Pressable>
             </ScrollView>
 

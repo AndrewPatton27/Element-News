@@ -1,4 +1,4 @@
-﻿# Element
+# Element
 
 **The news that touches your life, in plain words, with a source on every card.** Element is a business and public-interest news app for the web and phones. It turns public records and data into readable cards, with links back to the source.
 
@@ -39,7 +39,7 @@ One Expo and React Native codebase serves web and mobile. Supabase provides the 
 | [USGS](https://earthquake.usgs.gov/earthquakes/feed/) | Significant earthquake event reports (template cards) | U.S. government public domain |
 | [NASA](https://www.nasa.gov/news-release/) | Space exploration and science releases | [NASA media guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) |
 
-*This product uses the FREDÂ® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.*
+*This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.*
 
 ---
 

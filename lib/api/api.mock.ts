@@ -10,6 +10,7 @@ import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
 import { mockFeedStatus } from './mockStatus.ts';
+import { createMockCompanyApi } from '../companies/companyApi.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 
 import page1 from '../../contract/fixtures/feed.page1.json';
@@ -40,6 +41,7 @@ export function createMockApi(): Api {
   const cards = allCards();
   const trends = SAMPLE_NUMBER_TRENDS.map((t) => ({ ...t, points: [...t.points] }));
   const features = createMockFeatureApi(cards, parseMacroFacts(numbers), trends);
+  const companies = createMockCompanyApi(cards);
   return {
     sample: true,
     feed: (req) =>
@@ -69,5 +71,11 @@ export function createMockApi(): Api {
     mySubscriptions: () => wait(features.mySubscriptions()),
     unsubscribeMine: (k) => wait(features.unsubscribeMine(k)),
     updateMyTime: (k, h, tz) => wait(features.updateMyTime(k, h, tz)),
+    companies: {
+      search: (q, limit) => companies.search(q, limit).then(wait),
+      cards: (t, cursor, limit) => companies.cards(t, cursor, limit).then(wait),
+      directory: () => companies.directory().then(wait),
+      tags: (ids) => wait(companies.tagsNow(ids)),
+    },
   };
 }
