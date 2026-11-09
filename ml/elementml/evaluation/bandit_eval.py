@@ -51,6 +51,7 @@ DIMS = 4                          # zero card vectors: neither method reads them
 RELEVANT_TOPIC = 0.5              # P@10: a card is relevant when its hidden topic score is at least this
 PROBE_KS = (0, 3, 10)
 METHODS = ("a1_current_server", "ts_v2")
+ACTION_BUCKETS = ((0, 5), (5, 15), (15, 30), (30, 60), (60, 10**9))   # explicit events before the session
 
 
 def _state_factory(p, now):
@@ -233,6 +234,12 @@ def eval_task(args) -> dict:
     model = Model.from_rows(model_rows["rows"], model_rows["version"])
     if method == "ts_v2":
         base = BanditPolicy(cat, model, P)
+    elif method.startswith("ts_v2:"):
+        from .v3_eval import ts_v2_ablation
+        base = ts_v2_ablation(method, cat, model, P)
+    elif method.startswith("v3"):
+        from ..v3.methods import make_v3
+        base = make_v3(method, cat)
     else:
         base = CurrentServer(cat)
     graded: list[dict] = []
@@ -247,6 +254,9 @@ def eval_task(args) -> dict:
                repeat=mean([s["repeat"] for s in S]),
                p10=mean([g["p10"] for g in graded]), max_run=mean([g["max_run"] for g in graded]),
                recovery_days=_recovery(S, days))
+    res["ndcg_by_day"] = [mean([s["ndcg10"] for s in S if s["day"] == d]) for d in range(days)]
+    res["ndcg_by_actions"] = {f"{lo}-{hi}": mean([s["ndcg10"] for s in S if lo <= s["n_strong"] < hi])
+                              for lo, hi in ACTION_BUCKETS}
     anti = [g for g in graded if g["kind"] == "anti_macro" and g["day"] >= 7]
     res["macro_anti"] = mean([g["macro"] for g in anti])
     res["macro_anti_true"] = mean([g["macro_true"] for g in anti])

@@ -11,6 +11,8 @@ Commands (inputs -> outputs):
     diag           head AUC / calibration per world -> printed JSON
     demo           rank contract/fixtures for a made-up reader -> printed table
   ranking v2 (Thompson sampling, elementml.bandit):
+    eval-v3        ranking v3 (formula + per-reader residual) vs the formula -> results/v3_eval.json
+    sim-audit      does the simulator's ground truth favour the formula? (evaluation only)
     eval-bandit    ts_v2 vs the server formula on six reader types x worlds x seeds -> results/bandit_eval.json
     bandit-export  Supabase (service key from the environment) -> --data folder (60 days of events, pages, cards)
     train-bandit   --data folder -> <data>/model.json (core.ml_weights rows)
@@ -145,6 +147,21 @@ def cmd_eval_bandit(a):
         raise SystemExit(1)
 
 
+def cmd_eval_v3(a):
+    """Offline evaluation of ranking v3 (see evaluation/v3_eval.py)."""
+    from ..evaluation.v3_eval import run
+    seeds = tuple(int(x) for x in a.seed_list.split(",")) if a.seed_list else tuple(range(1, a.seeds + 1))
+    run(a.methods.split(";"), worlds=tuple(a.worlds.split(",")), seeds=seeds, per_type=a.per_type, days=a.days,
+        workers=a.workers, out_name=a.out)
+
+
+def cmd_sim_audit(a):
+    import json
+    from ..evaluation.sim_audit import audit
+    for w in a.worlds.split(","):
+        print(w, json.dumps(audit(w)))
+
+
 def cmd_bandit_step(a):
     """One weekly-job step on a data folder (bandit/job.py). Prints counts and pass/fail only."""
     from pathlib import Path
@@ -206,6 +223,16 @@ def main(argv=None):
     eb.add_argument("--days", type=int, default=14); eb.add_argument("--workers", type=int, default=7)
     eb.add_argument("--out", default="bandit_eval.json"); eb.add_argument("--require-pass", action="store_true")
     eb.set_defaults(f=cmd_eval_bandit)
+    e3 = sub.add_parser("eval-v3", help="ranking v3 offline evaluation vs the formula")
+    e3.add_argument("--methods", default="v3", help="';'-separated, e.g. 'ts_v2;v3;v3:solver=ridge'")
+    e3.add_argument("--seeds", type=int, default=5); e3.add_argument("--seed-list", default="")
+    e3.add_argument("--worlds", default="normal,stress,wild"); e3.add_argument("--per-type", type=int, default=10)
+    e3.add_argument("--days", type=int, default=14); e3.add_argument("--workers", type=int, default=7)
+    e3.add_argument("--out", default="v3_eval.json")
+    e3.set_defaults(f=cmd_eval_v3)
+    sa = sub.add_parser("sim-audit", help="simulator fairness audit")
+    sa.add_argument("--worlds", default="normal,stress,wild")
+    sa.set_defaults(f=cmd_sim_audit)
     for name in ("bandit-export", "train-bandit", "bandit-gate", "bandit-publish"):
         st = sub.add_parser(name); st.add_argument("--data", required=True)
         if name == "bandit-gate":
