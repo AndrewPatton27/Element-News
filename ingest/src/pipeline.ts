@@ -44,7 +44,7 @@ export interface Deps {
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
-  reportCard?: { enabled?: boolean; scorer?: ScoreClient; /** the Groq scorer is skipped once counter.used('groq') reaches this (cards then publish unscored) */ scorerMaxGroqUsed?: number };
+  reportCard?: { enabled?: boolean; scorer?: ScoreClient; /** the Groq scorer is skipped once counter.used('groq') reaches this (cards then publish unscored) */ scorerMaxGroqUsed?: number; /** at most this many cards are scored per run (cloud); the rest publish unscored. Unset = no limit (laptop) */ scorerMaxPerRun?: number };
   /** Candidate selection overrides (tests, flags): enabled replaces config.selection.enabled. */
   selection?: { enabled?: boolean };
 }
@@ -69,6 +69,8 @@ export interface RunStats {
   report_abandon: number;
   report_duplicate: number;
   report_provider_gemini: number;
+  report_unscored: number;
+  report_scored: number;
   report_provider_groq: number;
 }
 
@@ -98,7 +100,7 @@ async function recentCards(deps: Deps) {
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
-  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_provider_groq: 0 };
+  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0 };
   const ctx: RunCtx = {
     stats,
     budget: { left: opts.limit ?? 20 },
@@ -125,7 +127,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('nasa')) await runNasa(deps, ctx);
   if (collector) await runSelected(collector, deps, ctx, opts.limit ?? 20);
   } finally { collector = null; }
-  deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
+  deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
 
@@ -592,9 +594,12 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
       const stop = deps.reportCard?.scorerMaxGroqUsed;
       if (g && stop !== undefined && deps.counter.used('groq') >= stop) return null;   // Groq calls are reserved for writing and the Brief
+      const perRun = deps.reportCard?.scorerMaxPerRun;
+      if (g && perRun !== undefined && stats.report_scored >= perRun) return null;           // per-run cap: the rest publish unscored
       return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
     })();
     if (protocolOn && r.ai_generated && scorer) {
+      stats.report_scored++;
       const recent = await recentCards(deps);
       const candidate = { id: row.id, ai_generated: payload.ai_generated, as_of: payload.as_of, sources: [{ name: it.source_name, url: it.url }] } as any;
       const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
@@ -614,20 +619,23 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       if (rv.revised) stats.report_revise++;
       cardScore = rv.score;
       if (rv.verdict === 'unscored') {
-        stats.skipped++;                                   // item stays 'new': a later run tries it again
-        deps.log(`skip report_card_unscored (${rv.error ?? 'no score'}): ${it.title}`);
-        return;
-      }
-      if (rv.verdict !== 'publish') {
+        // Fail open: the scorer failed (rate limit, bad JSON), not the card. rv.payload already passed
+        // validatePublish (the revised one if the failure came on the re-score), so it publishes like a
+        // cutoff card, with the AI-generated label. Leaving it 'new' only re-spent Groq calls every hour.
+        payload = rv.payload;
+        stats.report_unscored++;
+        deps.log(`report_card_unscored, publishing unscored (${rv.error ?? 'no score'}): ${it.title}`);
+      } else if (rv.verdict !== 'publish') {
         if (rv.verdict === 'duplicate') stats.report_duplicate++;
         stats.report_abandon++;
         const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
         stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
         await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
         return;
+      } else {
+        payload = rv.payload;
+        stats.report_pass++;
       }
-      payload = rv.payload;
-      stats.report_pass++;
     }
     const res = await deps.publisher.publishBlurb(payload);
     stats[res.status === 'published' ? 'published' : res.status]++;
