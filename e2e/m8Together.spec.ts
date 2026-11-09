@@ -50,6 +50,16 @@ test('search: suggestions when empty, company rows above the results, row opens 
   await expect(page).toHaveURL(/\/company\/ADTB$/);
 });
 
+test('About page states the For you ranker record notice', async ({ page }) => {
+  await page.goto('/about');
+  const notice = page.getByText(
+    'To ensure the quality of recommended posts, we keep a short record of which cards were shown to you in each batch, for 21 days, linked only to your account. Deleting your data removes it.',
+    { exact: true },
+  );
+  await expect(notice.first()).toBeVisible({ timeout: 30_000 });
+  expect(await notice.count()).toBe(2);
+});
+
 test('feed: seen cards stay put while reading, can be revisited, and drop out of the next visit', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => current(page), { timeout: 60_000 }).toMatch(/\[SAMPLE\]/);

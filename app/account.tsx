@@ -298,6 +298,9 @@ export default function AccountScreen() {
                 We keep your topics and what you liked, viewed or opened, only to tailor your feed. Deleting it keeps your login; to remove that too,
                 delete your account.
               </Text>
+              <Text style={[styles.help, { color: p.muted }]}>
+                To ensure the quality of recommended posts, we keep a short record of which cards were shown to you in each batch, for 21 days, linked only to your account. Deleting your data removes it.
+              </Text>
               <Text style={[styles.help, { color: p.ink }]}>Delete your topics and history? This can’t be undone.</Text>
               <PrimaryButton danger
                 label="Yes, delete my data"
