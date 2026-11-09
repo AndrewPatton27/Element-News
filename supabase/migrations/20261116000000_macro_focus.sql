@@ -43,6 +43,8 @@
 --      device-local today, for guests and signed-in readers alike), newest first, bounded. The app merges them
 --      into its list (lib/feed/followedMicro.ts); server keyset paging is not touched.
 --   G  api.macro_share(): service role. Macro/finance and micro share of the guest Trending / Latest top 10 / 50.
+--      Macro/finance includes Federal Reserve cards and economic Federal Register cards (Drew decision 5; measuring
+--      only, ranking weights unchanged): core.is_macro_card, core.fedreg_economic.
 --
 -- Idempotent (a re-run resets the three weights in A). Check: supabase/tests/macro_focus_check.sql.
 -- =============================================================================
@@ -841,10 +843,48 @@ grant execute on function api.followed_micro(text[], int) to anon, authenticated
 
 -- =============================================================================
 -- G. api.macro_share(): what guests see at the top of Trending and Latest (service role only)
---    macro/finance = a data card, or a card in one of p_macro_categories (default: economy, money, business,
---    earnings, deals, energy, insider trades). micro = a card in a micro_category topic (cap or gate).
+--    macro/finance (core.is_macro_card, Drew decision 5) = a data card, a card in one of p_macro_categories
+--    (default: economy, money, business, earnings, deals, energy, insider trades), a Federal Reserve card (any
+--    source named "Federal Reserve ..."), or an ECONOMIC Federal Register card (core.fedreg_economic).
+--    micro = a card in a micro_category topic (cap or gate). Measuring only: ranking does not use these.
 --    Also: published cards of gated topics in the last 14 days, material vs left out.
 -- =============================================================================
+
+-- A Federal Register card is economic when its issuing agency (the attribution after "Federal Register ...,")
+-- is an economic agency, or its HEADLINE has an economic word (whole words; the body is not read: an FCC robocall
+-- rule that mentions banks in passing is not economic). Checked on real snapshot cards in macro_focus_check.sql.
+create or replace function core.fedreg_economic(p_headline text, p_attribution text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_attribution, '') ~* ('\m(Treasury|Internal Revenue Service|Securities and Exchange Commission|Commodity Futures Trading Commission|'
+              || 'Federal Deposit Insurance Corporation|Comptroller of the Currency|Federal Energy Regulatory Commission|Commerce Department|'
+              || 'Department of Commerce|International Trade Administration|International Trade Commission|Labor Department|Department of Labor|'
+              || 'Bureau of Labor Statistics|Bureau of Economic Analysis|Consumer Financial Protection Bureau|Federal Reserve System|'
+              || 'Federal Housing Finance Agency|Trade Representative|Small Business Administration|National Credit Union Administration|'
+              || 'Census Bureau|Fiscal Service)\M')
+      or coalesce(p_headline, '') ~* ('\m(rates?|interest|tariffs?|inflation|banks?|banking|securities|tax|taxes|trade|trading|prices?|'
+              || 'wages?|employment|jobs|mortgages?|credit|loans?|lending|exports?|stablecoins?|currency|dollar|debt|budget|'
+              || 'subsid(y|ies)|payments?|investors?|stocks?|bonds?)\M');
+$$;
+revoke all on function core.fedreg_economic(text, text) from public, anon, authenticated;
+
+-- One card (core.cards_json shape) counts as macro/finance for the share metric.
+create or replace function core.is_macro_card(p jsonb, p_macro_categories text[])
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p ->> 'kind' = 'data'
+      or p ->> 'category' = any (p_macro_categories)
+      or exists (select 1 from jsonb_array_elements(coalesce(p -> 'sources', '[]')) s where s ->> 'name' ~ '^Federal Reserve')
+      or (exists (select 1 from jsonb_array_elements(coalesce(p -> 'sources', '[]')) s where s ->> 'name' = 'Federal Register')
+          and core.fedreg_economic(p ->> 'headline', p ->> 'attribution'));
+$$;
+revoke all on function core.is_macro_card(jsonb, text[]) from public, anon, authenticated;
 
 create or replace function api.macro_share(
   p_macro_categories text[] default array['economy', 'personal-finance', 'markets', 'earnings', 'deals', 'energy', 'insider']
@@ -876,9 +916,9 @@ begin
       v_stats := v_stats || jsonb_build_object('top' || v_top, (
         select jsonb_build_object(
                  'n', count(*),
-                 'macro', count(*) filter (where x.c ->> 'kind' = 'data' or x.c ->> 'category' = any (p_macro_categories)),
+                 'macro', count(*) filter (where core.is_macro_card(x.c, p_macro_categories)),
                  'micro', count(*) filter (where x.c ->> 'category' = any (v_mcats)),
-                 'macro_share', round(count(*) filter (where x.c ->> 'kind' = 'data' or x.c ->> 'category' = any (p_macro_categories))::numeric
+                 'macro_share', round(count(*) filter (where core.is_macro_card(x.c, p_macro_categories))::numeric
                                       / nullif(count(*), 0), 3),
                  'micro_share', round(count(*) filter (where x.c ->> 'category' = any (v_mcats))::numeric / nullif(count(*), 0), 3))
           from jsonb_array_elements(v_all) with ordinality as x(c, o)
@@ -891,7 +931,8 @@ begin
                     and b.category in (select substr(key, 16) from core.rank_params where starts_with(key, 'micro_category:') and value = 2));
   return v_out || jsonb_build_object(
     'gated_14d', jsonb_build_object('cards', cardinality(v_ids), 'left_out', cardinality(core.micro_gated_ids(v_ids))),
-    'macro_categories', to_jsonb(p_macro_categories), 'micro_categories', to_jsonb(v_mcats),
+    'macro_categories', to_jsonb(p_macro_categories), 'macro_also', 'Federal Reserve cards; economic Federal Register cards',
+    'micro_categories', to_jsonb(v_mcats),
     'targets', jsonb_build_object('top10', 0.8, 'top50', 0.85), 'at', now());
 end;
 $$;

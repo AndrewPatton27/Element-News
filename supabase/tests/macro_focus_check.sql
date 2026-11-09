@@ -393,6 +393,35 @@ begin
     raise exception 'FAIL: overwrite touched an ingest verdict';
   end if;
 
+  -- ---- 14. macro/finance definition for the share metric (Drew decision 5; real Federal Register cards from the
+  --          2026-11-09 prod snapshot) -------------------------------------------------------------------------
+  foreach got in array array[
+      'OCC issues rules for payment stablecoins|Source: Federal Register (National Archives), Comptroller of the Currency',
+      'IRS finalises rules for paying taxes by card|Source: Federal Register (National Archives), Internal Revenue Service',
+      'Commerce sets new tariff rates on steel imports|Source: Federal Register (National Archives), International Trade Administration',
+      'SEC adopts rule on short sale reporting|Source: Federal Register (National Archives), Securities and Exchange Commission',
+      'Agency updates mortgage disclosure rules|Source: Federal Register (National Archives), Housing and Urban Development Department'] loop
+    if not core.fedreg_economic(split_part(got, '|', 1), split_part(got, '|', 2)) then raise exception 'FAIL: not economic: %', got; end if;
+  end loop;
+  foreach got in array array[
+      'Boeing 757 video monitors get new safety rules|Source: Federal Register (National Archives), Federal Aviation Administration',
+      'FAA orders fixes for Airbus A330-941 flight computers|Source: Federal Register (National Archives), Federal Aviation Administration',
+      'Fcc updates rules for stopping unwanted robocalls|Source: Federal Register (National Archives), Federal Communications Commission',
+      'Transportation department delays airline rule to February|Source: Federal Register (National Archives), Transportation Department',
+      'FAA updates eastern air navigation route|Source: Federal Register (National Archives), Federal Aviation Administration',
+      'Accelerated review for separated parts|Source: Federal Register (National Archives), Food and Drug Administration'] loop
+    if core.fedreg_economic(split_part(got, '|', 1), split_part(got, '|', 2)) then raise exception 'FAIL: economic: %', got; end if;
+  end loop;
+  -- whole card JSON: Fed always counts, Federal Register only when economic, the FCC body mentioning banks does not
+  if not core.is_macro_card('{"kind":"summary","category":"policy","headline":"Fed raises federal funds rate target range","sources":[{"name":"Federal Reserve Board"}]}', array['economy'])
+     or not core.is_macro_card('{"kind":"summary","category":"policy","headline":"Federal Reserve releases September FOMC meeting minutes","sources":[{"name":"Federal Reserve Board"}]}', array['economy'])
+     or not core.is_macro_card('{"kind":"summary","category":"policy","headline":"OCC issues rules for payment stablecoins","attribution":"Source: Federal Register (National Archives), Comptroller of the Currency","sources":[{"name":"Federal Register"}]}', array['economy'])
+     or core.is_macro_card('{"kind":"summary","category":"policy","headline":"Fcc updates rules for stopping unwanted robocalls","body":"Banks also get new ways to warn customers.","attribution":"Source: Federal Register (National Archives), Federal Communications Commission","sources":[{"name":"Federal Register"}]}', array['economy'])
+     or core.is_macro_card('{"kind":"summary","category":"policy","headline":"Interest rates explained","sources":[{"name":"Wikipedia"}]}', array['economy'])
+     or not core.is_macro_card('{"kind":"data","category":"policy","headline":"x","sources":[]}', array['economy']) then
+    raise exception 'FAIL: core.is_macro_card';
+  end if;
+
   raise exception 'ALL MACRO_FOCUS CHECKS PASSED (test data rolled back on purpose)';
 end;
 $$;
