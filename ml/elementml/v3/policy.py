@@ -59,6 +59,8 @@ class V3Config:
     tau: float = 0.5                 # reward noise sd for the draws
     base: str = "formula"            # "formula" (full v4 score) | "base_follow" (rank_score + follow only)
     step_extra: float = 0.0          # extra hours per better same-topic card ahead (diversity guard)
+    step_extra_cold: float = 1.0     # 1: the extra step also applies with no evidence; 0: only with evidence
+                                     # (the SQL port uses 0, so a cold reader gets exactly the v5 order)
     window_days: float = 30.0
     half_life_days: float = 14.0
 
@@ -161,8 +163,12 @@ class ResidualPolicy(Policy):
         seed = int(round(now * 1000)) % 2147483647
         return np.array([residual_hours(self.feats[r], b, n, self.cfg, state.uid, seed) for r in rows])
 
+    def has_evidence(self, state, now: float) -> bool:
+        """True when at least one viewed card with features is in the window (b_j can be nonzero)."""
+        return any(a.viewed and self.feats_of.get(cid) for cid, a in self.aggs(state, now).items())
+
     def rank(self, state, rows, now, crowd):
-        if self.cfg.step_extra == 0:
+        if self.cfg.step_extra == 0 or (not self.cfg.step_extra_cold and not self.has_evidence(state, now)):
             return self.inner.rank(state, rows, now, crowd, extra=lambda rr: self.hours(state, rr, now))
         old = C.SQL["category_step"]                     # same rank() with a bigger same-topic step
         C.SQL["category_step"] = old + self.cfg.step_extra
