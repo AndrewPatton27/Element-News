@@ -63,6 +63,10 @@ begin
   if got is distinct from 'v3_cap_hours=30,v3_holdout_pct=10,v3_hours_per_reward=36,v3_k0=3,v3_lambda=2,v3_step_extra=2.5,v3_w_source=0.5,v3_w_tag=1,v3_w_topic=1,v3_w_type=0.5' then
     raise exception 'FAIL: v3 rank_params are %', got;
   end if;
+  -- Drew's decision (20261117000000_v3_extra_cold.sql): the extra topic step also for cold readers
+  if (select value from core.rank_params where key = 'v3_step_extra_cold') is distinct from 1 then
+    raise exception 'FAIL: v3_step_extra_cold is %, expected 1', (select value from core.rank_params where key = 'v3_step_extra_cold');
+  end if;
   ok := false; begin update core.rank_params set value = 0 where key = 'v3_half_life_days'; exception when check_violation then ok := true; end;
   if not ok then raise exception 'FAIL: v3_half_life_days accepted 0'; end if;
   ok := false; begin update core.rank_params set value = -1 where key = 'v3_lambda'; exception when check_violation then ok := true; end;
@@ -116,12 +120,35 @@ begin
   update core.rank_params set value = 0 where key = 'v3_holdout_pct';         -- nobody in the holdout until section 9
   c0 := '1e12|ffffffff-ffff-ffff-ffff-ffffffffffff||' || to_char(asof at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '||';
 
-  -- ---- 3. cold start in mode 3: no weights, and exactly the v5 order over a whole scroll -------------------------
+  -- ---- 3. cold start in mode 3: no weights and no v3 hours. With v3_step_extra_cold = 1 (shipped) the extra
+  --         topic step applies: every score is the v5 score minus 2.5 h per better same-topic card ahead, and a
+  --         whole scroll still has all 36 cards once. With v3_step_extra_cold = 0: exactly the v5 order. ---------
   if exists (select 1 from core.v3_reader_weights(ua, asof)) then raise exception 'FAIL: cold reader has weights'; end if;
   if exists (select 1 from core.v3_scores(ua, asof, g) where o_v3 <> 0) then raise exception 'FAIL: cold reader has v3 hours'; end if;
   select jsonb_agg(jsonb_build_array(o_id, o_ps) order by o_ps desc, o_id desc) into cold from core.v3_scores(ua, asof, g);
   if coalesce(jsonb_array_length(cold), 0) <> 36 then raise exception 'FAIL: cold-start scores for % cards', jsonb_array_length(cold); end if;
+  if exists (select 1 from (
+        select o_ps, o_s0, row_number() over (partition by o_category order by o_s0 + o_v3 desc, o_id desc) - 1 as d
+          from core.v3_scores(ua, asof, g)) x
+      where x.d > 0 and x.o_ps > x.o_s0 - x.d * 2.5 + 1e-6) then
+    raise exception 'FAIL: cold reader does not get the extra topic step (v3_step_extra_cold = 1)';
+  end if;
   update core.rank_params set value = 3 where key = 'foryou_ml_mode';
+  perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
+  seen := '{}'; cur := null; n := 0;
+  loop
+    perform set_config('role', 'authenticated', true);
+    r := api.feed_for_you(cur, 10);
+    perform set_config('role', 'none', true);
+    seen := seen || array(select x ->> 'id' from jsonb_array_elements(r -> 'items') x);
+    cur := r ->> 'next_cursor'; n := n + 1;
+    exit when cur is null or n > 10;
+  end loop;
+  if cardinality(seen) <> 36 or (select count(distinct s) from unnest(seen) s) <> 36 then
+    raise exception 'FAIL: cold reader scroll with the extra step: % cards', cardinality(seen);
+  end if;
+  delete from core.ml_pages where user_id = ua;
+  update core.rank_params set value = 0 where key = 'v3_step_extra_cold';      -- the switch: exactly v5 again
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
   seen := '{}'; seen5 := '{}'; cur := null; cur2 := null; n := 0;        -- a new scroll (an old cursor stays on v5)
   loop
@@ -141,6 +168,7 @@ begin
   if (select ranker || '/' || ml_mode from core.ml_pages where user_id = ua order by shown_at, page_no limit 1) <> 'fy-v3/3' then
     raise exception 'FAIL: mode 3 page not logged as fy-v3';
   end if;
+  update core.rank_params set value = 1 where key = 'v3_step_extra_cold';      -- back to the shipped value
 
   -- reader A: follows tech, likes two tech cards, quick-skips a world card, dislikes a deals card
   insert into core.user_prefs (user_id, followed_categories) values (ua, '{tech}');

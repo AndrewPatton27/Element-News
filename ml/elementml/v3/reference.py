@@ -14,11 +14,14 @@ from ..bandit.params import params as v2_params
 from ..bandit.policy import Event, aggregate
 from .policy import V3Config, reader_weights, residual_hours
 
-# core.rank_params defaults written by the migration (a test compares them with the SQL)
+# core.rank_params values after every migration (a test compares them with the SQL). The ranking v3
+# migration writes v3_step_extra_cold = 0; 20261117000000_v3_extra_cold.sql sets it to 1 (Drew's decision:
+# the extra topic step also for cold readers, as in Python's V3Config).
+LATER_MIGRATION_VALUES = {"v3_step_extra_cold": 1.0}
 SQL_DEFAULTS = {
     "v3_hours_per_reward": 36.0, "v3_cap_hours": 30.0, "v3_lambda": 2.0, "v3_k0": 3.0,
     "v3_w_topic": 1.0, "v3_w_type": 0.5, "v3_w_source": 0.5, "v3_w_tag": 1.0, "v3_neg_mult": 1.0,
-    "v3_step_extra": 2.5, "v3_step_extra_cold": 0.0, "v3_window_days": 30.0, "v3_half_life_days": 14.0,
+    "v3_step_extra": 2.5, "v3_step_extra_cold": 1.0, "v3_window_days": 30.0, "v3_half_life_days": 14.0,
     "v3_max_evidence_cards": 500.0, "v3_max_candidates": 3000.0, "v3_holdout_pct": 10.0,
     "v3_kill_ratio": 1.2, "v3_kill_min_cards": 500.0,
 }
