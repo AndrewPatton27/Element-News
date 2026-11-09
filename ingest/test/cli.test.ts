@@ -39,12 +39,12 @@ test('dry run end to end: 5 template cards (1 Fed, 2 BEA, 2 USGS), Federal Regis
   assert.equal(stats.published, 5);
   assert.equal(stats.template, 5);
   assert.equal(dry.cards.filter((c) => c.sources[0].name === 'Federal Register').length, 0, 'no template Federal Register cards');
-  assert.equal(lines.filter((l) => l.startsWith('skip template_not_allowed')).length, 15);   // 5 Federal Register, 4 Wikipedia (today only), 5 CPSC (new-only cap), 1 NASA (page 1 only)
+  assert.equal(lines.filter((l) => l.startsWith('skip template_not_allowed')).length, 17);   // 1 Fed speech, 1 SEC press release, 5 Federal Register, 4 Wikipedia (today only), 5 CPSC (new-only cap), 1 NASA (page 1 only)
   assert.equal(lines.filter((l) => l.startsWith('skip low_interest')).length, 3, 'green-alert quakes: 2 on the Mid-Atlantic Ridge, 1 small one in Panama');
   assert.ok(lines.includes('skip routine_5.02: Costco Wholesale Corp 8-K'), 'Costco bonus-criteria 5.02 is routine');
   assert.ok(lines.some((l) => /not candidates: not_watched 1/.test(l)), 'GoPro is not on the watch list');
   assert.ok(lines.some((line) => line.startsWith('sec: watch list 152 of 188 companies resolved')));
-  assert.equal(stats.macro, 1);
+  assert.equal(stats.macro, 4, "DGS10 + 2 Treasury average rates in the fixture + the debt");
   assert.equal(stats.failed, 0);
   for (const c of dry.cards) {
     assert.deepEqual(validatePublish(c).errors, [], c.headline);
@@ -57,7 +57,7 @@ test('dry run end to end: 5 template cards (1 Fed, 2 BEA, 2 USGS), Federal Regis
   ]);
   // every request went to an allowlisted government host (data.sec.gov: per-company filing lists)
   for (const u of requested) {
-    assert.match(new URL(u).hostname, /^(www\.sec\.gov|data\.sec\.gov|www\.federalreserve\.gov|api\.stlouisfed\.org|apps\.bea\.gov|www\.federalregister\.gov|en\.wikipedia\.org|www\.saferproducts\.gov|earthquake\.usgs\.gov|www\.nasa\.gov)$/, u);
+    assert.match(new URL(u).hostname, /^(www\.sec\.gov|data\.sec\.gov|www\.federalreserve\.gov|api\.stlouisfed\.org|apps\.bea\.gov|www\.federalregister\.gov|en\.wikipedia\.org|www\.saferproducts\.gov|earthquake\.usgs\.gov|www\.nasa\.gov|api\.fiscaldata\.treasury\.gov)$/, u);
   }
   assert.ok(lines.some((l) => l.includes('DGS10 5.09%')));
 });

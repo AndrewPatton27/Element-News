@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa),
+// ingest-source: ONE ingest source per call (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
