@@ -33,6 +33,10 @@ for (const r of await q(`select key, value::float8 as value from core.rank_param
 for (const [k, v] of Object.entries(fx.params || {})) {
   await q('insert into core.rank_params (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [k, v]);
 }
+// Seen-card exclusion (20261113000000) is a separate layer that the Python mirror does not model; it would
+// drop the fixture's viewed cards from the v5/v7 scrolls. Parity is about the scores and order, so it is off here
+// (its own check is supabase/tests/seen_exclusion_check.sql).
+await q(`update core.rank_params set value = 0 where key = 'seen_exclude_mode'`);
 await q('insert into auth.users (id, email) values ($1, $2)', [fx.user, 'parity@example.com']);
 await q('insert into core.user_prefs (user_id, followed_categories, hidden_categories, hidden_sources) values ($1, $2, $3, $4)',
   [fx.user, fx.prefs.followed, fx.prefs.hidden_categories, fx.prefs.hidden_sources]);

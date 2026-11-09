@@ -39,6 +39,7 @@ import { ScreenShell } from '../components/shell/ScreenShell';
 import { SearchBox } from '../components/search/SearchBox';
 import { SearchIdle } from '../components/search/SearchIdle';
 import { SearchSuggestions } from '../components/search/SearchSuggestions';
+import { CompanySearchRows } from '../components/companies/CompanySearchRows';
 import { ErrorBoundary } from '../components/shell/ErrorBoundary';
 import { useSearchSuggestions } from '../lib/search/useSearchSuggestions';
 import { SearchResults } from '../components/search/SearchResults';
@@ -202,6 +203,8 @@ function SearchScreenBody() {
     );
     body = (
       <>
+        {/* Matching companies first (nothing when none match); "Suggested for you" is idle-only. */}
+        {target.kind === 'query' ? <CompanySearchRows query={target.q} /> : null}
         <View style={styles.headRow}>
           <View style={styles.headText}>
             {target.kind === 'category' ? (

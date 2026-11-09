@@ -1,6 +1,6 @@
 // Vertical one-card-per-screen pager. FlatList with paging and snap. On web the
 // arrow keys (and only those): up and down move between cards, right likes and left dislikes like a swipe; wide web also shows a
-// "Next: press â†“ or scroll" button in the card footer.
+// "Next: press ↓ or scroll" button in the card footer.
 //
 // Navigation is deterministic (lib/feed/feedNav.ts): the card on screen is tracked by id, the
 // order of cards already rendered is frozen (refetches, reranks after a like, new pages and the
@@ -509,7 +509,7 @@ export function FeedPager({
           ListFooterComponent={
             atEnd && rows.length > 0 ? (
               <View style={styles.end}>
-                <Text style={[styles.endText, { color: p.muted }]}>Youâ€™re all caught up. Switch to Latest or another topic.</Text>
+                <Text style={[styles.endText, { color: p.muted }]}>You’re all caught up. Switch to Latest or another topic.</Text>
               </View>
             ) : undefined
           }
@@ -529,7 +529,8 @@ export function FeedPager({
           </Pressable>
         </View>
       ) : null}
-      {reshownIds && items[index] && reshownIds.has(items[index].id) ? (
+      {/* By card id: `index` is the position in the nav order, which can differ from `items`. */}
+      {reshownIds && current && reshownIds.has(current.id) ? (
         <View style={styles.caughtUpDock} pointerEvents="none" accessibilityLiveRegion="polite">
           <Text style={[styles.caughtUp, { backgroundColor: p.ink, color: p.bg }]}>You’re all caught up. These are stories you’ve already seen.</Text>
         </View>
@@ -542,7 +543,8 @@ export function FeedPager({
         wide={wide}
         onUndo={undoSwipe}
         onDone={clearUndo}
-      />    </View>
+      />
+    </View>
   );
 }
 
