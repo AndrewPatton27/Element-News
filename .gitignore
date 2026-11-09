@@ -44,3 +44,12 @@ expo-env.d.ts
 .pgtmp/
 test-results/
 playwright-report/
+
+# Local-only: agent notes, slideshows, data dumps, scheduled-task helpers (Drew, 2026-11-09: never push)
+AGENTS.md
+.codex/
+PAUSE-NOTES.md
+*.pptx
+*.potx
+/*.csv
+ingest/run-*.cmd
