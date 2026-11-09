@@ -75,6 +75,7 @@ Custom secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets s
 | `SEC_USER_AGENT` | `ingest-source` sec and wiki (`"Element <contact email>"`) | those sources fail with a clear error |
 | `CRON_SECRET` | the watchdog Worker (re-triggers `ingest-source`) | the Worker's re-trigger gets HTTP 401 |
 | `REPORT_CARD_PROTOCOL` | `ingest-source`, optional | `1` = Groq scores each AI card before publishing (as in `ingest/run-ingest.cmd`) |
+| `CRON_SECRET` | both (caller check) | optional, 32+ random characters; the Vault `element_service_key` may hold it instead of the service key. Then deploy with `--no-verify-jwt` (it is not a JWT) |
 | `RESEND_API_KEY`, `EMAIL_FROM`, `MAIL_POSTAL_LINE` | later (brief email), not used yet | |
 
 ```

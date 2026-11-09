@@ -2,6 +2,7 @@
 CLAUDE.md
 context/
 docs/
+tests/
 
 # Secrets
 .env
