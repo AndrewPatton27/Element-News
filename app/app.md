@@ -33,6 +33,14 @@ npx expo export -p web      # same as: npm run export:web
 Output goes to `dist/` as a single-page app (`web.output: "single"` in `app.json`). The host must serve `index.html` for unknown paths so `/numbers` and `/about` work on reload; Cloudflare Pages does this by default when there is no `404.html`.
 
 
+## Browser smoke test
+
+```bash
+npm run test:e2e     # needs Chrome (PW_CHANNEL=chrome) or `npx playwright install chromium`
+```
+
+See `e2e/e2e.md`.
+
 ## Feed screen notes (`index.tsx`)
 
 - The same `visible` filter (hidden topics and sources) drives the list on screen and `useFeed` paging, so "load more" and "all caught up" follow what the reader can see.
