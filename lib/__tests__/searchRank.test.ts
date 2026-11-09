@@ -22,7 +22,8 @@ const cards = [
   mk('chile', 'Earthquake shakes northern Chile', 'Damage was light.', 1.5),
   mk('infl', 'Inflation cools in September', 'Consumer costs rose more slowly.', 2.5),
 ];
-const ids = (q: string) => rankSearch(cards, q, trend).map((c) => c.id);
+// The clock is frozen at hour 0 so these small Trending hours read as fresh (v5 prior).
+const ids = (q: string) => rankSearch(cards, q, trend, { nowHours: 0 }).map((c) => c.id);
 
 test('searchTerms: lowercase, no punctuation, no stopwords, no repeats, at most 6', () => {
   assert.deepEqual(searchTerms('  The FED, rate!! '), ['fed', 'rate']);
@@ -104,12 +105,12 @@ test('v4: a headline or summary match outranks a detail-only match; Trending bre
   const weak = mk('v4weak', 'Bridge reopens after repairs', 'Traffic moves.', B + 100,
     { sources: [{ ...card().sources[0], name: 'Inflation Monitor' }] });
   const pool = [pep, fed, cpi, weak];
-  const order = (q: string) => rankSearch(pool, q, trend).map((c) => c.id);
+  const order = (q: string) => rankSearch(pool, q, trend, { nowHours: B }).map((c) => c.id);
   assert.deepEqual(order('inflation'), ['v4cpi', 'v4fed', 'v4pep'], 'visible first (Trending among them), detail-only last, source-only dropped');
   assert.deepEqual(order('inflaton'), ['v4cpi', 'v4fed', 'v4pep'], 'typo still matches, detail-only typo still passes the gate');
   assert.ok(order('cpi').includes('v4cpi'), 'synonym still works');
-  assert.deepEqual(termScores('inflation', pep), { gate: 1, rank: 0.2 });
-  assert.deepEqual(termScores('inflation', cpi), { gate: 1, rank: 1 });
+  assert.deepEqual(termScores('inflation', pep), { gate: 1, rank: 0.2, visible: false });
+  assert.deepEqual(termScores('inflation', cpi), { gate: 1, rank: 1, visible: true });
   hours.set('v4fed', B + 3);
   assert.deepEqual(order('inflation'), ['v4fed', 'v4cpi', 'v4pep'], 'equal visible matches follow Trending');
 });
