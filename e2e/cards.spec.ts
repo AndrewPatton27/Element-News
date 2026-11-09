@@ -70,7 +70,7 @@ async function measure(page: Page): Promise<BarCheck | null> {
       pick('[aria-label^="Follow"], [aria-label^="Following this story"]'),
       pick('[aria-label="Share"]'),
     ].filter(Boolean) as HTMLElement[];
-    const strip = Array.from(document.querySelectorAll('[role="note"]')).find((el) => (el.textContent ?? '').includes(notice)) as HTMLElement | undefined;
+    const strip = Array.from(document.querySelectorAll('[role="note"]')).find((el) => (el.textContent ?? '').replace(/\u00A0/g, ' ').includes(notice)) as HTMLElement | undefined;
     const text = strip?.querySelector('div, span') as HTMLElement | null;
     const sr = strip?.getBoundingClientRect();
     const lineHeight = text ? parseFloat(getComputedStyle(text).lineHeight) || 16 : 16;
@@ -84,7 +84,7 @@ async function measure(page: Page): Promise<BarCheck | null> {
       headline: (h as HTMLElement).innerText,
       rows: boxes.map((r) => Math.round(r.top + r.height / 2)),
       sizes: items.map((el, i) => ({ w: boxes[i].width, h: boxes[i].height, label: el.getAttribute('aria-label') ?? '' })),
-      notice: strip?.textContent ?? '',
+      notice: (strip?.textContent ?? '').replace(/\u00A0/g, ' '),
       noticeTop: sr ? sr.top : -1,
       noticeBottom: sr ? sr.bottom : -1,
       noticeLines: text ? Math.round(text.getBoundingClientRect().height / lineHeight) : 0,
@@ -139,6 +139,7 @@ const SCREENS = [
 for (const size of [SIZES[0], SIZES[1], SIZES[3]]) {
   test(`feed-style screens show the notice strip at ${size.name}`, async ({ browser }, info) => {
     test.skip(info.project.name !== 'desktop', 'opens its own contexts; once is enough');
+    test.setTimeout(300_000); // three full page loads on the dev server
     const page = await open(browser, size);
     for (const screen of SCREENS) {
       await page.goto(screen.path);
@@ -148,14 +149,14 @@ for (const size of [SIZES[0], SIZES[1], SIZES[3]]) {
         await box.press('Enter');
         await expect(page.locator('[aria-label^="Sources:"]').first()).toBeVisible({ timeout: 20_000 });
       }
-      const strip = page.locator('[role="note"]').filter({ hasText: NOTICE });
+      const strip = page.locator('[role="note"]').filter({ hasText: 'AI-generated summaries may contain errors' });
       await expect(strip).toBeVisible({ timeout: 20_000 });
       await page.waitForTimeout(600);
       const r = await strip.boundingBox();
       expect(r!.y + r!.height, `${screen.name}: strip on screen`).toBeLessThanOrEqual(size.height);
       await page.screenshot({ path: `${SHOTS}/${size.name}-${screen.name}.png` });
       // tiles carry no copy of the notice: the only match on the page is the strip itself
-      expect(await page.getByText(/Not investment advice/).count(), `${screen.name}: notice once`).toBe(1);
+      expect(await page.getByText(/Not\s+investment\s+advice/).count(), `${screen.name}: notice once`).toBe(1);
     }
     await page.context().close();
   });

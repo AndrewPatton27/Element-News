@@ -8,7 +8,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BlurbCard } from '../../contract/types.ts';
-import { cardBarMeta } from '../../lib/shared/cardBody';
+import { WIDE_DOC_LABEL_MAX_NAME, cardBarMeta } from '../../lib/shared/cardBody';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { tip } from '../../lib/theme/tooltip';
@@ -24,13 +24,13 @@ interface SourceProps {
   link?: boolean; // onPress opens the original page (no sources sheet on that screen)
 }
 
-// "🔗 NASA · 1 d" on phones, "🔗 NASA · News release · 1 d ago" on wide web.
+// "🔗 Fed · 1 d" on phones (usual short agency names), "🔗 Fed · H.15 release · 1 d ago" on wide web.
 export function BarSource({ card, onPress, timeLabel, size = 'phone', link }: SourceProps) {
   const p = usePalette();
   const m = cardBarMeta(card, { timeLabel });
   if (!m) return null;
   const wide = size === 'wide';
-  const name = wide && m.docLabel ? `${m.name} · ${m.docLabel}` : m.name;
+  const name = wide && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? `${m.shortName} · ${m.docLabel}` : m.shortName;
   const time = wide ? m.time : m.timeShort;
   return (
     <Pressable

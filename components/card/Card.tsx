@@ -86,7 +86,8 @@ function metaLine(card: BlurbCard, categories: Category[]): string {
 
 // Type sizes for the takeaways: larger on tall cards so a short body does not leave
 // a gap, smaller on short phones so it still fits. Measured card height in px.
-function bodyType(wide: boolean, compact: boolean, h: number): { size: number; lead: number } {
+function bodyType(wide: boolean, compact: boolean, h: number, roomyTall: boolean): { size: number; lead: number } {
+  if (roomyTall) return { size: 23, lead: 35 };
   if (wide) return h > 0 && h < 660 ? { size: 18, lead: 27 } : { size: 21, lead: 32 };
   if (compact) return { size: 16, lead: 23 };
   return h > 620 ? { size: 18, lead: 28 } : { size: 17, lead: 25 };
@@ -127,22 +128,35 @@ export function Card(props: Props) {
   // the labels and the bottom bar still fit without scrolling.
   const [box, setBox] = useState({ w: 0, h: 0 });
   const tight = !!wide && box.h > 0 && box.h < 660;
+  // Tablets in the phone layout (a card over 600 px wide and 900 px tall): newspaper-size
+  // type and roomier gaps, so the centred content fills the card instead of floating in it.
+  const tablet = !wide && !compact && box.w >= 600 && box.h >= 700;
   const wideSize = tight ? 40 : box.w > 0 && box.w < 600 ? 38 : card.headline.length > 80 ? 42 : 48;
   // Feed-Data / Feed-LinkOut drafts: data and link-out cards get 24 px padding and a
   // 32 px headline on phones. Two-number data cards have a tall panel and the FRED
   // notice to show, so on phones they use the summary-card sizes and the panel tightens.
   const denseData = !wide && card.kind === 'data' && card.macro.length > 1;
   const roomy = !wide && !compact && card.kind !== 'summary' && !denseData;
-  const phoneSize = compact || denseData ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
+  const phoneSize = tablet ? (card.headline.length > 80 ? 44 : 50) : compact || denseData ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
   const headlineSize = wide ? wideSize : phoneSize;
   const headlineTrack = wide ? 0.025 : roomy ? 0.015 : 0.02;
   const headlineLead = wide ? 1.07 : linkOut ? 1.12 : 1.1;
   // Bar and type sizes. Narrow phones (under 360 px of card) get the small bar.
   const barSize: BarSize = wide ? 'wide' : compact || (box.w > 0 && box.w < 350) ? 'small' : 'phone';
-  const type = bodyType(!!wide, !!compact, box.h);
+  const type = bodyType(!!wide, !!compact, box.h, tablet);
   // How many bullets fit: data cards share the space with the numbers panel.
-  const maxPoints = wide ? (card.kind === 'data' ? 3 : 4) : compact ? (card.kind === 'data' ? 1 : 3) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
-  const takeaways = cardTakeaways(card, maxPoints);
+  const maxPoints = wide ? (card.kind === 'data' ? (tight ? 1 : 3) : 4) : compact ? (card.kind === 'data' ? 1 : 2) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
+  // Bullets are whole or not shown: when the middle overflows (short screens, long
+  // headlines), drop the last bullet until it fits instead of cutting one mid-line.
+  const [fit, setFit] = useState({ key: '', points: maxPoints });
+  const fitKey = `${card.id}:${box.w}x${box.h}:${maxPoints}`;
+  const points = fit.key === fitKey ? fit.points : maxPoints;
+  const view = useRef({ h: 0, content: 0 });
+  const checkFit = () => {
+    const { h, content } = view.current;
+    if (h > 0 && content > h + 1 && points > 1) setFit({ key: fitKey, points: points - 1 });
+  };
+  const takeaways = cardTakeaways(card, points);
   const showTakeaways = takeaways.kind !== 'none' && !(denseData && compact);
 
   // Share: system sheet or copy-link, with a short toast.
@@ -178,7 +192,7 @@ export function Card(props: Props) {
       numberOfLines={linkOut ? 6 : compact || denseData ? 3 : 4}
       style={[
         styles.headline,
-        { color: p.ink, fontSize: headlineSize, lineHeight: headlineSize * headlineLead, letterSpacing: -headlineSize * headlineTrack, maxWidth: wide ? 820 : undefined },
+        { color: p.ink, fontSize: headlineSize, lineHeight: headlineSize * headlineLead, letterSpacing: -headlineSize * headlineTrack, maxWidth: wide || tablet ? 820 : undefined },
       ]}
       accessibilityRole="header"
     >
@@ -289,6 +303,8 @@ export function Card(props: Props) {
               style={styles.middleScroll}
               contentContainerStyle={styles.middleContent}
               scrollEnabled={!!compact}
+              onLayout={(e) => { view.current.h = e.nativeEvent.layout.height; checkFit(); }}
+              onContentSizeChange={(_, h) => { view.current.content = h; checkFit(); }}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
@@ -304,14 +320,14 @@ export function Card(props: Props) {
                   accessibilityLabel={opensDetail ? `${card.headline}. ${OPEN_DETAIL_HINT}` : a11yActions.length > 0 ? card.headline : undefined}
                   accessibilityActions={a11yActions.length > 0 ? a11yActions : undefined}
                   onAccessibilityAction={a11yActions.length > 0 ? onA11yAction : undefined}
-                  style={[styles.middlePressable, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }, roomy && { gap: 18 }]}
+                  style={[styles.middlePressable, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }, roomy && { gap: 18 }, tablet && { gap: 30 }]}
                 >
                   {headline}
 
                   {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} /> : null}
 
                   {showTakeaways ? (
-                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={maxPoints} maxWidth={wide ? 720 : undefined} />
+                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} maxWidth={wide || tablet ? 720 : undefined} />
                   ) : null}
 
                   {validTickers.length > 0 ? (

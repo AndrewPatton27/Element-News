@@ -5,7 +5,7 @@
 // two short lines on phones. Shell renders it when a screen passes `notice`.
 
 import { StyleSheet, Text, View } from 'react-native';
-import { feedNoticeText } from '../../lib/shared/labels';
+import { FEED_AI_NOTICE, feedNoticeText } from '../../lib/shared/labels';
 import { useAppData } from '../../lib/shared/appData';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
@@ -17,6 +17,11 @@ export const FEED_NOTICE_MAX_HEIGHT = 40;
 export function FeedNotice({ wide, insetLeft = 0 }: { wide: boolean; insetLeft?: number }) {
   const p = usePalette();
   const { config } = useAppData();
+  const text = feedNoticeText(config);
+  // phones: no-break spaces inside the disclaimer, so a two-line strip breaks after the
+  // AI notice and never splits "Not investment advice"
+  const cut = FEED_AI_NOTICE.length + 3;
+  const shown = wide ? text : text.slice(0, cut) + text.slice(cut).replace(/ /g, '\u00A0');
   return (
     <View
       role="note"
@@ -24,7 +29,7 @@ export function FeedNotice({ wide, insetLeft = 0 }: { wide: boolean; insetLeft?:
       style={[styles.strip, wide ? styles.wide : styles.narrow, !wide && insetLeft > 0 && { paddingHorizontal: insetLeft }]}
     >
       <Text numberOfLines={wide ? 1 : 2} style={[styles.text, wide && styles.textWide, { color: p.muted }]}>
-        {feedNoticeText(config)}
+        {shown}
       </Text>
     </View>
   );

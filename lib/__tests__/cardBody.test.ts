@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TAKEAWAYS_MAX, cardBarMeta, cardTakeaways, shortTime } from '../shared/cardBody.ts';
+import { TAKEAWAYS_MAX, cardBarMeta, cardTakeaways, shortSourceName, shortTime } from '../shared/cardBody.ts';
 import { NOW, card, dataCard } from './helpers.ts';
 
 const points = (n: number) => Array.from({ length: n }, (_, i) => `Point ${i + 1}.`);
@@ -61,6 +61,16 @@ test('bottom bar on the Latest tab says when we added the card', () => {
 test('bottom bar: data cards use their publish time; no sources means no bar', () => {
   assert.ok(cardBarMeta(dataCard(), { now: NOW }));
   assert.equal(cardBarMeta(card({ sources: [] }), { now: NOW }), null);
+});
+
+test('bars use the usual short name of well-known agencies only', () => {
+  assert.equal(shortSourceName('Federal Reserve Board'), 'Fed');
+  assert.equal(shortSourceName('U.S. Bureau of Labor Statistics'), 'BLS');
+  assert.equal(shortSourceName('SEC'), 'SEC');
+  assert.equal(shortSourceName('Northwind Daily'), 'Northwind Daily');
+  const m = cardBarMeta(card({ sources: [{ ...card().sources[0], name: 'U.S. Geological Survey' }] }), { now: NOW });
+  assert.equal(m?.shortName, 'USGS');
+  assert.match(m?.a11y ?? '', /U\.S\. Geological Survey/);
 });
 
 test('short time drops "ago" only', () => {
