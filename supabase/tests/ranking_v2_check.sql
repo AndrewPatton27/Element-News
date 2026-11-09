@@ -293,25 +293,68 @@ begin
   if (select user_id from core.ml_pages where page_id = (r ->> 'page_id')::uuid) <> ub then raise exception 'FAIL: B page logged for another reader'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
 
-  -- ---- 8. kill switch mid-scroll: a v6 cursor after the mode drops is served by v5 --------------------------------
-  update core.rank_params set value = 1 where key = 'foryou_ml_mode';
-  perform set_config('role', 'authenticated', true);
-  r := api.feed_for_you(cur, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(cur, 10);
-  if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: kill switch did not fall back to v5'; end if;
-  if split_part(r ->> 'next_cursor', '|', 7) <> '' or split_part(r ->> 'next_cursor', '|', 9) <> '1' then
-    raise exception 'FAIL: kill switch cursor %', r ->> 'next_cursor';
-  end if;
+  -- ---- 8. switching off mid-scroll: a v6 cursor finishes its scroll on v6 (no repeats); new scrolls get v5 ---------
+  foreach n in array array[1, 0] loop
+    update core.rank_params set value = n where key = 'foryou_ml_mode';
+    perform set_config('role', 'authenticated', true);
+    r := api.feed_for_you(cur, 10);
+    perform set_config('role', 'none', true); r2 := core.feed_for_you_v6(cur, 10, m_ok, seed);
+    if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '2'
+       or split_part(r ->> 'next_cursor', '|', 10) <> seed::text then
+      raise exception 'FAIL: mode % did not keep the v6 scroll (cursor %)', n, r ->> 'next_cursor';
+    end if;
+    perform set_config('role', 'authenticated', true);
+    r := api.feed_for_you(null, 10);
+    perform set_config('role', 'none', true);
+    if split_part(r ->> 'next_cursor', '|', 10) <> '' or split_part(r ->> 'next_cursor', '|', 9) <> n::text then
+      raise exception 'FAIL: new scroll in mode % not on v5 (%)', n, r ->> 'next_cursor';
+    end if;
+  end loop;
   update core.rank_params set value = 2 where key = 'foryou_ml_mode';
-  -- a v6 cursor whose model lost its pass also falls back
+  -- a model that lost its pass: the running scroll finishes on it, a new scroll uses the newest passed model
   update core.ml_models set gate_passed = false where model_id = m_ok;
   insert into core.ml_models (version, gate_passed) values ('test-newer', true);
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(cur, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(cur, 10);
-  if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: unpassed model kept serving'; end if;
+  perform set_config('role', 'none', true); r2 := core.feed_for_you_v6(cur, 10, m_ok, seed);
+  if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: running scroll changed model'; end if;
+  perform set_config('role', 'authenticated', true);
+  r := api.feed_for_you(null, 10);
+  perform set_config('role', 'none', true);
+  if split_part(r ->> 'next_cursor', '|', 7) <> (select model_id::text from core.ml_models where version = 'test-newer') then
+    raise exception 'FAIL: new scroll did not take the newest passed model';
+  end if;
   delete from core.ml_models where version = 'test-newer';
   update core.ml_models set gate_passed = true where model_id = m_ok;
+  -- cost guards: too many candidates, or an error inside v6, serve v5 instead of failing
+  update core.rank_params set value = 1 where key = 'v2_max_candidates';
+  perform set_config('role', 'authenticated', true);
+  r := api.feed_for_you(null, 10);
+  perform set_config('role', 'none', true);
+  if split_part(r ->> 'next_cursor', '|', 10) <> '' or jsonb_array_length(r -> 'items') <> 10 then raise exception 'FAIL: candidate guard'; end if;
+  update core.rank_params set value = 3000 where key = 'v2_max_candidates';
+  alter table core.ml_weights rename to ml_weights_gone;
+  perform set_config('role', 'authenticated', true);
+  r := api.feed_for_you(null, 10);
+  perform set_config('role', 'none', true);
+  if split_part(r ->> 'next_cursor', '|', 10) <> '' or jsonb_array_length(r -> 'items') <> 10 then raise exception 'FAIL: v6 error not caught'; end if;
+  alter table core.ml_weights_gone rename to ml_weights;
+  -- settings that must stay positive
+  ok := false; begin update core.rank_params set value = 0 where key = 'v2_lambda_default'; exception when check_violation then ok := true; end;
+  if not ok then raise exception 'FAIL: v2_lambda_default accepted 0'; end if;
+  -- precomputed features follow edits and new rules
+  if exists (select 1 from core.blurbs b left join core.card_features cf on cf.blurb_id = b.id
+              where b.id = any (cards)
+                and cf.features is distinct from core.v2_features(b.category, coalesce(b.event_type, b.kind),
+                                                  core.source_key_of(b.kind, b.id), b.headline, b.macro)) then
+    raise exception 'FAIL: card_features out of date';
+  end if;
+  update core.blurbs set headline = 'Jobless claims rise ' || 99 where id = cards[3];
+  if not coalesce((select 'g:jobs' = any (features) from core.card_features where blurb_id = cards[3]), false) then raise exception 'FAIL: feature after edit'; end if;
+  insert into core.tag_rules (match_kind, pattern, tag) values ('keyword', 'claims', 'claims-test');
+  if not coalesce((select 'g:claims-test' = any (features) from core.card_features where blurb_id = cards[3]), false) then raise exception 'FAIL: feature after new rule'; end if;
+  delete from core.tag_rules where tag = 'claims-test';
+  update core.blurbs set headline = heads[4] || ' 3' where id = cards[3];            -- back as before (cold check below)
 
   -- ---- 9. holdout: formula pages, logged as holdout ------------------------------------------------------------
   update core.rank_params set value = 100 where key = 'v2_holdout_pct';
@@ -398,6 +441,7 @@ begin
   select ua, c, 'dislike', now() - interval '110 minutes' from unnest(cards[1:3]) c;
   insert into core.user_events (user_id, blurb_id, kind, created_at) values (ub, cards[1], 'dislike', now() - interval '110 minutes');
   r := api.ml_v2_check();
+  if (r ->> 'stale')::boolean or (r ->> 'model_age_days')::numeric > 1 then raise exception 'FAIL: fresh model reported stale: %', r; end if;
   if not (r ->> 'dropped')::boolean or (select value from core.rank_params where key = 'foryou_ml_mode') <> 1
      or (r ->> 'treat_rate')::numeric <> 0.3 or (r ->> 'hold_rate')::numeric <> 0.1 then
     raise exception 'FAIL: daily check did not drop to mode 1: %', r;
