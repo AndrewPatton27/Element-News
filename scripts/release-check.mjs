@@ -15,6 +15,7 @@ const npm = win ? 'npm.cmd' : 'npm';
 export function buildSteps({ e2e = false, exists = existsSync, pythonCmd = null, env = process.env } = {}) {
   const sqlRunner = env.RELEASE_SQL_RUNNER || 'supabase/tests/run-pglite.mjs';
   const steps = [
+    { name: 'no private files tracked', cmd: process.execPath, args: ['scripts/private-files-check.mjs'] },
     { name: 'tsc app', cmd: npx, args: ['tsc', '--noEmit'] },
     { name: 'tsc ingest', cmd: npx, args: ['tsc', '--noEmit', '-p', 'ingest/tsconfig.json'] },
     { name: 'tsc functions', cmd: npx, args: ['tsc', '--noEmit', '-p', 'supabase/functions/tsconfig.json'] },
