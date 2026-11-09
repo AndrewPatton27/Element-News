@@ -43,6 +43,11 @@ export function AppDataProvider({ api, children }: { api: Api; children: ReactNo
   return <AppDataContext.Provider value={{ api, config, categories }}>{children}</AppDataContext.Provider>;
 }
 
+/** Like useAppData, but null outside the provider (for parts that can render without data). */
+export function useOptionalAppData(): AppData | null {
+  return useContext(AppDataContext);
+}
+
 export function useAppData(): AppData {
   const value = useContext(AppDataContext);
   if (!value) throw new Error('useAppData must be used inside AppDataProvider');

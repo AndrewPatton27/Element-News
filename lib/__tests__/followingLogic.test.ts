@@ -45,7 +45,9 @@ test('toggleValue adds, removes, and refuses past the cap', () => {
 test('normalizeTicker accepts 1-5 letters with an optional class and rejects the rest', () => {
   assert.equal(normalizeTicker(' aapl '), 'AAPL');
   assert.equal(normalizeTicker('ba'), 'BA');
-  assert.equal(normalizeTicker('brk.b'), 'BRK.B');
+  // SEC style (cards and the company directory use BRK-B), so a follow matches the cards
+  assert.equal(normalizeTicker('brk.b'), 'BRK-B');
+  assert.equal(normalizeTicker('BRK-B'), 'BRK-B');
   for (const bad of ['', 'toolong', 'A1', 'federal reserve', 'ab cd', '$AAPL']) assert.equal(normalizeTicker(bad), null, bad);
 });
 

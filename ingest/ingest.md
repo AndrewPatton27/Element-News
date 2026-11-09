@@ -126,7 +126,7 @@ Keys are never printed (`[set]` / `[missing]` only), never put in URLs except wh
 | `src/ranking.ts` | copy of the database importance and decay formula (tests only) |
 | `src/html.ts` | small HTML/XML helpers |
 | `src/fixtures/` | labeled sample inputs (REAL / RECONSTRUCTED / SYNTHETIC), see its `README.md` |
-| `test/*.test.ts` | `node:test` files, run offline by `npm test`: `allowlist`, `audit-fixes`, `broad-sources`, `cli`, `config`, `contract`, `dedupe`, `fedreg`, `finance-sources`, `groq`, `macro-bea`, `new-items-only`, `pacing-length`, `publish`, `ranking`, `rewrite-detail`, `sec-classify`, `sources`, `summarizer`, `trending-refresh`, `validate`, `watchlist-relevance` |
+| `test/*.test.ts` | `node:test` files, run offline by `npm test`: `allowlist`, `audit-fixes`, `companies` (company directory vs the watch list, tagging false positives shared with the SQL check, search scores, generated SQL in sync), `broad-sources`, `cli`, `config`, `contract`, `dedupe`, `fedreg`, `finance-sources`, `groq`, `macro-bea`, `new-items-only`, `pacing-length`, `publish`, `ranking`, `rewrite-detail`, `sec-classify`, `sources`, `summarizer`, `trending-refresh`, `validate`, `watchlist-relevance` |
 | `package.json`, `tsconfig.json`, `.gitignore` | scripts (`test`, `dry-run`, `ingest`, `ingest:loop`), Node 22.18+ engine, type-check config; `cache/`, `state/` and `.env` are git-ignored |
 | `README.md` | short overview and command list for this folder |
 
