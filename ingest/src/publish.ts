@@ -27,6 +27,8 @@ export interface Publisher {
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
   /** api.set_card_category (service role): re-file a published or hidden card. */
   setCardCategory?(id: string, category: string): Promise<{ status: 'updated' | 'not_found'; id: string; category: string }>;
+  /** api.set_card_material (service role): a recall's material flag, reason codes and company tickers. */
+  setCardMaterial?(id: string, m: { material: boolean; reasons: string[]; tickers: string[] }): Promise<unknown>;
 }
 
 /** Thrown when a Supabase RPC answers with a non-2xx status (message from PostgREST, no key). */
@@ -90,6 +92,7 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
       return [...new Map(rows.map((r) => [r.id, r])).values()];
     },
     setCardCategory: (id, category) => rpc('set_card_category', { p_id: id, p_category: category }),
+    setCardMaterial: (id, m) => rpc('set_card_material', { p: { id, ...m } }),
     async setStoryLink(id, related, kind) { try { await rpc('set_story_link', { p_card_id: id, p_related_id: related, p_kind: kind }); } catch { /* optional RPC */ } },
   };
 }
@@ -103,6 +106,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
   const seen = new Set<string>();
   const trending = { refreshes: 0, mlPurges: 0 };
   const categories: Array<{ id: string; category: string }> = [];
+  const materials: Array<{ id: string; material: boolean; reasons: string[]; tickers: string[] }> = [];
   const publisher: Publisher = {
     async upsertItem(item) {
       const is_new = !seen.has(item.url);
@@ -125,10 +129,11 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
       return { status: p.action === 'hide' ? 'hidden' : 'revised', id: p.id };
     },
     async setCardCategory(id, category) { categories.push({ id, category }); return { status: 'updated', id, category }; },
+    async setCardMaterial(id, m) { materials.push({ id, ...m }); return { status: 'set', id }; },
     async refreshTrending() { trending.refreshes += 1; return { generation: trending.refreshes, boosted: 0 }; },
     async mlPurge() { trending.mlPurges += 1; return { pages: 0, events: 0, runs: 0, stopped: false }; },
   };
-  return { publisher, items, cards, macro, revisions, trending, categories };
+  return { publisher, items, cards, macro, revisions, trending, categories, materials };
 }
 
 /** Row for api.upsert_item: the item's metadata (page text is never stored). */

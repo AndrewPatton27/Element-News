@@ -129,7 +129,7 @@ begin
   if (select ai_label from core.blurbs where dedupe_key = 'test-ok') is distinct from 'AI-generated summary · may contain errors' then
     raise exception 'FAIL: ai_label not taken from app_config';
   end if;
-  if (select importance from core.blurbs where dedupe_key = 'test-ok') <> 5 then
+  if (select importance from core.blurbs where dedupe_key = 'test-ok') <> 6 then   -- earnings weight 6 (20261116000000_macro_focus.sql)
     raise exception 'FAIL: publish_blurb did not refresh the rank';
   end if;
   r := api.publish_blurb('{"dedupe_key":"test-ok","kind":"summary","headline":"TEST OK","category":"earnings","sort_at":"2026-10-17T20:00:00Z","sources":[{"name":"SEC","kind":"filing","url":"https://www.sec.gov/test/ok","license_class":"company_filing"}]}');

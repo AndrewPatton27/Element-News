@@ -12,8 +12,9 @@ export const RANK_DEFAULTS = {
   coverageCap: 20,
   authority: { government: 1.25, filing: 1.0, news: 0.8 } as Record<string, number>,
   eventWeights: {
-    fed: 8, macro_release: 8, earnings: 5, deal: 4, exec_change: 3, insider: 2, default: 2,
-    world_event: 6, recall: 5, science: 3,          // broad topics (20261017020000_broad_topics.sql)
+    fed: 8, macro_release: 8, earnings: 6, deal: 4,   // earnings 5 -> 6 (macro focus)
+    exec_change: 3, insider: 2, default: 2,
+    world_event: 6, recall: 1.5, science: 1.5,      // broad topics; recall 5 -> 1.5, science 3 -> 1.5 (20261116000000_macro_focus.sql)
   } as Record<string, number>,
 };
 

@@ -200,7 +200,7 @@ test('new cards: AI detail goes into the publish payload; template and data card
   const fed = dry.cards.find((c) => c.sources[0].name === 'Federal Reserve Board')!;
   assert.deepEqual(fed.detail, DETAIL);
   const quakes = dry.cards.filter((c) => c.category === 'science');
-  assert.equal(quakes.length, 2, 'only the quakes above the publishing threshold');
+  assert.equal(quakes.length, 1, 'only the quakes above the publishing threshold, and at most 1 USGS card per run (narrow-source cap)');
   for (const q of quakes) {
     assert.deepEqual(checkDetailShape(q.detail), [], q.headline);
     assert.equal(q.prompt_version, 'tpl-v5');
