@@ -9,6 +9,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | `account/` | Sign-in session, account state and account labels |
 | `api/` | The `Api` interface, mock and Supabase implementations, error types and app config |
 | `brief/` | Daily and weekly brief logic |
+| `companies/` | Company directory answers, sector grouping, "About: Apple" chips, the company API (Supabase and sample) and batched card tag lookups |
 | `feed/` | Feed ordering, paging, ranking (For you, local), swipe and early first-page logic |
 | `following/` | Followed topics and stories, following re-rank |
 | `numbers/` | Number formatting, tone and trend sample data |
@@ -85,6 +86,10 @@ Files in `lib/__tests__/`: `account`, `api`, `detail`, `dwell`, `feedLogic`, `fi
 
 - `searchLogic.ts`: 300 ms debounce, 2-character minimum, query normalising, the search target and list key, recent searches (add, remove, parse), wording. Tests: `__tests__/searchLogic.test.ts`. Also the mock-mode copy of search v2 (`20261018020000_search_v2.sql`): `searchTerms` (lowercase, no punctuation, no stopwords, max 6 words), `matchedTermCount` (any word by stem/prefix, the same 10 synonym groups, typos with edit distance <= 1 / <= 2 from 8 letters, exact ticker or series id) and `rankSearch` (Trending order via `mockRankScore`, x1.3 per extra matched word, ties importance, newest, id); `api.mockFeatures.ts` search uses it. Tests: `__tests__/searchRank.test.ts`. Keep `SYNONYM_GROUPS` in step with `core.search_synonyms`.
 - `followingLogic.ts`: the three follow lists (topics, sources, tickers), parse / toggle / ticker check, which topics come from the account, the "Because you follow X" text with topic slugs turned into names. Tests: `__tests__/followingLogic.test.ts` (includes the mock search and following feed).
+- `companyLogic.ts`: reads the company RPC answers (no prices kept), the Companies screen grouping (followed first, then sectors, most cards first, typo-tolerant filter), the "About: Apple" chips (server tags, else the card's tickers), card-count wording and the search helpers `companyRowsFor` / `companyCardsFirst`.
+- `companyApi.ts`: `CompanyApi` (search, cards, directory, tags) over the Supabase RPCs of `20261115000000_companies.sql`, and the sample version over the fixture cards with the same matcher (`SAMPLE_COMPANIES`).
+- `tagBatcher.ts`: collects card ids for ~25 ms and asks `api.card_companies` once (<= 50 ids); answers cached, failures cached as no tags.
+- `useCardCompanies.ts`: the hook the card chips use (one batcher per API).
 - `useFollows.ts`: the follow lists for the screens (account topics when signed in, device storage otherwise).
 - `usePagedCards.ts`: pages any card list by key (search, topic, follows) with the feed's rules: a new key starts over, late answers are dropped, hidden topics and sources are skipped.
 

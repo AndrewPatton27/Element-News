@@ -11,6 +11,7 @@ import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts, radius } from '../../lib/theme/theme';
 import { CloseIcon } from '../shell/Icons';
 import { TopicChip } from '../feed/TopicPicker';
+import { go } from '../shell/TabBar';
 
 export interface FollowingManagerProps {
   categories: Category[]; // topics that can be followed (hidden ones already left out)
@@ -155,6 +156,9 @@ export function FollowingManager({
               Enter a ticker of 1 to 5 letters, like AAPL.
             </Text>
           ) : null}
+          <Pressable onPress={() => go('/companies' as never)} accessibilityRole="link" style={styles.browse}>
+            <Text style={[styles.toggleText, { color: p.accentInk }]}>Browse companies by sector →</Text>
+          </Pressable>
 
           <Text style={[styles.label, { color: p.muted }]}>Sources</Text>
           <View style={styles.chips} accessibilityRole="list">
@@ -175,6 +179,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { fontFamily: fonts.serif, fontSize: 21, lineHeight: 25 },
   toggle: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
+  browse: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   toggleText: { fontFamily: fonts.sansSemi, fontSize: 15 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   removable: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.chip, borderWidth: 1 },

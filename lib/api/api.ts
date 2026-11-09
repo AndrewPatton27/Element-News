@@ -7,6 +7,7 @@ import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
 import { createMockAccount, createSupabaseAccount, type AccountApi } from '../account/account.ts';
 import { createSupabaseApi } from './api.supabase.ts';
+import type { CompanyApi } from '../companies/companyApi.ts';
 
 export interface FeedRequest {
   mode: FeedMode;
@@ -43,6 +44,8 @@ export interface Api {
   unsubscribeMine(kind: 'daily' | 'weekly'): Promise<MyBriefChangeResult>;
   /** status 'unavailable' when the RPC does not exist yet. */
   updateMyTime(kind: 'daily' | 'weekly', hour: number, tz: string): Promise<MyBriefChangeResult>;
+  /** Company directory, company search, a company's cards and card -> company tags (lib/companies/companyApi.ts). */
+  companies: CompanyApi;
 }
 
 export type ApiResult = { ok: true; api: Api; account: AccountApi } | { ok: false; error: string };
