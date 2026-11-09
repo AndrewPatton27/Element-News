@@ -53,6 +53,7 @@
     "test:sql": "node supabase/tests/run-pglite.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
     "release:check": "node scripts/release-check.mjs",
+    "security:gate": "node scripts/security-gate.mjs",
     "smoke:prod": "node scripts/prod-smoke.mjs",
     "deploy": "npm run export:web && wrangler deploy",
     "preview": "npm run export:web && wrangler dev"
