@@ -83,6 +83,28 @@ export interface FetchAllowedOptions {
   cacheTtlMinutes?: number;           // > 0 enables the local file cache (GET only)
   cacheDir?: string;
   perSecond?: number;
+  timeoutMs?: number;                 // per request, body read included (default config.fetchTimeoutMs, 20 s)
+}
+
+/** Thrown when a request (headers or body) takes longer than the timeout. name 'TimeoutError' like AbortSignal.timeout. */
+export class RequestTimeoutError extends Error {
+  constructor(host: string, ms: number) {
+    super(`request to ${host} timed out after ${Math.round(ms / 1000)} s`);
+    this.name = 'TimeoutError';
+  }
+}
+
+/** Races `work` against the deadline signal, so a fetch or body read that ignores the abort signal still ends on time. */
+function raceDeadline<T>(work: Promise<T>, signal: AbortSignal, onTimeout: () => Error): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(onTimeout());
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener('abort', abort, { once: true });
+    work.then(
+      (v) => { signal.removeEventListener('abort', abort); resolve(v); },
+      (e) => { signal.removeEventListener('abort', abort); reject(e); },
+    );
+  });
 }
 
 /**
@@ -112,14 +134,18 @@ export async function fetchAllowed(url: string, opts: FetchAllowedOptions): Prom
     await rateLimit(opts.perSecond ?? config.maxRequestsPerSecond);
     const headers: Record<string, string> = { ...(opts.headers ?? {}) };
     if (opts.userAgent) headers['User-Agent'] = opts.userAgent;
-    const res = await fetchImpl(current, {
-      method,
-      headers,
-      body: opts.body,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(config.fetchTimeoutMs),
-    });
+    // One deadline per request: it covers the response headers AND the body read below.
+    const timeoutMs = opts.timeoutMs ?? config.fetchTimeoutMs;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);   // a normal (ref'd) timer; cleared when the body is read
+    const signal = ctl.signal;
+    const timeoutErr = () => new RequestTimeoutError(new URL(current).hostname, timeoutMs);
+    let res: Response;
+    try {
+      res = await raceDeadline(fetchImpl(current, { method, headers, body: opts.body, redirect: 'manual', signal }), signal, timeoutErr);
+    } catch (e) { clearTimeout(timer); throw e; }
     if (res.status >= 300 && res.status < 400) {
+      clearTimeout(timer);
       const loc = res.headers.get('location');
       if (!loc) throw new AllowlistError(`redirect without location from ${new URL(current).hostname}`);
       const next = new URL(loc, current).toString();
@@ -127,7 +153,8 @@ export async function fetchAllowed(url: string, opts: FetchAllowedOptions): Prom
       current = next;
       continue;
     }
-    const text = await res.text();
+    let text: string;
+    try { text = await raceDeadline(res.text(), signal, timeoutErr); } finally { clearTimeout(timer); }
     if (cacheFile && res.ok) {
       await mkdir(opts.cacheDir ?? config.cacheDir, { recursive: true });
       await writeFile(cacheFile, text, 'utf8');

@@ -11,13 +11,13 @@
 // Outputs: RunSummary JSON (counts, stop reason, last log lines; no keys, no source text).
 
 import {
-  buildProviders, createSupabasePublisher, fetchAllowed, SOURCE_NAMES, runOnce, wikimediaUserAgent,
+  buildProviders, config, createSupabasePublisher, fetchAllowed, SOURCE_NAMES, runOnce, wikimediaUserAgent,
   type Deps, type FetchLike, type Publisher, type RunStats, type SourceName, type Summarizer,
 } from '../_shared/ingest.ts';
-import { createTimeBudget, guardFetch, guardPublisher, type TimeBudget } from '../_shared/budget.ts';
+import { createTimeBudget, DeadlineError, guardFetch, guardPublisher, withDeadline, type TimeBudget } from '../_shared/budget.ts';
 import { describeFunctionEnv, truthy, type FunctionEnv } from '../_shared/env.ts';
 import { createServiceRpc, type Rpc } from '../_shared/rpc.ts';
-import { buildRunSummary, runLogPayload, type RunSummary } from '../_shared/runSummary.ts';
+import { buildRunSummary, runLogPayload, startRunLog, type RunSummary } from '../_shared/runSummary.ts';
 import { createUsageTracker, rpcUsageStore, withUsage, type UsageStore } from '../_shared/usage.ts';
 
 export const DEFAULT_WORK_CAP = 5;
@@ -78,19 +78,22 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
   const rpc = deps.rpc ?? createServiceRpc({ url: env.supabaseUrl, key: env.serviceKey, fetchImpl: deps.fetchImpl });
   const tracker = await createUsageTracker(deps.usageStore ?? rpcUsageStore(rpc));
   for (const e of tracker.errors) say(`warning: ${e}`);
+  const runId = opts.noRunLog ? null : await startRunLog(rpc, opts.source, startedAt);
 
   let stats: RunStats | undefined;
   let error: string | null = null;
+  let timedOut = false;
+  let providers: Summarizer[] = [];
   const guarded = guardPublisher(
     deps.publisher ?? createSupabasePublisher({ url: env.supabaseUrl, key: env.serviceKey, fetchImpl: deps.fetchImpl }),
     budget, opts.workCap,
   );
-  try {
+  const work = async () => {
     if ((opts.source === 'sec' || opts.source === 'wiki') && !env.secUserAgent && !deps.fetchText) {
       throw new Error('SEC_USER_AGENT is not set ("<app name> <contact email>"); SEC and Wikipedia need it');
     }
     const base = deps.providers ?? buildProviders({ geminiApiKey: env.geminiApiKey, groqApiKey: env.groqApiKey }, { fetchImpl: deps.fetchImpl }).providers;
-    const providers = base.map((p) => withUsage(p, tracker, p.dailyCap ?? 0, (w) => budget.aiAllowed(w)));
+    providers = base.map((p) => withUsage(p, tracker, p.dailyCap ?? 0, (w) => budget.aiAllowed(w)));
     say(`ingest-source ${opts.source}: work cap ${opts.workCap}, soft ${budget.softMs} ms, hard ${budget.hardMs} ms; summarizers ${providers.map((p) => p.name).join(' -> ')}; ${describeFunctionEnv(env)}`);
     const pipelineDeps: Deps = {
       fetchText: guardFetch(deps.fetchText ?? liveFetchText(env, deps.fetchImpl), budget),
@@ -100,7 +103,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       fredApiKey: env.fredApiKey,
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
-      reportCard: env.reportCard ? { enabled: true } : undefined,
+      reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed } : undefined,
       // Cross-source candidate selection is off here: each call has one source, and with selection on the
       // spend phase starts items without an upsertItem call, so the soft deadline (guardPublisher) could
       // not stop it. Off = the source's own order, every item start passes through the guard.
@@ -108,19 +111,26 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
     };
     stats = await runOnce(pipelineDeps, { only: [opts.source], limit: opts.workCap });
     if (opts.finish) await finishRun(guarded.publisher, say);
+  };
+  try {
+    // 140 s deadline: the platform kills the call at 150 s, so give up first and still write the run-log row.
+    await withDeadline(work(), Math.max(0, budget.hardMs - budget.elapsedMs()));
   } catch (e) {
+    timedOut = e instanceof DeadlineError;
     error = (e as Error).message;
     say(`error: ${error}`);
   }
+  const modelMissing = providers.some((p) => p.modelMissing);
+  if (modelMissing) say('warning: a model is no longer available; the fallback model answered (update ingest/src/config.ts)');
   if (guarded.counts.deferredTime || guarded.counts.deferredCap) {
     say(`stopped early (${guarded.counts.stoppedBy}): ${guarded.counts.deferredTime + guarded.counts.deferredCap} items left for the next run`);
   }
   const run = buildRunSummary({
     source: opts.source, startedAt, finishedAt: now(), stats, guard: guarded.counts,
-    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, log,
+    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
   });
   if (!opts.noRunLog) {
-    try { await rpc('log_run', { p: runLogPayload(run) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }
+    try { await rpc('log_run', { p: runLogPayload(run, runId) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }
   }
   return run;
 }
