@@ -1,6 +1,50 @@
 # Ranking v3: findings (2026-11-09, simulated readers only)
 
-**Verdict: GO for a SQL port of v3 in shadow mode. NO-GO for serving it now.** On held-out seeds 1-5, v3 beats today's formula on NDCG@10 in every world and every seed (15/15). It also lowers dislikes and the anti-macro reader's macro share. It still fails the synthetic gate on two points (see below), and the real-data replay gate is still required.
+**Verdict: GO for a SQL port of v3 in shadow mode. NO-GO for serving it now.** On held-out seeds 1-5, v3 beats today's formula on NDCG@10 in every world and every seed (15/15). It also lowers dislikes and the anti-macro reader's macro share. The final setting (same-topic step +2.5 h) passes the synthetic gate in all three worlds, **but only under a macro test that was changed after seeing results** (see "Final run"). The real-data replay gate is still required.
+
+## Final run (2026-11-09, second pass; this section replaces the gate status below)
+
+**What was tuned.** Only `step_extra`, on tuning seeds 101-102 (normal and stress); nothing else changed. The values tried and their results (NDCG normal / stress, topics@10 normal / stress; formula 0.433 / 0.317, 4.76 / 4.95):
+
+| step_extra | NDCG normal | NDCG stress | topics normal | topics stress |
+|---|---|---|---|---|
+| 1.5 | 0.507 | 0.336 | 4.49 | 4.73 |
+| 2 | 0.502 | 0.336 | 4.58 | 4.81 |
+| **2.5** | 0.503 | 0.337 | 4.68 | 4.90 |
+| 3 | 0.504 | 0.336 | 4.78 | 5.03 |
+
+2.5 was picked as the smallest step that keeps topics within 0.1 of the formula in both worlds; NDCG is flat across the values. Seeds 1-5 were then run **once** (`results/v3_eval_final.json`). That run also included one robustness variant with tags switched off.
+
+| world | method | NDCG@10 | wins | paired gain (min..max) | dislike@10 | topics@10 | recovery d | anti-macro share |
+|---|---|---|---|---|---|---|---|---|
+| normal | formula | 0.454 | | | 0.060 | 4.77 | 4.4 | 0.058 |
+| normal | **v3 (step 2.5)** | **0.530** | 5/5 | +0.064..+0.090 | 0.052 | 4.61 | 5.2 | 0.013 |
+| normal | v3, no tags | 0.514 | 5/5 | | 0.053 | 4.67 | 5.8 | 0.026 |
+| stress | formula | 0.332 | | | 0.080 | 4.90 | 4.0 | 0.130 |
+| stress | **v3 (step 2.5)** | **0.350** | 5/5 | +0.010..+0.024 | 0.077 | 4.85 | 3.2 | 0.060 |
+| stress | v3, no tags | 0.349 | 5/5 | | 0.077 | 4.95 | 4.4 | 0.070 |
+| wild | formula | 0.323 | | | 0.080 | 5.26 | 1.6 | 0.208 |
+| wild | **v3 (step 2.5)** | **0.341** | 5/5 | +0.011..+0.023 | 0.076 | 5.26 | 1.2 | 0.100 |
+| wild | v3, no tags | 0.340 | 5/5 | | 0.077 | 5.35 | 1.8 | 0.113 |
+
+Learning speed is unchanged from the first pass. In normal, NDCG@10 after 15-29 explicit actions is 0.498, against the formula's 0.484 after 60 or more.
+
+**Gate: v3 (step 2.5) PASSES normal, stress and wild under the changed macro test.** The no-tags variant fails normal on recovery (+1.4 days).
+
+**The macro test was changed after seeing results. Drew should judge this.**
+- Old test: the anti-macro reader's macro share must be at most 1.2 x their true macro interest. For the formula's runs that limit is 0.007 in normal, 0.075 in stress and 0.082 in wild.
+- New test (`bandit/gate.py`): at most the formula's own share + 0.02.
+- Why: today's formula scores 0.058 / 0.130 / 0.208 and fails the old test in every world. No method built on rank_score can get near 0.007, because macro cards carry higher importance (importance correlates -0.42 with this reader's taste).
+- Under the old test v3 (its own limits 0.0078 / 0.0824 / 0.0901) would still fail in normal (0.0130) and in wild (0.0996), and would pass in stress (0.0599).
+- In every world v3 roughly halves the formula's macro share.
+- No other gate item was changed: NDCG wins >= 4/5, dislikes <= +0.005, topics >= -0.3, recovery <= +1 day.
+
+**Real-headline tag check** (`python -m elementml.evaluation.tag_coverage`). 85 realistic headlines from `contract/fixtures` (SEC 8-K and Form 4, Fed, FRED, BEA, CPSC and USGS styles), the `ingest/test/fixtures` RSS titles (FOMC, Fed speeches, SEC press) and the ingest test strings:
+- 29.4% of them get at least one keyword tag, against 29.7% of synthetic headlines. The overall rate matches.
+- The mix does not. Real tags are almost all `rates` (15) and `recalls` (5), plus a few `jobs`, `inflation`, `energy` and `crypto`. Synthetic headlines also get `ai`, `disaster`, `markets` and `space`.
+- Earnings, 8-K, insider and deal headlines get no tag at all.
+- So on real text the tags mostly separate rates stories. The no-tags run is the lower bound: it keeps most of the gain (normal +0.060 instead of +0.076; stress and wild essentially unchanged), but it does not pass the gate.
+- This uses a small fixture sample (85 headlines), not production cards.
 
 ## What v3 is
 
@@ -64,7 +108,7 @@ The main cause is that v2 replaced the formula's personal terms (the follow boos
 - The headroom is small outside the normal world. The best ordering using rank_score plus the reader's true topic term reaches 0.716 in normal, 0.431 in stress and 0.476 in wild. Noise is 74% of the hidden-score variance in stress, so +0.017 there is a large share of what can be gained.
 - **The gate's macro test cannot be met.** It asks for at most 1.2 x the true interest (about 0.004 in normal), and the formula itself scores 0.058. Proposed change: compare against the formula's share.
 
-## Gate status of v3
+## Gate status of v3 (first pass, superseded by "Final run")
 
 - normal: fails topics@10 (-0.34; the limit is -0.30) and macro (unmeetable test).
 - stress: passes everything.
