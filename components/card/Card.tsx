@@ -35,7 +35,7 @@ interface Props {
   categories: Category[];
   onShowSources: (card: BlurbCard) => void;
   onOpenDetail?: (card: BlurbCard) => void; // tap on the card body
-  onMore?: (card: BlurbCard) => void; // "â‹¯" options (signed in only)
+  onMore?: (card: BlurbCard) => void; // "⋯" options (signed in only)
   onNext?: () => void;
   wide?: boolean;
   compact?: boolean; // short screens: smaller type so the card fits
@@ -82,13 +82,14 @@ function factsFor(card: BlurbCard): { label: string; value: string }[] {
   return out;
 }
 
-// "World Â· 2 h ago", or "Recalls & Safety Â· Recall Â· 2 h ago" when the event adds something.
+// "World · 2 h ago", or "Recalls & Safety · Recall · 2 h ago" when the event adds something.
 function metaLine(card: BlurbCard, categories: Category[], timeLabel?: 'added'): string {
   const category = categoryName(card.category, categories);
   if (card.kind === 'link_out') return [category, linkOutDelay(card.freshness?.delayed_hours)].filter(Boolean).join(' · ');
   const event = eventLabel(card.event_type);
   const parts = [category];
-  if (event && !category.toLowerCase().includes(event.toLowerCase())) parts.push(event);
+  // Data cards already carry the "New data" badge, so "Data release" would only repeat it.
+  if (event && card.kind !== 'data' && !category.toLowerCase().includes(event.toLowerCase())) parts.push(event);
   // Same label the detail sheet shows (lib/format cardTime), so the two never disagree.
   parts.push(timeLabel === 'added' ? addedLabel(card) || cardTime(card) : cardTime(card));
   return parts.join(' · ');
@@ -135,8 +136,11 @@ export function Card(props: Props) {
   const wideSize = tight ? 40 : box.w > 0 && box.w < 600 ? 38 : card.headline.length > 80 ? 42 : 48;
   // Feed-Data / Feed-LinkOut drafts: data and link-out cards get 24 px padding, 16 px
   // gaps and a 32 px headline on phones (summary cards keep Mobile-Final's 20 / 14 / 28).
-  const roomy = !wide && !compact && card.kind !== 'summary';
-  const phoneSize = compact ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
+  // Two-number data cards have a tall panel and the FRED notice to show, so on phones they use the
+  // summary-card sizes (not the roomy ones) and the panel tightens; nothing may be clipped.
+  const denseData = !wide && card.kind === 'data' && card.macro.length > 1;
+  const roomy = !wide && !compact && card.kind !== 'summary' && !denseData;
+  const phoneSize = compact || denseData ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
   const headlineSize = wide ? wideSize : phoneSize;
   const headlineTrack = wide ? 0.025 : roomy ? 0.015 : 0.02;
   const headlineLead = wide ? 1.07 : linkOut ? 1.12 : 1.1;
@@ -173,7 +177,7 @@ export function Card(props: Props) {
 
   const headline = (
     <Text
-      numberOfLines={linkOut ? 6 : compact ? 3 : 4}
+      numberOfLines={linkOut ? 6 : compact || denseData ? 3 : 4}
       style={[
         styles.headline,
         { color: p.ink, fontSize: headlineSize, lineHeight: headlineSize * headlineLead, letterSpacing: -headlineSize * headlineTrack, maxWidth: wide ? 820 : undefined },
@@ -235,7 +239,7 @@ export function Card(props: Props) {
     <View style={styles.wrap}>
       <View
         onLayout={wide ? (e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) }) : undefined}
-        style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, compact && styles.cardCompact, roomy && styles.cardRoomy, { backgroundColor: p.surface, borderColor: p.border }]}
+        style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, (compact || denseData) && styles.cardCompact, roomy && styles.cardRoomy, { backgroundColor: p.surface, borderColor: p.border }]}
       >
         <View style={styles.meta}>
           {badge.text ? (
@@ -305,7 +309,7 @@ export function Card(props: Props) {
             >
               {headline}
 
-              {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} /> : null}
+              {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} /> : null}
 
               {/* On phones a two-number data card has no room for its template sentence, which only
                   restates the numbers; it stays readable in the detail sheet. */}
@@ -354,8 +358,6 @@ export function Card(props: Props) {
             </Pressable>
             </ScrollView>
 
-            {/* empty space collects here, so the sources and footer sit at the bottom */}
-            <View style={styles.spacer} />
 
             <View style={styles.sourceBlock}>
               {opensDetail ? (
@@ -445,7 +447,7 @@ const styles = StyleSheet.create({
   factValue: { fontFamily: fonts.sansSemi, fontSize: 15 },
   tickers: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   ticker: { fontFamily: fonts.sansMedium, fontSize: 13, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 },
-  middleScroll: { flexShrink: 1, minHeight: 0 },
+  middleScroll: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 }, // takes the free space, so no empty gap is left above the sources
   middleContent: { flexGrow: 1 },
   middleContentCompact: { gap: 8 },
   middlePressable: { gap: 14 },

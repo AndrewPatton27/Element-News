@@ -15,7 +15,10 @@ import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
-import { buildDataCard, buildObservation, fredUrl, parseFredObservations } from './sources/macro.ts';
+import { buildDataCard, buildObservation, differenceSeries, fredUrl, parseFredObservations, type Point } from './sources/macro.ts';
+import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
+import { secPressToItem, selectSecPress } from './sources/secpress.ts';
+import { avgRatesUrl, debtUrl, parseAvgRates, parseDebt } from './sources/fiscaldata.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -28,8 +31,8 @@ import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
-export type SourceName = 'macro' | 'fed' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
-export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'fed', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
+export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
+export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -41,7 +44,7 @@ export interface Deps {
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
-  reportCard?: { enabled?: boolean; scorer?: ScoreClient };
+  reportCard?: { enabled?: boolean; scorer?: ScoreClient; /** the Groq scorer is skipped once counter.used('groq') reaches this (cards then publish unscored) */ scorerMaxGroqUsed?: number; /** at most this many cards are scored per run (cloud); the rest publish unscored. Unset = no limit (laptop) */ scorerMaxPerRun?: number };
   /** Candidate selection overrides (tests, flags): enabled replaces config.selection.enabled. */
   selection?: { enabled?: boolean };
 }
@@ -66,6 +69,8 @@ export interface RunStats {
   report_abandon: number;
   report_duplicate: number;
   report_provider_gemini: number;
+  report_unscored: number;
+  report_scored: number;
   report_provider_groq: number;
 }
 
@@ -95,7 +100,7 @@ async function recentCards(deps: Deps) {
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
-  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_provider_groq: 0 };
+  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0 };
   const ctx: RunCtx = {
     stats,
     budget: { left: opts.limit ?? 20 },
@@ -109,7 +114,10 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   collector = select ? [] : null;                    // selection on: sources only collect; the budget is spent below
   try {
   if (only.has('macro')) await runMacro(deps, stats);
+  if (only.has('treasury')) await runTreasury(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
+  if (only.has('fedspeech')) await runFedSpeech(deps, ctx);
+  if (only.has('secpress')) await runSecPress(deps, ctx);
   if (only.has('bea')) await runBea(deps, ctx);
   if (only.has('fedreg')) await runFedReg(deps, ctx);
   if (only.has('sec')) await runSec(deps, stats, ctx.budget, ctx.guard, ctx.chain);
@@ -119,7 +127,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('nasa')) await runNasa(deps, ctx);
   if (collector) await runSelected(collector, deps, ctx, opts.limit ?? 20);
   } finally { collector = null; }
-  deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
+  deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
 
@@ -132,6 +140,28 @@ async function runFed(deps: Deps, { stats, budget, guard, chain }: RunCtx): Prom
     await processItems(items, deps, stats, budget, guard, chain, async (it) => fedPageText(await deps.fetchText(it.url, 'page', config.cacheTtlMinutes)));
   } catch (e) {
     deps.log(`fed: feed failed: ${(e as Error).message}`);
+  }
+}
+
+/** Fed Board speeches and testimony: RSS (page host list, www.federalreserve.gov); the AI sees only the feed's title and description. */
+async function runFedSpeech(deps: Deps, { stats, budget, guard, chain }: RunCtx): Promise<void> {
+  try {
+    const list = parseRss(await deps.fetchText(config.feeds.fedSpeechRss, 'page', config.feedCacheTtlMinutes));
+    const items = selectFedSpeeches([list], deps.now).map(fedSpeechToItem);
+    await processItems(items, deps, stats, budget, guard, chain, async () => '');
+  } catch (e) {
+    deps.log(`fedspeech: feed failed: ${(e as Error).message}`);
+  }
+}
+
+/** SEC press releases: RSS (page host list, www.sec.gov); feed text only, 10-word copy limit. */
+async function runSecPress(deps: Deps, { stats, budget, guard, chain }: RunCtx): Promise<void> {
+  try {
+    const list = parseRss(await deps.fetchText(config.feeds.secPressRss, 'page', config.feedCacheTtlMinutes));
+    const items = selectSecPress(list, deps.now).map(secPressToItem);
+    await processItems(items, deps, stats, budget, guard, chain, async () => '');
+  } catch (e) {
+    deps.log(`secpress: feed failed: ${(e as Error).message}`);
   }
 }
 
@@ -562,9 +592,14 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     const protocolOn = deps.reportCard?.enabled ?? config.reportCard.protocolEnabled;
     const scorer = deps.reportCard?.scorer ?? ((): ScoreClient | null => {
       const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
+      const stop = deps.reportCard?.scorerMaxGroqUsed;
+      if (g && stop !== undefined && deps.counter.used('groq') >= stop) return null;   // Groq calls are reserved for writing and the Brief
+      const perRun = deps.reportCard?.scorerMaxPerRun;
+      if (g && perRun !== undefined && stats.report_scored >= perRun) return null;           // per-run cap: the rest publish unscored
       return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
     })();
     if (protocolOn && r.ai_generated && scorer) {
+      stats.report_scored++;
       const recent = await recentCards(deps);
       const candidate = { id: row.id, ai_generated: payload.ai_generated, as_of: payload.as_of, sources: [{ name: it.source_name, url: it.url }] } as any;
       const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
@@ -584,20 +619,23 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       if (rv.revised) stats.report_revise++;
       cardScore = rv.score;
       if (rv.verdict === 'unscored') {
-        stats.skipped++;                                   // item stays 'new': a later run tries it again
-        deps.log(`skip report_card_unscored (${rv.error ?? 'no score'}): ${it.title}`);
-        return;
-      }
-      if (rv.verdict !== 'publish') {
+        // Fail open: the scorer failed (rate limit, bad JSON), not the card. rv.payload already passed
+        // validatePublish (the revised one if the failure came on the re-score), so it publishes like a
+        // cutoff card, with the AI-generated label. Leaving it 'new' only re-spent Groq calls every hour.
+        payload = rv.payload;
+        stats.report_unscored++;
+        deps.log(`report_card_unscored, publishing unscored (${rv.error ?? 'no score'}): ${it.title}`);
+      } else if (rv.verdict !== 'publish') {
         if (rv.verdict === 'duplicate') stats.report_duplicate++;
         stats.report_abandon++;
         const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
         stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
         await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
         return;
+      } else {
+        payload = rv.payload;
+        stats.report_pass++;
       }
-      payload = rv.payload;
-      stats.report_pass++;
     }
     const res = await deps.publisher.publishBlurb(payload);
     stats[res.status === 'published' ? 'published' : res.status]++;
@@ -627,7 +665,7 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
  * config.templateSecItems. Federal Register template cards are never published.
  */
 export function templateAllowed(it: RawItem): boolean {
-  if (it.source === 'fed_rss' || it.source === 'bea_rss') return true;
+  if (it.source === 'fed_rss' || it.source === 'bea_rss') return true;   // fed_speech and sec_press: AI only (a template cannot judge relevance)
   if (it.source === 'sec_8k') {
     const main = primaryItem((it.items ?? []).filter((i) => (config.watchItems as readonly string[]).includes(i.number)));
     return !!main && (config.templateSecItems as readonly string[]).includes(main);
@@ -639,26 +677,64 @@ export function templateAllowed(it: RawItem): boolean {
 async function runMacro(deps: Deps, stats: RunStats): Promise<void> {
   if (!deps.fredApiKey) { deps.log('macro: FRED_API_KEY not set, skipping'); return; }
   const start = new Date(deps.now.getTime() - config.fredLookbackDays * 86_400_000).toISOString().slice(0, 10);
+  const fetched = new Map<string, Point[]>();
   for (const id of config.macroSeries) {
     if ((config.forbiddenSeries as readonly string[]).includes(id)) { deps.log(`macro: ${id}: forbidden series, skipped`); continue; }
     try {
       const url = new URL(fredUrl(id, start));
       url.searchParams.set('api_key', deps.fredApiKey);          // never logged: errors print the host only
       const points = parseFredObservations(await deps.fetchText(url.toString(), 'api', 60));
-      const obs = buildObservation(id, points);
-      if (!obs) { deps.log(`macro: ${id}: not enough data`); continue; }
-      await deps.publisher.upsertMacro(obs);
-      stats.macro++;
-      const card = buildDataCard(obs);
-      if (card) {
-        const res = await deps.publisher.publishBlurb(card);
-        if (res.status === 'published') stats.data_cards++;
-        deps.log(`macro: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> data card ${res.status}`);
-      } else {
-        deps.log(`macro: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> numbers panel only`);
-      }
+      fetched.set(id, points);
+      await publishSeries(deps, stats, 'macro', id, points, true);
     } catch (e) {
       deps.log(`macro: ${id}: ${(e as Error).message}`);
     }
+  }
+  // Derived series (e.g. the 10Y-2Y spread) are computed here, never fetched from FRED.
+  for (const [id, [a, b]] of Object.entries(config.derivedSeries)) {
+    const pa = fetched.get(a), pb = fetched.get(b);
+    if (!pa || !pb) { deps.log(`macro: ${id}: inputs ${a}/${b} not fetched, skipped`); continue; }
+    try {
+      await publishSeries(deps, stats, 'macro', id, differenceSeries(pa, pb), true);
+    } catch (e) {
+      deps.log(`macro: ${id}: ${(e as Error).message}`);
+    }
+  }
+}
+
+/** One series' points -> Numbers panel row and, if `cardAllowed` and the move is big enough, a data card. */
+async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean): Promise<void> {
+  const obs = buildObservation(id, points);
+  if (!obs) { deps.log(`${tag}: ${id}: not enough data`); return; }
+  await deps.publisher.upsertMacro(obs);
+  stats.macro++;
+  const card = cardAllowed ? buildDataCard(obs) : null;
+  if (card) {
+    const res = await deps.publisher.publishBlurb(card);
+    if (res.status === 'published') stats.data_cards++;
+    deps.log(`${tag}: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> data card ${res.status}`);
+  } else {
+    deps.log(`${tag}: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> numbers panel only`);
+  }
+}
+
+/**
+ * Treasury FiscalData: average interest rates (Bills, Notes, Bonds) and the national debt, from the JSON API
+ * (API host list, no key). Same Numbers/data-card path as FRED series; only config.fiscalData.cardSeries may
+ * become data cards. One failing dataset is logged and the other still runs.
+ */
+async function runTreasury(deps: Deps, stats: RunStats): Promise<void> {
+  try {
+    const rates = parseAvgRates(await deps.fetchText(avgRatesUrl(), 'api', 0));
+    for (const id of Object.keys(rates)) {
+      await publishSeries(deps, stats, 'treasury', id, rates[id], config.fiscalData.cardSeries.includes(id));
+    }
+  } catch (e) {
+    deps.log(`treasury: average rates failed: ${(e as Error).message}`);
+  }
+  try {
+    await publishSeries(deps, stats, 'treasury', 'TREAS_DEBT', parseDebt(await deps.fetchText(debtUrl(), 'api', 0)), config.fiscalData.cardSeries.includes('TREAS_DEBT'));
+  } catch (e) {
+    deps.log(`treasury: debt failed: ${(e as Error).message}`);
   }
 }

@@ -87,13 +87,14 @@ test('protocol on: a failing setStoryLink is tolerated', async () => {
   assert.equal(s.failed, 0);
 });
 
-test('protocol on: a scorer that is down or returns junk publishes nothing, leaves the items for a later run, and does not crash', async () => {
+test('protocol on: a scorer that is down or returns junk fails open: cards publish unscored and nothing crashes', async () => {
   for (const generate of [async () => { throw new Error('Groq HTTP 429'); }, async () => 'not json', async () => '{"scores":[{"id":"x"}]}']) {
     const t = setup({ reportCard: { enabled: true, scorer: { generate } } });
     const s = await runOnce(t.deps, { only: ['cpsc'], limit: 5 });
-    assert.equal(s.published, 0);
+    assert.ok(s.published > 0);
+    assert.equal(s.report_unscored, s.published);
     assert.equal(s.failed, 0);
-    assert.deepEqual(t.statuses, [], 'items stay new');
+    assert.deepEqual(t.statuses, [], 'no item is skipped or failed');
     assert.ok(t.lines.some((l) => /report_card_unscored/.test(l)));
   }
 });

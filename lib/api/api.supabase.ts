@@ -7,7 +7,7 @@ import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../c
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
 import { takeEarlyFeed, type EarlyFeed } from '../feed/earlyFeed.ts';
-import { isBlurbCard, isMacroFact, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
+import { isBlurbCard, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
 export interface SupabaseOptions {
   url: string; // https://<project>.supabase.co, no trailing slash
@@ -38,7 +38,7 @@ export interface PlannedRequest {
 export function planRequest(
   base: string,
   key: string,
-  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief',
+  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief' | 'feed_status',
   req?: FeedRequest & { q?: string; cardId?: string; topics?: string[]; sources?: string[]; tickers?: string[] },
   token?: string | null,
 ): PlannedRequest {
@@ -57,7 +57,7 @@ export function planRequest(
       init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: JSON.stringify(body) },
     };
   }
-  if (op === 'top_stories' || op === 'number_trends') {
+  if (op === 'top_stories' || op === 'number_trends' || op === 'feed_status') {
     return {
       url: `${base}/rest/v1/rpc/${op}`,
       init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: '{}' },
@@ -178,6 +178,10 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     appConfig: async () => parseAppConfig(await call(planRequest(opts.url, opts.key, 'config'))),
     // The side column is optional: before the migration is applied (404) or on any error the
     // site shows nothing there instead of failing.
+    // api.feed_status() is added server-side separately; until then (404) the banner stays hidden.
+    async feedStatus() {
+      return parseFeedStatus(await optional('feed_status'));
+    },
     async topStories() {
       try {
         const x = await call(planRequest(opts.url, opts.key, 'top_stories'));

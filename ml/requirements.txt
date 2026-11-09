@@ -1,0 +1,7 @@
+# Python libraries for the ml/ prototype (see ml.md). Pinned to the versions the tests pass with on Python 3.13.
+numpy==2.5.4
+scipy==1.18.1
+pandas==3.1.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+pytest==9.2.0

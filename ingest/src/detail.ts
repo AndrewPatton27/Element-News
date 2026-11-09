@@ -21,6 +21,8 @@ function shortPoint(s: string, max: number = config.detail.keyPointMaxWords): st
 function agencyIntro(it: RawItem): string {
   switch (it.source) {
     case 'fed_rss': return 'The Federal Reserve is the U.S. central bank. It sets key interest rates and watches over banks.';
+    case 'fed_speech': return 'The Federal Reserve is the U.S. central bank. Its Board members give speeches to explain how they see the economy and interest rates.';
+    case 'sec_press': return 'The U.S. Securities and Exchange Commission is the government agency that oversees public companies and the markets.';
     case 'bea_rss': return 'The U.S. Bureau of Economic Analysis is the government office that measures the economy, such as GDP and trade.';
     case 'fedreg': return 'The Federal Register is the government\'s daily journal, where agencies publish their official rules.';
     case 'nasa': return 'NASA is the U.S. space agency.';

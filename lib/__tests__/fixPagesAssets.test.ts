@@ -9,6 +9,7 @@ const script = fileURLToPath(new URL('../../scripts/fix-pages-assets.mjs', impor
 
 for (const layout of ['node_modules', 'expo/node_modules']) {
   test(`fix-pages-assets relocates ${layout} asset layout and injects HTML helpers idempotently`, () => {
+    mkdirSync(join(process.cwd(), '.pgtmp'), { recursive: true });   // a fresh checkout (CI) has no .pgtmp yet
     const root = mkdtempSync(join(process.cwd(), '.pgtmp', 'pages-assets-'));
     try {
       const dist = join(root, 'dist');

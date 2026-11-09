@@ -18,6 +18,7 @@
     "lib/__tests__",
     "ingest",
     "supabase/functions",
+    "workers",
     "docs"
   ]
 }

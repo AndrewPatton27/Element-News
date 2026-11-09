@@ -13,7 +13,7 @@ count as CPU.
 | Function | What it does | Body (JSON) | Schedule |
 |---|---|---|---|
 | `brief-summary` | The AI summary at the top of the daily and weekly Brief, once per period (`ingest/src/briefSummary.ts`): reads `api.daily_brief` / `api.weekly_brief`, skips a period that already has its summary, Gemini then Groq then a template, each AI draft validated (numbers in the brief, copy limit, no advice words, length), writes with `api.put_brief_summary`. | `{"kind":"daily"\|"weekly"\|"both"}` (default both), optional `"force":true`, `"dry_run":true` (writes nothing), `"no_ai":true` | 10:30 UTC daily |
-| `ingest-source` | ONE ingest source per call: `macro`, `fed`, `bea`, `fedreg`, `sec`, `wiki`, `cpsc`, `usgs` or `nasa`. Runs `runOnce({ only: [source] })` from `ingest/src/pipeline.ts`: allowlisted fetchers and parsers, topic filter, license gate, Gemini then Groq then template with the validator, the report-card scorer when `REPORT_CARD_PROTOCOL=1`, publishing through the service-role RPCs. | `{"source":"fed"}`, optional `"work_cap":1-20` (default 5), `"finish":true` (afterwards refresh Trending and purge old ML rows) | each source once an hour, 6 minutes apart |
+| `ingest-source` | ONE ingest source per call: `macro`, `treasury`, `fed`, `fedspeech`, `secpress`, `bea`, `fedreg`, `sec`, `wiki`, `cpsc`, `usgs` or `nasa`. Runs `runOnce({ only: [source] })` from `ingest/src/pipeline.ts`: allowlisted fetchers and parsers, topic filter, license gate, Gemini then Groq then template with the validator, the report-card scorer when `REPORT_CARD_PROTOCOL=1`, publishing through the service-role RPCs. | `{"source":"fed"}`, optional `"work_cap":1-20` (default 5), `"finish":true` (afterwards refresh Trending and purge old ML rows) | the original nine sources once an hour, 6 minutes apart; `fedspeech` and `secpress` hourly at :18 and :24; `treasury` once a day (migration `20261111000000_finance_sources_cron.sql`) |
 
 Each call writes one row to `ingest.run_log` (`api.log_run`) and returns the same summary as JSON:
 `source, ok, started_at, finished_at, duration_ms, items_new, published, skipped, failed, ai_calls,
@@ -27,12 +27,23 @@ lines; never keys or source text).
 - **Time budget:** no new item starts after 100 s; no AI call starts if its pacing wait plus the 20 s
   request timeout would end after 140 s (the chain then falls back to the next provider or the template,
   as after a 429); no network request starts after 140 s.
+- **Request timeout:** every outbound request (`fetchAllowed`, headers AND body read) ends after 20 s with a `TimeoutError`, even if the server never answers.
+- **Run deadline:** the handler gives up at 140 s (`withDeadline`), logs `stopped_by: 'timeout'` and still writes its run-log row; the platform would kill the call at 150 s.
+- **Start row:** `api.run_start` writes the `ingest.run_log` row before the work (`finished_at` null); `api.log_run` finishes it. A run killed anyway leaves an open row; after 10 minutes the watchdog reports it and the next `log_run` marks it `killed`.
 - **AI caps across runs:** every real AI call first takes one unit from `core.ai_usage` with the atomic
-  `api.ai_usage_take(provider, cap)` (Gemini 500/day, Groq 74/day, from `ingest/src/config.ts`; UTC days).
+  `api.ai_usage_take(provider, cap)` (caps are read from `core.ai_caps`: Gemini 500, Groq 74, with 10 and 5 calls kept in reserve for `brief-summary`; the
+  numbers in `ingest/src/config.ts` are the fallback; UTC days). A daily-quota 429 (`RPD`/`TPD`/"per day" in the reply) sets
+  today's use to the cap (`api.ai_usage_exhaust`), so the rest of the day skips that provider. Order: Gemini, then Groq, then
+  the template card. The Groq report-card scorer switches off once Groq has been used 50 times that day
+  (`config.reportCard.cloudScorerMaxGroqUsed`); cards then publish unscored. At most `config.reportCard.scorerMaxPerRun` (3) cards are scored per run; the rest publish unscored. A scorer error (rate limit, bad JSON) also publishes the card unscored (it already passed the validator) instead of leaving it for an hourly retry; DUPLICATE/ABANDON and a failed revision still reject.
+- **Retired model:** a 404, or a 400 "model not found", repeats the same call with `config.gemini.fallbackModel` /
+  `config.groq.alternativeModel` and sets `stats.model_missing` in the run summary (the watchdog opens `wd:model`).
   At the cap, or if the counter cannot be read, no AI call is made. The Groq report-card scorer counts
   against Groq too. Gemini pacing (5 s) and Groq pacing (30 s) apply within a call.
 - **Caller check:** the `Authorization: Bearer` token must equal the project's service-role key
-  (`SUPABASE_SERVICE_ROLE_KEY`); anything else gets HTTP 401.
+  (`SUPABASE_SERVICE_ROLE_KEY`) or the function secret `CRON_SECRET` (24+ characters; the watchdog Worker uses it, so the
+  Worker never holds the service-role key); anything else gets HTTP 401. Because a `CRON_SECRET` bearer is not a JWT,
+  deploy both functions with `--no-verify-jwt` (this check is then the gate).
 
 ## Files
 
@@ -62,7 +73,9 @@ Custom secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets s
 | `GROQ_API_KEY` | both | Groq is skipped; the report-card scorer is off |
 | `FRED_API_KEY` | `ingest-source` macro | macro numbers are skipped |
 | `SEC_USER_AGENT` | `ingest-source` sec and wiki (`"Element <contact email>"`) | those sources fail with a clear error |
+| `CRON_SECRET` | the watchdog Worker (re-triggers `ingest-source`) | the Worker's re-trigger gets HTTP 401 |
 | `REPORT_CARD_PROTOCOL` | `ingest-source`, optional | `1` = Groq scores each AI card before publishing (as in `ingest/run-ingest.cmd`) |
+| `CRON_SECRET` | both (caller check) | optional, 32+ random characters; the Vault `element_service_key` may hold it instead of the service key. Then deploy with `--no-verify-jwt` (it is not a JWT) |
 | `RESEND_API_KEY`, `EMAIL_FROM`, `MAIL_POSTAL_LINE` | later (brief email), not used yet | |
 
 ```

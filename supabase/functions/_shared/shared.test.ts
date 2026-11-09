@@ -216,6 +216,15 @@ test('auth: only the exact service-role bearer token passes', () => {
   assert.equal(isAuthorized('Bearer short', (k) => (k === 'SUPABASE_SERVICE_ROLE_KEY' ? 'short' : undefined)), false, 'no short keys');
 });
 
+test('auth: CRON_SECRET (24+ chars) also passes; a short or wrong one does not', () => {
+  const withCron = (c: string) => (k: string) => (k === 'CRON_SECRET' ? c : ENV[k as keyof typeof ENV]);
+  const cron = 'cron-secret-for-tests-0123456789';
+  assert.equal(isAuthorized(`Bearer ${cron}`, withCron(cron)), true);
+  assert.equal(isAuthorized(`Bearer ${cron}x`, withCron(cron)), false);
+  assert.equal(isAuthorized('Bearer short-cron', withCron('short-cron')), false, 'no short secrets');
+  assert.equal(isAuthorized(`Bearer ${cron}`, get), false, 'CRON_SECRET unset');
+});
+
 test('env: injected Supabase values + custom secrets; missing or placeholder values are null', () => {
   const e = readFunctionEnv(get);
   assert.equal(e.supabaseUrl, ENV.SUPABASE_URL);

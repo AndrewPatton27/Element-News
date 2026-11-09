@@ -73,7 +73,7 @@ export function DeviceData() {
     <View style={styles.data} accessibilityLabel="Your data on this device">
       <Text style={[styles.title, { color: p.ink }]}>Your data on this device</Text>
       <Text style={[styles.help, { color: p.inkSoft }]}>
-        Likes, favorite and hidden topics, followed companies, recent searches and the quick-tour flag are saved in this browser or app only.
+        Everything here stays in this browser or app only: your likes, topics, followed companies, recent searches and the quick-tour flag.
         Clearing them does not touch an account.
       </Text>
       {confirming ? (
