@@ -293,6 +293,8 @@ export default function FeedScreen() {
   } else {
     body = (
       <FeedPager
+        // A new tab or topic is a new list: start it fresh (the pager freezes the order it shows).
+        key={pagerKey}
         items={pagerItems}
         timeLabel={mode === 'latest' ? 'added' : undefined}
         config={config}
