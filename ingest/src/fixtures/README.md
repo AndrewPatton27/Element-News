@@ -25,3 +25,5 @@ Labels: **REAL** = verbatim fetched content. **RECONSTRUCTED** = every value com
 | `wiki-featured-2026-10-16.json` | SYNTHETIC (Wikipedia featured feed for the day before: one story that repeats the 10-17 feed, one fictional story only this day has; tests the cross-day dedupe) |
 | `sec-company-tickers-watch.json` | RECONSTRUCTED (rows verbatim from SEC company_tickers_exchange.json, fetched 2026-10-17, filtered to the watch-list CIKs plus GoPro, LifeStance, Laser Photonics and Bridgeline Digital) |
 | `sec-submissions-CIK0000320193.json` | RECONSTRUCTED (Apple's data.sec.gov submissions JSON, fetched 2026-10-17; identity fields and `filings.recent` verbatim, arrays filtered to the first 3 rows plus every 8-K / 8-K/A row) |
+| `fed-speeches.rss.xml`, `sec-press.rss.xml` | SYNTHETIC (shape of the Fed speeches and SEC press-release feeds; fictional text; dry run only) |
+| `fiscaldata-avg-interest-rates.json`, `fiscaldata-debt.json` | SYNTHETIC (Treasury FiscalData API shape, values are strings; dry run only) |
