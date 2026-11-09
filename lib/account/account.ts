@@ -38,7 +38,8 @@ export interface AccountApi {
   getPrefs(): Promise<UserPrefs>;
   /** Saves followed topics (and optionally hidden ones); marks the user onboarded. */
   setPrefs(followed: string[], hidden?: string[], hiddenSources?: string[]): Promise<UserPrefs>;
-  feedForYou(cursor: string | null, limit?: number): Promise<FeedPage>;
+  /** `followed`: ids of followed stories (device-side); For you leaves out cards the reader has seen, except these. */
+  feedForYou(cursor: string | null, limit?: number, followed?: string[]): Promise<FeedPage>;
   /** `ms` only with 'dwell' (how long the card was looked at). */
   track(cardId: string, event: TrackEvent, ms?: number, shadow?: ShadowContext | null): Promise<void>;
   /** The last dwell when the page is closing: fire and forget, sent with fetch `keepalive` so it
@@ -104,6 +105,9 @@ export function planRpc(base: string, key: string, token: string, fn: string, ar
 const SESSION_KEY = 'element.session.v1';
 
 // ---- RPC names and arguments (supabase/migrations/20261017030000_accounts.sql) ----
+export const FOLLOWED_IDS_MAX = 200; // same as core.rank_params seen_followed_max
+const FOLLOWED_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const ACCOUNT_RPC = {
   getPrefs: { fn: 'get_prefs', args: () => ({}) },
   setPrefs: {
@@ -116,7 +120,14 @@ export const ACCOUNT_RPC = {
       ...(hiddenSources ? { p_hidden_sources: hiddenSources } : {}),
     }),
   },
-  feedForYou: { fn: 'feed_for_you', args: (cursor: string | null, limit: number): FeedForYouParams => ({ p_cursor: cursor, p_limit: limit }) },
+  feedForYou: {
+    fn: 'feed_for_you',
+    // p_followed only when there are followed stories (an older server has no such argument), at most FOLLOWED_IDS_MAX ids.
+    args: (cursor: string | null, limit: number, followed?: string[]): FeedForYouParams => {
+      const ids = (followed ?? []).filter((x) => FOLLOWED_ID.test(x)).slice(0, FOLLOWED_IDS_MAX);
+      return { p_cursor: cursor, p_limit: limit, ...(ids.length ? { p_followed: ids } : {}) };
+    },
+  },
   track: {
     fn: 'track',
     args: (cardId: string, event: TrackEvent, ms?: number, shadow?: ShadowContext | null): TrackParams & ShadowTrackArgs => ({
@@ -290,6 +301,7 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
   }
 
   let shadowRejected = false;
+  let followedRejected = false;
   return {
     sample: false,
     currentUser: () => session?.user ?? null,
@@ -324,8 +336,18 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
     async setPrefs(followed, hidden, hiddenSources) {
       return parseUserPrefs(await rpc(ACCOUNT_RPC.setPrefs.fn, ACCOUNT_RPC.setPrefs.args(followed, hidden, hiddenSources)));
     },
-    async feedForYou(cursor, limit) {
-      return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit))));
+    async feedForYou(cursor, limit, followed) {
+      const send = !followedRejected ? followed : undefined;
+      try {
+        return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit), send)));
+      } catch (e) {
+        // A server without the 3-argument For you (migration not applied): stop sending the list and ask again once.
+        if (send?.length && e instanceof AccountError && isUnknownArgsError(e.status)) {
+          followedRejected = true;
+          return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit))));
+        }
+        throw e;
+      }
     },
     async track(cardId, event, ms, shadow) {
       const extra = event === 'view' && !shadowRejected && shadowArgs(shadow).p_page !== undefined;

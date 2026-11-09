@@ -1,10 +1,14 @@
 -- =============================================================================
--- Element: seen-card exclusion for Trending, Latest and For you (signed-in readers) (2026-11-13)
+-- Element: seen-card exclusion for For you (signed-in readers) (2026-11-13)
 --
--- A signed-in reader is not shown a card they have already seen, on any of the three tabs. "Seen" is the
--- existing 'view' event (api.track kind 'view': the card became the active card on screen), shared across
--- the three tabs because core.user_events is per reader, not per tab. No new table, no new event kind,
--- nothing new is stored.
+-- A signed-in reader is not shown a card in For you that they have already seen. Rules (Drew, 2026-11-09):
+--   1. a card seen in Trending does not also appear in For you;
+--   2. a card seen in For you does not appear again in For you;
+--   3. Trending and Latest show ALL their cards, whatever was seen (api.feed is not touched);
+--   4. Search and Following are not affected.
+-- "Seen" is the existing 'view' event (api.track kind 'view': the card became the active card on screen). Views
+-- are not tab-specific, so a view from ANY tab, Latest included, counts toward For you's exclusion.
+-- No new table, no new event kind, nothing new is stored.
 --
 -- Scalability first (Drew): the work per page is bounded and flat, however long the reader has been here.
 --   * only the reader's latest seen_exclude_max (800) distinct viewed cards inside the last
@@ -21,7 +25,7 @@
 -- updated after the reader last saw it (core.blurbs.updated_at, set by a revision, later than the last view).
 -- A disliked card is gone as before (For you already did this).
 --
--- Paging: the exclusion is a filter placed after scoring, next to the keyset test, so every remaining card
+-- Paging (For you): the exclusion is a filter placed after scoring, next to the keyset test, so every remaining card
 -- keeps its sort key (same-topic step, boosts, scores unchanged) and the cursor stays valid: no repeats, no
 -- reshuffles. All three tabs use the views up to the moment of the request (the set is not frozen into the
 -- cursor: it only removes cards, it never moves one).
@@ -31,14 +35,14 @@
 -- re-shown card; 0 on later pages) so the app can say "all caught up". The tail has its own cursor
 -- 'S|<sort_at>|<id>'; it ends when the (capped) seen set is used up.
 --
--- Guests: api.feed output is byte-for-byte what it was (v_uid is null: empty seen set, no tail).
+-- Guests: api.feed (Trending, Latest) is not changed for anyone; api.feed_for_you needs a signed-in reader.
 -- Ranking v3 / ml modes: unchanged by this file. The filter sits in v5, v6 and v7, so it applies in every
 -- foryou_ml_mode, to the v3 arm and to the holdout alike. seen_exclude_mode = 0 restores the old behaviour.
 --
 --   B  settings (core.rank_params seen_*, on conflict do nothing), partial index
 --   C  core.seen_ids(user, as_of), core.seen_tail(...), core.seen_fill(...)  (private)
---   F  the cores: feed_top, feed_for_you_v5 / v6 / v7 (bodies copied, filter lines added)
---   G  api.feed, api.feed_for_you (bodies copied, tail cursor and seen_fill added)
+--   F  the cores: feed_top (unchanged), feed_for_you_v5 / v6 / v7 (bodies copied, filter lines added)
+--   G  api.feed (unchanged body), api.feed_for_you (body copied, tail cursor and seen_fill added)
 --
 -- Idempotent. Run after 20261112000000_ranking_v3.sql. Check: supabase/tests/seen_exclusion_check.sql
 -- =============================================================================
@@ -51,13 +55,17 @@
 insert into core.rank_params (key, value) values
   ('seen_exclude_mode',  1),    -- 1 = seen cards are left out (signed-in readers); 0 = off (the old behaviour)
   ('seen_exclude_days', 14),    -- only views in the last N days count (must stay below ml_purge_events_days' floor of 31)
-  ('seen_exclude_max', 800)     -- at most the N most recent distinct viewed cards count (flat cost per page)
+  ('seen_exclude_max', 800),    -- at most the N most recent distinct viewed cards count (flat cost per page)
+  ('seen_followed_max', 200)    -- at most N followed-story ids per request are exempt from the exclusion
 on conflict (key) do nothing;
 
 alter table core.rank_params drop constraint if exists rank_params_seen_range;
 alter table core.rank_params add constraint rank_params_seen_range
   check ((key not in ('seen_exclude_days', 'seen_exclude_max') or value > 0)
+     and (key <> 'seen_followed_max' or value >= 0)
      and (key <> 'seen_exclude_mode' or value in (0, 1)));
+
+create index if not exists story_links_related_idx on core.story_links (related_id);
 
 create index if not exists user_events_view_idx
   on core.user_events (user_id, created_at desc) where kind = 'view';
@@ -79,14 +87,29 @@ as $$
 declare
   v_mode numeric; v_days numeric; v_max numeric;
   v_ids  uuid[];
+  v_ex   uuid[] := '{}';
+  v_fmax numeric;
 begin
   if p_user is null then return '{}'; end if;
   select coalesce(max(value) filter (where key = 'seen_exclude_mode'), 0),
          greatest(coalesce(max(value) filter (where key = 'seen_exclude_days'), 14), 1),
-         greatest(coalesce(max(value) filter (where key = 'seen_exclude_max'), 800), 1)
-    into v_mode, v_days, v_max
+         greatest(coalesce(max(value) filter (where key = 'seen_exclude_max'), 800), 1),
+         greatest(coalesce(max(value) filter (where key = 'seen_followed_max'), 200), 0)
+    into v_mode, v_days, v_max, v_fmax
     from core.rank_params;
   if v_mode = 0 then return '{}'; end if;
+
+  -- Followed stories are exempt (and their linked updates). The ids come with the request (api.feed_for_you's
+  -- p_followed, put in the transaction setting element.seen_exempt): follows live on the device, not on the server.
+  -- Bounded: only the first seen_followed_max ids count; a malformed list counts as empty.
+  begin
+    v_ex := coalesce((string_to_array(nullif(current_setting('element.seen_exempt', true), ''), ',')::uuid[])[1:v_fmax::int], '{}');
+  exception when others then v_ex := '{}';
+  end;
+  if cardinality(v_ex) > 0 then
+    v_ex := v_ex || array(select l.related_id from core.story_links l where l.card_id = any (v_ex) and l.kind = 'update')
+                 || array(select l.card_id from core.story_links l where l.related_id = any (v_ex) and l.kind = 'update');
+  end if;
 
   select coalesce(array_agg(s.blurb_id order by s.last_at desc), '{}') into v_ids
     from (
@@ -103,7 +126,8 @@ begin
            group by r.blurb_id
         ) x
         join core.blurbs b on b.id = x.blurb_id
-       where (b.updated_at is null or b.updated_at <= x.last_at)             -- updated since: may come back
+       where x.blurb_id <> all (v_ex)                                            -- followed story: exempt
+         and (b.updated_at is null or b.updated_at <= x.last_at)             -- updated since: may come back
          and not exists (select 1 from core.user_events l                    -- liked: may come back
                           where l.user_id = p_user and l.blurb_id = x.blurb_id and l.kind = 'like')
        order by x.last_at desc
@@ -253,7 +277,6 @@ declare
   v_more     boolean := false;
   v_lastkey  text;
   v_lastid   uuid;
-  v_sx     uuid[] := '{}';
 begin
   if v_mode not in ('top', 'latest') then
     raise exception 'invalid_mode' using errcode = 'PT422';
@@ -264,7 +287,6 @@ begin
   end if;
   v_hid  := coalesce(v_hid, '{}');
   v_hsrc := coalesce(v_hsrc, '{}');
-  v_sx := core.seen_ids(v_uid, clock_timestamp());     -- seen-card exclusion (signed in only; guests get '{}')
 
   if p_cursor is null then
     v_rank_key := 1e12;
@@ -302,8 +324,7 @@ begin
        where b.status = 'published'
          and (p_category is null or b.category = p_category)
          and not (b.category = any (v_hid))
-         and (cardinality(v_hsrc) = 0 or not (core.source_key_of(b.kind, b.id) = any (v_hsrc)))
-         and not (b.id = any (v_sx));
+         and (cardinality(v_hsrc) = 0 or not (core.source_key_of(b.kind, b.id) = any (v_hsrc)));
     end if;
     select coalesce(max(value), 3)::int into v_extra from core.rank_params where key = 'diversity_carry';
     v_fetch := greatest(v_limit + greatest(v_extra, 0) - cardinality(v_carry), 1);
@@ -321,7 +342,6 @@ begin
            and (cardinality(v_hsrc) = 0 or not (core.source_key_of(b.kind, b.id) = any (v_hsrc)))
            and b.rank_score < v_rank_key + greatest(v_maxb, 0) + 1        -- index-friendly prefilter (safe bound)
            and (b.rank_score + coalesce(t.boost, 0), b.id) < (v_rank_key, v_id)
-           and not (b.id = any (v_sx))
          order by 2 desc, b.id desc
          limit v_fetch + 1
       ) s;
@@ -338,7 +358,6 @@ begin
            and not (b.category = any (v_hid))
            and (cardinality(v_hsrc) = 0 or not (core.source_key_of(b.kind, b.id) = any (v_hsrc)))
            and (b.sort_at, b.id) < (v_time_key, v_id)
-           and not (b.id = any (v_sx))
          order by b.sort_at desc, b.id desc
          limit v_limit + 1
       ) s;
@@ -861,7 +880,7 @@ $$;
 revoke all on function core.feed_for_you_v7(text, int) from public, anon, authenticated;
 
 -- =============================================================================
--- G. api.feed and api.feed_for_you: previous bodies plus the tail cursor and core.seen_fill at every return
+-- G. api.feed: ml_shadow body, UNCHANGED (re-created for the same reason). api.feed_for_you: previous body plus the tail cursor and core.seen_fill
 -- =============================================================================
 
 create or replace function api.feed(
@@ -888,14 +907,9 @@ declare
   v_max    numeric;
   v_n      int;
   v_page   uuid;
-  v_lim    int := least(greatest(coalesce(p_limit, 20), 10), 30);
 begin
-  if v_uid is not null and p_cursor like 'S|%' then                     -- seen-cards tail (all caught up)
-    if coalesce(p_mode, 'top') not in ('top', 'latest') then raise exception 'invalid_mode' using errcode = 'PT422'; end if;
-    return core.seen_tail(v_uid, p_category, p_cursor, v_lim, false);
-  end if;
   v_r := core.feed_top(p_mode, p_cursor, p_limit, p_category);
-  if coalesce(p_mode, 'top') <> 'top' then return core.seen_fill(v_r, v_uid, p_category, v_lim, false); end if;           -- Latest: unchanged
+  if coalesce(p_mode, 'top') <> 'top' then return v_r; end if;           -- Latest: unchanged
 
   select case when coalesce(max(value), 0) = 0 then 0 else 1 end into v_mode
     from core.rank_params where key = 'trending_ml_mode';
@@ -914,7 +928,7 @@ begin
   end if;
 
   if v_uid is null or v_mode = 0 or p_category is not null or jsonb_array_length(v_r -> 'items') = 0 then
-    return core.seen_fill(v_r, v_uid, p_category, v_lim, false);
+    return v_r;
   end if;
   begin
     select coalesce(max(value), 60) into v_max from core.rank_params where key = 'ml_pages_max_per_hour';
@@ -940,13 +954,14 @@ begin
     v_page := null;                                                      -- never break the feed
   end;
   if v_page is not null then v_r := v_r || jsonb_build_object('page_id', v_page); end if;
-  return core.seen_fill(v_r, v_uid, p_category, v_lim, false);
+  return v_r;
 end;
 $$;
 
 revoke execute on function api.feed(text, text, int, text) from public;
 grant  execute on function api.feed(text, text, int, text) to anon, authenticated, service_role;
 
+-- api.feed_for_you keeps its 2-argument signature and body (so anything that wraps it keeps working).
 create or replace function api.feed_for_you(p_cursor text default null, p_limit int default 20)
 returns jsonb
 language plpgsql
@@ -1114,6 +1129,30 @@ $$;
 
 revoke all on function api.feed_for_you(text, int) from public, anon;
 grant execute on function api.feed_for_you(text, int) to authenticated;
+
+-- 3-argument form: p_followed = ids of the stories the reader follows (follows live on the device). They are exempt from
+-- the exclusion: the ids are put in the transaction setting element.seen_exempt, which core.seen_ids reads (bounded by
+-- seen_followed_max), then the 2-argument function runs. No default on p_followed, so a 2-argument call is never ambiguous.
+create or replace function api.feed_for_you(p_cursor text, p_limit int, p_followed uuid[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_r jsonb;
+begin
+  if auth.uid() is null then raise exception 'not_authenticated' using errcode = 'PT401'; end if;
+  perform set_config('element.seen_exempt', coalesce(array_to_string(p_followed[1:greatest(coalesce((select r.value from core.rank_params r where r.key = 'seen_followed_max'), 200), 0)::int], ','), ''), true);
+  v_r := api.feed_for_you(p_cursor, p_limit);
+  perform set_config('element.seen_exempt', '', true);
+  return v_r;
+end;
+$$;
+
+revoke all on function api.feed_for_you(text, int, uuid[]) from public, anon;
+grant execute on function api.feed_for_you(text, int, uuid[]) to authenticated;
 
 -- HOW TO CHECK: paste this file twice (expected "Success. No rows returned" both times), then run
 -- supabase/tests/seen_exclusion_check.sql and every older check.
