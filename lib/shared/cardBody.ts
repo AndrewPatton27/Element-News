@@ -38,8 +38,33 @@ export function shortTime(label: string): string {
   return label.replace(/\s+ago$/, '');
 }
 
+// Well-known agencies get their usual short name in the bar, so the one-line bar shows a
+// readable name instead of "Federal Res…". Only exact matches; anything else keeps its
+// full name (and truncates). The full name stays in the accessible name and the sources sheet.
+const SHORT_NAMES: Record<string, string> = {
+  'Federal Reserve Board': 'Fed',
+  'Board of Governors of the Federal Reserve System': 'Fed',
+  'U.S. Bureau of Labor Statistics': 'BLS',
+  'Bureau of Labor Statistics': 'BLS',
+  'U.S. Energy Information Administration': 'EIA',
+  'U.S. Geological Survey': 'USGS',
+  'U.S. Consumer Product Safety Commission': 'CPSC',
+  'U.S. Census Bureau': 'Census Bureau',
+  'U.S. Bureau of Economic Analysis': 'BEA',
+  'U.S. Department of the Treasury': 'Treasury',
+  'U.S. Food and Drug Administration': 'FDA',
+  'National Highway Traffic Safety Administration': 'NHTSA',
+};
+export function shortSourceName(name: string): string {
+  return SHORT_NAMES[name.trim()] ?? name;
+}
+// Wide bars add the document label only after a short name ("SEC · Form 8-K"), so the
+// agency name itself never has to truncate.
+export const WIDE_DOC_LABEL_MAX_NAME = 16;
+
 export interface CardBarMeta {
   name: string; // primary outlet or agency, e.g. "NASA", "SEC"
+  shortName: string; // the bar's label: "Fed", "BLS" (full name when there is no known short one)
   docLabel: string | null; // "News release", "Form 8-K" (wide bars only)
   time: string; // "1 d ago" (or "Added 1 d ago" on the Latest tab)
   timeShort: string; // "1 d" for phone-width bars
@@ -62,6 +87,7 @@ export function cardBarMeta(
   const when = time ? ` Published ${time.replace(/^Added /, '')}.` : '';
   return {
     name: src.name,
+    shortName: shortSourceName(src.name),
     docLabel: src.doc_label && src.doc_label.trim() !== '' ? src.doc_label : null,
     time,
     timeShort: shortTime(time),

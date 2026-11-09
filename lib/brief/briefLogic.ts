@@ -5,7 +5,7 @@
 
 import type { AppConfig, BlurbCard, Brief, BriefKind, BriefMarkets, BriefSubscribeStatus, BriefSummary, Category, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { categoryName, clampText, relativeTime } from '../shared/format.ts';
-import { cardNotices, disclaimerText, primarySource, shareAlikeCredit, type ShareAlikeCredit } from '../shared/labels.ts';
+import { cardNotices, primarySource, shareAlikeCredit, type ShareAlikeCredit } from '../shared/labels.ts';
 import type { KeyValueStore } from '../storage/storage.ts';
 import { isHttpUrl } from '../shared/types.ts';
 
@@ -176,9 +176,10 @@ export function summaryTitle(mode: BriefMode): string {
   return mode === 'weekly' ? 'Weekly summary' : 'Daily summary';
 }
 
-/** The muted line under the summary: the AI label (always) then the disclaimer. */
-export function summaryFooter(config: AppConfig | null | undefined): string {
-  return [SUMMARY_LABEL, disclaimerText(config)].filter(Boolean).join(' · ');
+/** The muted line under the summary: the AI label, right by the AI-written text. The
+ *  disclaimer is the Brief screen's persistent strip (D-80), so it is not repeated here. */
+export function summaryFooter(): string {
+  return SUMMARY_LABEL;
 }
 
 // ---- Text ----
