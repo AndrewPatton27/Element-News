@@ -1,7 +1,8 @@
 // Search (designs Mobile-Search / Web-Search). The box waits 300 ms after the last
 // key, searches from 2 characters, and shows api.search results page by page.
-// Empty box: recent searches (kept on this device), topics to browse and companies
-// to try. A topic tile shows that topic's top cards; a company search offers
+// Empty box: "Suggested for you" (up to 5 unseen stories picked for this reader, see
+// lib/search/suggestions.ts), recent searches (kept on this device), topics to browse and
+// companies to try. A topic tile shows that topic's top cards; a company search offers
 // "Follow". Hidden topics and sources stay out of the results, as in the feed.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -37,6 +38,9 @@ import { Disclaimer } from '../components/card/Labels';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { SearchBox } from '../components/search/SearchBox';
 import { SearchIdle } from '../components/search/SearchIdle';
+import { SearchSuggestions } from '../components/search/SearchSuggestions';
+import { ErrorBoundary } from '../components/shell/ErrorBoundary';
+import { useSearchSuggestions } from '../lib/search/useSearchSuggestions';
 import { SearchResults } from '../components/search/SearchResults';
 import { Shell } from '../components/shell/Shell';
 import { SourcesSheet } from '../components/card/SourcesSheet';
@@ -44,7 +48,16 @@ import { disclaimerText } from '../lib/shared/labels';
 
 const store = defaultStore();
 
+// Its own boundary, so a crash here is recorded as "search" (sessionStorage element.last-error).
 export default function SearchScreen() {
+  return (
+    <ErrorBoundary where="search">
+      <SearchScreenBody />
+    </ErrorBoundary>
+  );
+}
+
+function SearchScreenBody() {
   const p = usePalette();
   const wide = useWide();
   const { api, config, categories } = useAppData();
@@ -133,6 +146,12 @@ export default function SearchScreen() {
   }, [detailCard, signedIn, trackOpenDetail]);
 
   const topics = useMemo(() => suggestedTopics(categories, hidden), [categories, hidden]);
+  const suggestions = useSearchSuggestions(target.kind === 'idle');
+  const browse = useCallback((c: { slug: string; name: string }) => {
+    setText('');
+    setTyped('');
+    setTopic({ slug: c.slug, name: c.name });
+  }, []);
 
   // "Follow" appears for a topic being browsed, and for a company the results are about.
   const ticker = target.kind === 'query' ? normalizeTicker(target.q) : null;
@@ -150,6 +169,7 @@ export default function SearchScreen() {
   if (target.kind === 'idle') {
     body = (
       <>
+        <SearchSuggestions items={suggestions.items} categories={categories} onOpen={openDetail} onPickTopic={browse} />
         <SearchIdle
           recent={recent}
           topics={topics}
@@ -158,11 +178,7 @@ export default function SearchScreen() {
             store.set(RECENT_KEY, serializeRecents([]));
             setRecent([]);
           }}
-          onPickTopic={(c) => {
-            setText('');
-            setTyped('');
-            setTopic({ slug: c.slug, name: c.name });
-          }}
+          onPickTopic={browse}
           onPickTicker={pickText}
         />
         <Disclaimer text={disclaimerText(config)} center={!wide} />

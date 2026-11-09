@@ -6,9 +6,10 @@
 // A class component is required: componentDidCatch/getDerivedStateFromError have no
 // hook equivalent.
 
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { light, fonts, font } from '../../lib/theme/theme';
+import { crashRecord, reloadForChunkError, saveCrash, sessionOf, type WindowLike } from '../../lib/shared/crashReport';
 
 interface Props {
   children: ReactNode;
@@ -17,6 +18,8 @@ interface Props {
   // Bumping this key (e.g. the active card id) clears a caught error so a new child
   // gets a fresh render instead of staying stuck on the fallback.
   resetKey?: unknown;
+  // Label stored with a caught error ("app", "card", "search"...).
+  where?: string;
 }
 
 interface State {
@@ -30,9 +33,15 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: unknown): void {
-    // Keep a trace in dev; never surface the raw error to the user.
-    if (process.env.NODE_ENV !== 'production') console.error('ErrorBoundary caught', error);
+  componentDidCatch(error: unknown, info?: ErrorInfo): void {
+    // Never shown to the reader, but always logged (production too) with the component stack, and a
+    // short sanitized copy is kept in sessionStorage (element.last-error) so a report is diagnosable.
+    const win = typeof window !== 'undefined' ? (window as unknown as WindowLike) : null;
+    const rec = crashRecord(error, { componentStack: info?.componentStack ?? null, where: this.props.where ?? (this.props.fallback ? 'card' : 'app'), path: win?.location?.pathname ?? null });
+    console.error('[Element] error boundary caught', error, info?.componentStack ?? '');
+    saveCrash(sessionOf(win), rec);
+    // A screen file from an older deploy could not load: one reload picks up the new files.
+    reloadForChunkError(error, win);
   }
 
   componentDidUpdate(prev: Props): void {

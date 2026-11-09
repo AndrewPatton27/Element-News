@@ -133,3 +133,26 @@ test('Updates delayed banner shows only when the status says so', async ({ page 
   await page.goto('/?mock_delayed=1');
   await expect(page.getByText(/^Updates delayed · last updated .+ ago$/)).toBeVisible();
 });
+
+test('search: empty box suggests up to 5 stories above the topics, a suggestion opens its detail', async ({ page }) => {
+  await page.goto('/search');
+  const box = page.getByTestId('search-suggestions');
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await expect(box.getByText('Suggested for you')).toBeVisible();
+  const rows = box.locator('[aria-label$="Opens more detail"]');
+  const n = await rows.count();
+  expect(n).toBeGreaterThan(0);
+  expect(n).toBeLessThanOrEqual(5);
+  // the existing chips stay below the suggestions
+  const chips = page.getByText('Try a company');
+  await expect(chips).toBeVisible();
+  const boxY = (await box.boundingBox())!.y;
+  expect((await chips.boundingBox())!.y).toBeGreaterThan(boxY);
+  await rows.first().click();
+  await expect(page.locator('[aria-label^="More detail: "]').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).first().click();
+  // typing a query replaces the suggestions with results, without the error screen
+  await page.getByLabel('Search stories, companies and topics').fill('sample');
+  await expect(box).toBeHidden();
+  await expect(page.getByText('Something went wrong')).toHaveCount(0);
+});
