@@ -11,6 +11,6 @@ npm run test:e2e
 - Browser: run `npx playwright install chromium` once, or set `PW_CHANNEL=chrome` (or `msedge`) to use an installed browser.
 - No network is needed: outbound links are recorded by a stubbed `window.open`, and the OS share sheet is disabled so Share copies the link.
 
-`smoke.spec.ts` checks: the feed loads with the SAMPLE banner and the disclaimer, no images and no sideways overflow; ArrowDown / ArrowUp change the card; like and dislike on each card are at least 44 px, toggle with `aria-pressed` and undo; the Sources sheet opens and a source link goes to an `https` page; Share copies a `/b/<id>` link and that path opens in the app; the "Updates delayed" banner shows only with `/?mock_delayed=1`.
+`smoke.spec.ts` checks: the feed loads with the SAMPLE banner and the disclaimer, no images and no sideways overflow; ArrowDown / ArrowUp change the card; like and dislike on each card are at least 44 px, toggle with `aria-pressed` and undo; the Sources sheet opens and a source link goes to an `https` page; Share copies a `/b/<id>` link and that path opens in the app; the "Updates delayed" banner shows only with `/?mock_delayed=1`; on `/search` the empty box shows "Suggested for you" (1 to 5 stories) above "Try a company", a suggestion opens its More detail sheet, and typing a query replaces the suggestions without the error screen.
 
 The real `/b/<id>` share page is served by the host in production, not by Expo's dev server, so the test only checks that the path loads without an error.

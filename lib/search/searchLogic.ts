@@ -83,11 +83,13 @@ export function serializeRecents(list: string[]): string {
   return JSON.stringify(list.slice(0, RECENT_MAX));
 }
 
-// ---- Matching and ranking (mock mode; mirrors api.search v4, 20261019030000_search_v4.sql) ----
+// ---- Matching and ranking (mock mode; mirrors api.search: matching from v4,
+// 20261019030000_search_v4.sql, order key from v5, 20261114000000_search_v5.sql) ----
 //
 // Each query term contributes its best evidence score; weak metadata and ambiguous short synonyms
-// cannot dominate. Order: relevance (visible matches count fully, detail-only matches x0.2) first,
-// then the Trending score with the existing multi-term bonus as the tiebreak.
+// cannot dominate. Order: visible match first, then relevance (visible matches count fully,
+// detail-only matches x0.2) blended with a small capped ranking prior (Trending freshness and, when
+// signed in, the reader's topic taste); see searchOrderKey below.
 
 export const SEARCH_MAX_TERMS = 6; // settings.md: search_max_terms
 export const SEARCH_TERM_BONUS = 1.3; // settings.md: search_term_bonus
@@ -195,14 +197,14 @@ function visibleText(card: BlurbCard): string {
 
 // v4: `gate` is the v3 quality (best match anywhere, used for the 0.5 cutoff); `rank` counts a match
 // found only in the in-depth detail at SEARCH_DETAIL_WEIGHT, so visible matches rank first.
-export function termScores(term: string, card: BlurbCard): { gate: number; rank: number } {
+export function termScores(term: string, card: BlurbCard): { gate: number; rank: number; visible: boolean } {
   const vis = visibleText(card);
   const all = clean([vis, card.detail?.paragraphs.join(' '), card.detail?.key_points.join(' ')]);
   const qVis = textQuality(term, card, vis);
   const qAll = textQuality(term, card, all);
   const meta = clean([card.category, card.event_type?.replace(/_/g, ' '), ...card.sources.map((x) => x.name)]).split(' ');
   const qMeta = meta.includes(term) ? 0.25 : 0;
-  return { gate: Math.max(qAll, qMeta), rank: Math.max(qVis, SEARCH_DETAIL_WEIGHT * qAll, qMeta) };
+  return { gate: Math.max(qAll, qMeta), rank: Math.max(qVis, SEARCH_DETAIL_WEIGHT * qAll, qMeta), visible: qVis > 0 || qMeta > 0 };
 }
 
 function termQuality(term: string, card: BlurbCard): number {
@@ -233,19 +235,69 @@ export function searchScore(trendingHours: number, matched: number): number {
   return trendingHours + TRENDING_HALF_LIFE_HOURS * Math.log2(SEARCH_TERM_BONUS) * Math.max(0, matched - 1);
 }
 
-// Matching cards: visible matches before detail-only ones, then Trending; ties: importance, newest, id desc.
-export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: BlurbCard) => number): BlurbCard[] {
+// ---- v5 order key (mirrors 20261114000000_search_v5.sql) ----
+//
+// key = 10 x visible + (1 - w) x relevance / words + w x prior, higher first, rounded to 9 places.
+// The prior (0..1) can move a card by at most w, so a card more than w / (1 - w) (0.18) ahead on
+// per-word relevance always ranks first, and a visible match always beats a detail-only one.
+export const SEARCH_PRIOR_WEIGHT = 0.15; // settings.md: search_prior_weight (core.rank_params)
+export const SEARCH_PRIOR_AFFINITY_SHARE = 0.5; // settings.md: search_prior_affinity_share
+export const SEARCH_VISIBLE_TIER = 10;
+const AFFINITY_CAP_HOURS = 4; // rank_params.affinity_cap_hours
+
+const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+/** Trending key (hours) relative to now as 0..1: x / (1 + x), x = 2^((key - now) / half-life). */
+export function rankPrior(trendHours: number, nowHours: number, halfLife: number = TRENDING_HALF_LIFE_HOURS): number {
+  if (!Number.isFinite(trendHours) || !Number.isFinite(nowHours)) return 0;
+  const x = 2 ** clamp((trendHours - nowHours) / Math.max(halfLife, 0.5), -40, 40);
+  return x / (1 + x);
+}
+
+/** Reader taste in hours (core.taste_hours) as 0..1; 0.5 is neutral. */
+export function affinityPrior(tasteHours: number, capHours: number = AFFINITY_CAP_HOURS): number {
+  return (clamp((Number.isFinite(tasteHours) ? tasteHours : 0) / Math.max(capHours, 0.01), -1, 1) + 1) / 2;
+}
+
+export function searchOrderKey(
+  o: { visible: boolean; relevance: number; terms: number; rankPart: number; affinity?: number | null },
+  weight: number = SEARCH_PRIOR_WEIGHT,
+  affinityShare: number = SEARCH_PRIOR_AFFINITY_SHARE,
+): number {
+  const w = clamp(weight, 0, 0.5);
+  const a = clamp(affinityShare, 0, 1);
+  const rel = Math.min(Math.round(o.relevance * 10000) / 10000 / Math.max(o.terms, 1), 1);
+  const prior = o.affinity === null || o.affinity === undefined ? o.rankPart : (1 - a) * o.rankPart + a * o.affinity;
+  return Math.round(((o.visible ? SEARCH_VISIBLE_TIER : 0) + (1 - w) * rel + w * prior) * 1e9) / 1e9;
+}
+
+export interface SearchRankOptions {
+  nowHours?: number; // the frozen clock (SQL: the cursor's as-of time)
+  tasteHours?: ((c: BlurbCard) => number) | null; // signed in: the reader's taste per card; null for guests
+  weight?: number;
+  affinityShare?: number;
+}
+
+// Matching cards in the v5 order; ties: importance, newest, id desc (same as SQL).
+export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: BlurbCard) => number, opts: SearchRankOptions = {}): BlurbCard[] {
   const terms = searchTerms(raw);
   if (terms.length === 0) return [];
+  const now = opts.nowHours ?? Date.now() / 3_600_000;
   return cards
     .map((c) => {
       const s = terms.map((t) => termScores(t, c));
-      return { c, n: s.filter((x) => x.gate > 0).length, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0) };
+      return { c, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0), vis: s.some((x) => x.visible && x.gate > 0) };
     })
     .filter((x) => x.q >= SEARCH_MIN_QUALITY)
-    // Same as the SQL key relevance x 10,000,000 + Trending: relevance first, Trending breaks ties.
-    .map((x) => ({ c: x.c, r: Math.round(x.rq * 10000) / 10000, k: searchScore(trendingHours(x.c), x.n) }))
-    .sort((a, b) => b.r - a.r || b.k - a.k || (b.c.importance ?? 1) - (a.c.importance ?? 1)
+    .map((x) => ({
+      c: x.c,
+      k: searchOrderKey(
+        { visible: x.vis, relevance: x.rq, terms: terms.length, rankPart: rankPrior(trendingHours(x.c), now), affinity: opts.tasteHours ? affinityPrior(opts.tasteHours(x.c)) : null },
+        opts.weight,
+        opts.affinityShare,
+      ),
+    }))
+    .sort((a, b) => b.k - a.k || (b.c.importance ?? 1) - (a.c.importance ?? 1)
       || Date.parse(b.c.sort_at) - Date.parse(a.c.sort_at) || (a.c.id < b.c.id ? 1 : a.c.id > b.c.id ? -1 : 0))
     .map((x) => x.c);
 }
