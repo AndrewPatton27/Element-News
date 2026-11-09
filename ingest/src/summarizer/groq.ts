@@ -8,7 +8,7 @@
 import { config, groqDailyCap, groqMinIntervalMs } from '../config.ts';
 import { fetchAllowed, type FetchLike } from '../allowlist.ts';
 import { AI_CATEGORY_SLUGS } from '../validate.ts';
-import { buildPrompt, ProviderError, RateLimitedError, RELEVANCE_RUBRIC } from './gemini.ts';
+import { buildPrompt, isDailyQuota, modelFallback, ProviderError, RateLimitedError, RELEVANCE_RUBRIC } from './gemini.ts';
 import type { Summarizer, SummaryDraft } from '../types.ts';
 
 type ResponseFormat = 'json_schema' | 'json_object';
@@ -86,11 +86,13 @@ export function createGroqSummarizer(opts: {
   fetchImpl?: FetchLike;
   minIntervalMs?: number;
   dailyCap?: number;
+  timeoutMs?: number;
+  fallbackModel?: string | null;
 }): Summarizer {
-  const model = opts.model ?? config.groq.model;
+  const mf = modelFallback(opts.model ?? config.groq.model, opts.fallbackModel === undefined ? config.groq.alternativeModel : opts.fallbackModel);
   let lastScoreCall = 0;
 
-  async function call(prompt: string, format: ResponseFormat) {
+  async function call(prompt: string, format: ResponseFormat, model: string) {
     const body: Record<string, unknown> = {
       model,
       messages: [{ role: 'user', content: prompt }],
@@ -107,13 +109,15 @@ export function createGroqSummarizer(opts: {
       fetchImpl: opts.fetchImpl,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },  // key in a header, never in the URL
       body: JSON.stringify(body),
+      timeoutMs: opts.timeoutMs,
     });
   }
 
   return {
     name: 'groq',
     usesAi: true,
-    model,
+    get model() { return mf.model; },
+    get modelMissing() { return mf.missing; },
     dailyCap: opts.dailyCap ?? groqDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? groqMinIntervalMs(),
     async generate(prompt: string, gopts?: { maxTokens?: number }): Promise<string> {
@@ -121,15 +125,16 @@ export function createGroqSummarizer(opts: {
         const wait = lastScoreCall + config.reportCard.scoreMinIntervalMs - Date.now();
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
         lastScoreCall = Date.now();
-        const res = await fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl,
+        const res = await mf.call((model) => fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
           body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1,
-            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, reasoning_effort: 'low', response_format: { type: 'json_object' } }) });
-        if (res.status === 429 && attempt < config.reportCard.scoreMax429Retries) {
+            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, reasoning_effort: 'low', response_format: { type: 'json_object' } }) }));
+        // A daily-quota 429 will not clear by waiting: stop at once instead of retrying for minutes.
+        if (res.status === 429 && !isDailyQuota(res.text) && attempt < config.reportCard.scoreMax429Retries) {
           await new Promise(r => setTimeout(r, retryWaitMs(res)));
           continue;
         }
-        if (res.status === 429) throw new RateLimitedError('groq');
+        if (res.status === 429) throw new RateLimitedError('groq', isDailyQuota(res.text));
         if (res.status < 200 || res.status >= 300) throw new ProviderError(`groq scorer HTTP ${res.status}`);
         try { const x = JSON.parse(res.text)?.choices?.[0]?.message?.content; if (typeof x !== 'string') throw 0; return x; }
         catch { throw new ProviderError('groq scorer returned invalid JSON envelope'); }
@@ -139,13 +144,13 @@ export function createGroqSummarizer(opts: {
       // Tokens per minute are Groq's binding limit: send a shorter slice of the (already licensed) text.
       const prompt = buildPrompt({ ...input, text: input.text.slice(0, config.groq.sourceTextMaxChars) });
       let format: ResponseFormat = config.groq.responseFormat;
-      let res = await call(prompt, format);
+      let res = await mf.call((m) => call(prompt, format, m));
       // Structured output not accepted for this model/request: retry once in plain JSON mode.
       if (res.status === 400 && format === 'json_schema' && /response_format|json_schema|schema/i.test(res.text)) {
         format = 'json_object';
-        res = await call(prompt, format);
+        res = await mf.call((m) => call(prompt, format, m));
       }
-      if (res.status === 429) throw new RateLimitedError('groq');
+      if (res.status === 429) throw new RateLimitedError('groq', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) {
         throw new ProviderError(`groq: HTTP ${res.status}: ${res.text.slice(0, 200)}`);
       }
