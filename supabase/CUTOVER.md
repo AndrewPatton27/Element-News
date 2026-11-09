@@ -16,9 +16,10 @@ Paste each file in the SQL editor (or `supabase db push`). Each is re-runnable. 
 
 | Step | File | Why this position |
 |---|---|---|
-| 1 | `migrations/20261109000000_ranking_v2.sql` | Only if the file exists on the branch you deploy from. Skip silently if it does not. |
+| 1 | `migrations/20261109000000_ranking_v2.sql` | Now present on the release branch: apply it (ships OFF, `foryou_ml_mode` stays 0). |
 | 2 | `migrations/20261110000000_watchdog.sql` | **Must come before the functions are redeployed.** It drops the 2-argument `api.ai_usage_take(text, int)` and creates the 3-argument `api.ai_usage_take(text, int, boolean)`, adds `core.ai_caps`, `api.run_start`, the new `api.log_run`, `api.feed_status`, `api.ops_status`. The new function code calls these; the old code calls the old signature. Needs `ai_usage` and `run_log` migrations first (applied). |
 | 3 | `migrations/20261111000000_finance_sources_cron.sql` | Widens the `ingest.run_log.source` check to `treasury`, `fedspeech`, `secpress`, adds the series, and schedules three cron jobs. Needs `20261017010000_more_series.sql` (the `in_numbers` column) and the cron migration. Its jobs call functions that do not know the new sources until step 5 deploys, so deploy right after (a failed early call is only a logged error). |
+| 4 | `migrations/20261112000000_ranking_v3.sql` | Needs step 1 (reuses its `core.card_features` and tag tables). Ships OFF: `foryou_ml_mode` stays 0, so nothing about the feed changes. Mode 3 (v3 live) is a separate decision after the release is verified. Also recreates the v2 feed wrapper with a working statement-timeout fallback. |
 
 Checks after the steps:
 
