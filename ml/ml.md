@@ -140,14 +140,21 @@ Paging held: 600 frozen scrolls, 0 repeats, 0 same-cursor mismatches. Per type (
 
 Its limits: the simulator that grades ts_v2 is the same family of simulator its prior is trained on (the gate also needs the real replay), simulated readers carry no slot on their per-card record (so the simulated feed uses propensity 1), and the anti-macro reader stands in for a sports fan.
 
-## Ranking v3 (`elementml/v3/`): the formula plus a per-reader residual (prototype, Python only)
+## Ranking v3 (`elementml/v3/`): the formula plus a per-reader residual (Python prototype + SQL port, shipped off)
 
-The live formula stays the base. On top of it, each reader gets a bounded personal term in hours. It is built from their own rewards, centered on that reader's usual reward, per card feature (topic, type, source, tag, the same features as v2), with prior mean 0, so there is no pull toward the population average. A new reader gets the formula. In the simulator, with the final setting (topic step +2.5 h), it beats the formula in 15 of 15 world-seed pairs (NDCG@10 0.454 -> 0.530 normal, 0.332 -> 0.350 stress, 0.323 -> 0.341 wild). It passes the synthetic gate in all three worlds, but only under a macro test that was changed after seeing results: it is now at most the formula share + 0.02, because the formula itself failed the old test. There is no SQL yet. The numbers, the reasons v2 lost and the simulator audit are in `v3-findings.md`.
+The live formula stays the base. On top of it, each reader gets a bounded personal term in hours. It is built from their own rewards, centered on that reader's usual reward, per card feature (topic, type, source, tag, the same features as v2), with prior mean 0, so there is no pull toward the population average. A new reader gets the formula. In the simulator, with the final setting (topic step +2.5 h), it beats the formula in 15 of 15 world-seed pairs (NDCG@10 0.454 -> 0.530 normal, 0.332 -> 0.350 stress, 0.323 -> 0.341 wild). It passes the synthetic gate in all three worlds, but only under a macro test that was changed after seeing results: it is now at most the formula share + 0.02, because the formula itself failed the old test. The numbers, the reasons v2 lost and the simulator audit are in `v3-findings.md`.
+
+**SQL port** (`supabase/migrations/20261112000000_ranking_v3.sql`, served only when `foryou_ml_mode` = 3; ships at 0). It needs no training job: `core.v3_reader_weights` is one GROUP BY over the reader's own events and the precomputed `core.card_features`; `core.v3_scores` is v5's score plus the hours. Every setting is a `v3_*` row in `core.rank_params` (H 36, cap 30, lambda 2, k0 3, group weights 1 / 0.5 / 0.5 / 1, step 2.5). Two deliberate differences from the Python default, both settings:
+- The extra same-topic step applies only once the reader has evidence (`v3_step_extra_cold` = 0), so a cold reader gets exactly the v5 order. Simulator, seeds 1-5, step 2.5, Python default vs cold-gated: NDCG@10 0.530 / 0.529 normal, 0.350 / 0.349 stress, 0.341 / 0.341 wild; but topic recovery in normal goes 5.2 -> 6.2 days, so the cold-gated variant fails the gate's recovery line in normal (stress and wild pass). Set `v3_step_extra_cold` = 1 for the Python behaviour.
+- At most `v3_max_evidence_cards` (500) of the reader's latest viewed cards count (cost bound; Python has no cap).
+Tags: a card with no `g:` tag (about 71% of real headlines; real tags are mostly rates and recalls) gets no tag term, only its topic, type and source terms. A card none of whose features the reader has evidence on gets exactly 0 hours, so its v5 score. Measured in PGlite (in-memory, single process; a hosted Postgres is usually faster): 3000 cards in the window and a reader with 500 viewed cards, first page v5 227 ms vs v3 292 ms (b_j alone 16 ms); 600 cards and 100 viewed cards, 105 vs 107 ms.
 
 | File | What happens there |
 |---|---|
 | `v3/policy.py` | `V3Config` (every v3 setting), `reader_weights` (diag or ridge), `residual_hours`, `ResidualPolicy` for the simulator. |
-| `v3/methods.py` | Method names for the harness: `v3`, `v3:H=36,cap=30,step_extra=1.5`, `v3:solver=ridge`, ... |
+| `v3/reference.py` | Python mirror of the SQL port: `SQL_DEFAULTS` (the `v3_*` rows), `sql_config`, `weights` (= `core.v3_reader_weights`), `card_hours`. |
+| `v3/methods.py` | Method names for the harness: `v3`, `FINAL` = `v3:H=36,cap=30,step_extra=2.5`, `v3:solver=ridge`, `...,step_extra_cold=0`, ... |
+| `tests/test_v3_sql.py`, `tests/pglite_parity_v3.mjs` | SQL vs Python parity in PGlite: b_j, n_j, usual reward, every card's hours and page key, cold reader = v5 page for page, H = 0 = v5, caps, untagged cards, lambda = k0 = 0. Needs `PGLITE_PACKAGE_JSON` (else skipped). |
 | `evaluation/v3_eval.py` | Formula vs v3 (and ts_v2 or its ablations `ts_v2:lam=1,onformula=1`) over worlds and seeds, with the gate per method. |
 | `evaluation/v3_curves.py` | NDCG by explicit actions and by day, and paired differences, from `results/v3_eval.json`. |
 | `evaluation/sim_audit.py` | Does the ground truth favour the formula? Fixed-order NDCG ceilings, variance shares, importance-taste correlation. |
@@ -157,6 +164,7 @@ $PY -m elementml.cli eval-v3 --methods "ts_v2;v3;v3:H=36,cap=30,step_extra=1.5" 
 $PY -m elementml.cli sim-audit
 $PY -m elementml.evaluation.v3_curves
 $PY -m pytest tests/test_v3.py -q
+PGLITE_PACKAGE_JSON=<repo>/package.json $PY -m pytest tests/test_v3_sql.py -q   # SQL parity, about 2 min
 ```
 
 ## Rules this prototype keeps
