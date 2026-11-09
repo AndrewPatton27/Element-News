@@ -45,6 +45,8 @@
     "test:app": "node --experimental-strip-types --test \"lib/__tests__/*.test.ts\"",
     "test:ingest": "npm --prefix ingest test",
     "test:functions": "node --experimental-strip-types --test \"supabase/functions/**/*.test.ts\"",
+    "test:worker": "npm --prefix workers/watchdog test",
+    "scan:secrets": "node scripts/secret-scan.mjs",
     "deploy": "npm run export:web && wrangler deploy",
     "preview": "npm run export:web && wrangler dev"
   },

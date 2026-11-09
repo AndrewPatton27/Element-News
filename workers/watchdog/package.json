@@ -1,0 +1,10 @@
+{
+  "name": "element-watchdog",
+  "private": true,
+  "type": "module",
+  "description": "Hourly Cloudflare Worker: reads Element's health from Supabase, re-triggers a stale pipeline, alerts through GitHub issues and a Healthchecks.io dead-man ping.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"test/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
