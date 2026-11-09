@@ -3,7 +3,7 @@
 //    (real API requests also keep the free Supabase project from pausing). No service-role key in the Worker.
 // 2. Re-trigger: when the pipeline is stale, POST ingest-source for 4 rotating sources, one after another,
 //    in the first run of each 6-hour block, with CRON_SECRET.
-// 3. Alert through GitHub issues in a private repo (alerts.ts), then ping the Healthchecks.io dead-man check
+// 3. Alert through GitHub issues in a private repo (alerts.ts), then (only if HEALTHCHECK_URL is set) ping a dead-man check
 //    (it emails if this Worker stops, or if GitHub refuses the token, e.g. an expired PAT).
 // All secrets come from the environment (wrangler secret put); nothing is written in code.
 // Inputs: Env (below). Outputs: a JSON summary in the Worker log (counts and kinds only).
@@ -18,7 +18,7 @@ export interface Env {
   CRON_SECRET: string;                  // secret: same value as the Edge Function secret CRON_SECRET
   GITHUB_TOKEN: string;                 // secret: fine-grained PAT, Issues read/write on the one private repo
   ALERT_REPO: string;                   // var: "owner/element-ops" (private)
-  HEALTHCHECK_URL: string;              // secret: https://hc-ping.com/<uuid>
+  HEALTHCHECK_URL?: string;             // optional secret (https://hc-ping.com/<uuid>); when unset the ping is skipped
 }
 
 export interface RunReport {

@@ -12,7 +12,7 @@ No public surface (HTTP requests get 404). Cloudflare Free allows 5 cron trigger
    of a 6-hour block (UTC hours 0, 6, 12, 18), it POSTs `ingest-source` for 4 sources one after another (a window
    that rotates through macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa), with `CRON_SECRET` as the bearer
    token. No stored state is needed.
-3. **Alert** through GitHub issues, then **ping** Healthchecks.io.
+3. **Alert** through GitHub issues. (An optional Healthchecks.io ping runs only if `HEALTHCHECK_URL` is set; Drew chose not to use it.)
 
 ## Problems it reports (label `wd:<kind>`)
 
@@ -34,8 +34,10 @@ could not judge (Supabase down) is never closed. Issue text holds only counts, t
 classes, cut to 200 characters with keys, uuids and long opaque strings removed (`sanitize` in `src/logic.ts`).
 The repo must be **private** (issues in a public repo are public).
 
-If GitHub answers 4xx (for example an expired token) the Worker sends `/fail` to the Healthchecks.io check, which emails
-Drew. If the Worker stops running at all, the check misses its hourly ping and emails too.
+Alerts are GitHub issues only. If GitHub answers 4xx (for example an expired token) no alert can be sent; the Worker
+logs it, and the app's "updates delayed" banner still works because it comes from `api.feed_status()`, not the Worker.
+Check the token's expiry date when you create it and put a reminder in your calendar. With `HEALTHCHECK_URL` set, a
+Healthchecks.io check would also email when the Worker stops (not enabled).
 
 ## Files
 
@@ -56,7 +58,7 @@ Drew. If the Worker stops running at all, the check misses its hourly ping and e
 | `WATCHDOG_TOKEN` | secret | same value as the Vault secret `element_watchdog_token` |
 | `CRON_SECRET` | secret | same value as the Edge Function secret `CRON_SECRET` (24+ characters) |
 | `GITHUB_TOKEN` | secret | fine-grained token, Issues read and write, only the `element-ops` repo |
-| `HEALTHCHECK_URL` | secret | the check's ping URL from Healthchecks.io |
+| `HEALTHCHECK_URL` | optional secret | not used; leave unset and the ping is skipped |
 
 Set each secret with `npx wrangler secret put <NAME>` in this folder (type the value there; never put it in a file).
 Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 10 jobs) are constants at the top of `src/logic.ts`.
