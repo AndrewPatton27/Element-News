@@ -1,0 +1,39 @@
+# CI: runs on every push and pull request. Nothing here is scheduled (GitHub disables scheduled workflows after
+# 60 days without repository activity, and the news pipeline does not run here: pg_cron in Supabase does).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Secret scan (tracked files; no key shapes, no .env, CLAUDE.md, context/ or docs/)
+        run: npm run scan:secrets
+      - name: Type check app
+        run: npx tsc --noEmit
+      - name: Type check ingest, Edge Functions and watchdog
+        run: |
+          npx tsc --noEmit -p ingest/tsconfig.json
+          npx tsc --noEmit -p supabase/functions/tsconfig.json
+          npx tsc --noEmit -p workers/watchdog/tsconfig.json
+      - name: App tests
+        run: npm run test:app
+      - name: Ingest tests
+        run: npm run test:ingest
+      - name: Edge Function tests
+        run: npm run test:functions
+      - name: Watchdog Worker tests
+        run: npm run test:worker

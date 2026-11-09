@@ -9,10 +9,10 @@
 // Outputs: { ok, outcomes: [{ kind, status, for_date, model }], ai_calls, run } (no summary text, no keys).
 
 import { buildTextModels, createMailRpc, fetchBrief, runBriefSummary, type BriefInput, type BriefKind, type FetchLike, type TextModel } from '../_shared/ingest.ts';
-import { createTimeBudget, type TimeBudget } from '../_shared/budget.ts';
+import { createTimeBudget, DeadlineError, withDeadline, type TimeBudget } from '../_shared/budget.ts';
 import { describeFunctionEnv, truthy, type FunctionEnv } from '../_shared/env.ts';
 import { createServiceRpc, type Rpc } from '../_shared/rpc.ts';
-import { buildRunSummary, runLogPayload, type RunSummary } from '../_shared/runSummary.ts';
+import { buildRunSummary, runLogPayload, startRunLog, type RunSummary } from '../_shared/runSummary.ts';
 import { createUsageTracker, rpcUsageStore, textModelWithUsage, type UsageStore } from '../_shared/usage.ts';
 
 export interface BriefSummaryOptions {
@@ -59,6 +59,7 @@ export async function handleBriefSummary(deps: BriefSummaryDeps, opts: BriefSumm
   const rpc = deps.rpc ?? createServiceRpc({ url: env.supabaseUrl, key: env.serviceKey, fetchImpl: deps.fetchImpl });
   const tracker = await createUsageTracker(deps.usageStore ?? rpcUsageStore(rpc));
   for (const e of tracker.errors) say(`warning: ${e}`);
+  const runId = opts.dryRun ? null : await startRunLog(rpc, 'brief-summary', startedAt);
 
   const base = opts.noAi ? [] : (deps.models ?? buildTextModels({ geminiApiKey: env.geminiApiKey, groqApiKey: env.groqApiKey }, deps.fetchImpl));
   const models = base.map((m) => textModelWithUsage(m, tracker, (w) => budget.aiAllowed(w)));
@@ -67,27 +68,30 @@ export async function handleBriefSummary(deps: BriefSummaryDeps, opts: BriefSumm
   const mail = opts.dryRun || deps.putSummary ? null : createMailRpc({ url: env.supabaseUrl, key: env.serviceKey, fetchImpl: deps.fetchImpl });
   let outcomes: BriefSummaryResult['outcomes'] = [];
   let error: string | null = null;
+  let timedOut = false;
   try {
-    const res = await runBriefSummary({
+    const res = await withDeadline(runBriefSummary({
       fetchBrief: deps.fetchBrief ?? ((kind) => fetchBrief(kind, { url: env.supabaseUrl, key: env.readKey, fetchImpl: deps.fetchImpl })),
       putSummary: opts.dryRun ? undefined : (deps.putSummary ?? ((kind, d, text, model) => mail!.putBriefSummary(kind, d, text, model))),
       models, counter: tracker.counter, now: new Date(startedAt), log: say,
-    }, { kinds: opts.kinds, force: opts.force, dryRun: opts.dryRun });
+    }, { kinds: opts.kinds, force: opts.force, dryRun: opts.dryRun }), Math.max(0, budget.hardMs - budget.elapsedMs()));
     outcomes = res.map((o) => ({ kind: o.kind, status: o.status, for_date: o.for_date, model: o.model }));
   } catch (e) {
+    timedOut = e instanceof DeadlineError;
     error = (e as Error).message;
     say(`error: ${error}`);
   }
+  const modelMissing = models.some((m) => m.modelMissing);
 
   const written = outcomes.filter((o) => o.status === 'written').length;
   const run = buildRunSummary({
     source: 'brief-summary', startedAt, finishedAt: now(),
     stats: { published: written, skipped: outcomes.length - written, failed: error ? 1 : 0 },
     guard: { itemsNew: outcomes.length, deferredTime: 0, deferredCap: 0, stoppedBy: 'done' },
-    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, log,
+    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
   });
   if (!opts.dryRun) {
-    try { await rpc('log_run', { p: runLogPayload(run) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }
+    try { await rpc('log_run', { p: runLogPayload(run, runId) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }
   }
   return { ok: !error, outcomes, ai_calls: run.ai_calls, run };
 }

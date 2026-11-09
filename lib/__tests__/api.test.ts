@@ -124,7 +124,9 @@ test('topStories and numberTrends parse good rows and skip bad ones', async () =
 });
 
 test('new mock endpoints provide searchable, related, following and brief data', async () => {
-  const api = createMockFeatureApi([card(), card({ id: 'c2', headline: '[SAMPLE] Northwind raises outlook', category: 'markets' }), card({ id: 'c3', headline: '[SAMPLE] Another company beats estimates', category: 'earnings' })], [], []);
+  const t = new Date(Date.now() - 3_600_000).toISOString();   // fresh: the brief window is relative to now
+  const fresh = { as_of: t, published_at: t, sort_at: t };
+  const api = createMockFeatureApi([card(fresh), card({ ...fresh, id: 'c2', headline: '[SAMPLE] Northwind raises outlook', category: 'markets' }), card({ ...fresh, id: 'c3', headline: '[SAMPLE] Another company beats estimates', category: 'earnings' })], [], []);
   assert.equal((await api.search('Northwind')).items.length, 3);
   assert.deepEqual(await api.search('x'), { items: [], next_cursor: null });
   assert.ok((await api.relatedCards('c1')).every((c) => c.id !== 'c1'));

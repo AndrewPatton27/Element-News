@@ -44,7 +44,7 @@ export interface Deps {
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
-  reportCard?: { enabled?: boolean; scorer?: ScoreClient };
+  reportCard?: { enabled?: boolean; scorer?: ScoreClient; /** the Groq scorer is skipped once counter.used('groq') reaches this (cards then publish unscored) */ scorerMaxGroqUsed?: number };
   /** Candidate selection overrides (tests, flags): enabled replaces config.selection.enabled. */
   selection?: { enabled?: boolean };
 }
@@ -590,6 +590,8 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     const protocolOn = deps.reportCard?.enabled ?? config.reportCard.protocolEnabled;
     const scorer = deps.reportCard?.scorer ?? ((): ScoreClient | null => {
       const g = deps.providers.find((p) => p.name === 'groq' && typeof p.generate === 'function');
+      const stop = deps.reportCard?.scorerMaxGroqUsed;
+      if (g && stop !== undefined && deps.counter.used('groq') >= stop) return null;   // Groq calls are reserved for writing and the Brief
       return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
     })();
     if (protocolOn && r.ai_generated && scorer) {

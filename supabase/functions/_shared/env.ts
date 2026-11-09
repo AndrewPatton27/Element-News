@@ -57,13 +57,18 @@ function sameSecret(a: string, b: string): boolean {
 }
 
 /**
- * Only the scheduler (pg_cron + pg_net, key from Vault) or Drew may run a function: the bearer token
- * must equal the project's service-role key. The gateway's JWT check (verify_jwt) comes on top.
+ * Only the scheduler (pg_cron + pg_net, key from Vault), the watchdog Worker or Drew may run a function: the
+ * bearer token must equal the project's service-role key, or the function secret CRON_SECRET (at least 24
+ * characters; it can only start these two functions, which is why the Worker holds it instead of the
+ * service-role key). A CRON_SECRET bearer is not a JWT, so deploy both functions with --no-verify-jwt;
+ * this check is then the gate (see supabase/functions/functions.md).
  */
 export function isAuthorized(authorization: string | null | undefined, get: EnvGet): boolean {
   const key = (get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+  const cron = (get('CRON_SECRET') ?? '').trim();
   const m = /^Bearer\s+(\S+)$/i.exec((authorization ?? '').trim());
-  return key.length >= 20 && !!m && sameSecret(m[1], key);
+  if (!m) return false;
+  return (key.length >= 20 && sameSecret(m[1], key)) || (cron.length >= 24 && sameSecret(m[1], cron));
 }
 
 /** Reads a JSON object body; an empty or bad body counts as {} (the query string can carry the options too). */

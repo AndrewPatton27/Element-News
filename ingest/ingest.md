@@ -44,6 +44,8 @@ The ingest script runs on a laptop (Node 22.18 or newer, no dependencies). Each 
    5. `api.publish_blurb` stores the card and its source link, then ranks it. The database repeats the duplicate, ticker-cap, source and license checks.
 7. A summary line per card and a final count are printed.
 
+**Hardening (watchdog, 2026-11-08).** Every request ends after `config.fetchTimeoutMs` (20 s) including the body read (`fetchAllowed`, `timeoutMs` option, `TimeoutError`); the Gemini and Groq adapters pass it down, and an HTTP 404 (or a 400 saying the model was not found) switches the same call to `config.gemini.fallbackModel` / `config.groq.alternativeModel` and sets `modelMissing` on the provider. A 429 whose text says the daily quota is gone throws `RateLimitedError` with `daily = true` (the Edge Functions then mark the provider used up for the day; the Groq scorer does not wait and retry). `Deps.reportCard.scorerMaxGroqUsed` (set only by the Edge Functions to `config.reportCard.cloudScorerMaxGroqUsed`, 50) skips the Groq scorer once Groq has been used that many times today. Tests: `test/hardening.test.ts`.
+
 Every outbound request goes through `src/allowlist.ts`:
 - Full pages come only from `www.sec.gov`, `www.federalreserve.gov` and `www.bls.gov`.
 - Data APIs are limited to FRED, Treasury (`home.treasury.gov` and the FiscalData API `api.fiscaldata.treasury.gov`), BEA's RSS host (`apps.bea.gov`), the Federal Register API (`www.federalregister.gov`), SEC's per-company filing lists (`data.sec.gov`, JSON only), Wikipedia's REST feed (`en.wikipedia.org`), CPSC (`www.saferproducts.gov`), USGS (`earthquake.usgs.gov`), NASA's RSS (`www.nasa.gov`), Gemini, Groq (`api.groq.com`) and the project's Supabase host. None of these is a page host.
