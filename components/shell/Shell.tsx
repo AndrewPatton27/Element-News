@@ -41,7 +41,7 @@ export function Wordmark({ size = 24, text = APP_NAME }: { size?: number; text?:
   // The Element name in the top left of every page takes you back to the feed.
   if (text !== APP_NAME) return label;
   return (
-    <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, back to the feed`} hitSlop={8}>
+    <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, back to the feed`} hitSlop={{ top: 11, bottom: 11, left: 8, right: 8 }}>
       {label}
     </Pressable>
   );
@@ -186,6 +186,7 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
           onPress={() => go('/about')}
           accessibilityRole="link"
           accessibilityLabel="About Element"
+          hitSlop={4}
           style={[active === 'feed' ? styles.aboutFabFeed : styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
         >
           <InfoIcon color={p.inkSoft} size={24} />
