@@ -8,7 +8,7 @@ export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa';
 
 /** One collected item, ready for summarizing. */
 export interface RawItem {
-  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
+  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
   external_id: string;
   url: string;                       // the page we cite (and may fetch: allowlisted hosts only)
   title: string;

@@ -172,6 +172,8 @@ export const config = {
   // data.sec.gov serves only the per-company submissions JSON here (filing lists, never pages).
   apiHosts: ['api.stlouisfed.org', 'home.treasury.gov', 'generativelanguage.googleapis.com', 'api.groq.com', 'apps.bea.gov',
     'www.federalregister.gov', 'data.sec.gov',
+    // Treasury FiscalData JSON API (average interest rates, debt to the penny): numbers only, never pages.
+    'api.fiscaldata.treasury.gov',
     // Broad topics (feed/API text only, never pages): Wikipedia REST featured feed, CPSC recalls API,
     // USGS earthquake GeoJSON, NASA news-release RSS.
     'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov'],
@@ -190,11 +192,21 @@ export const config = {
       'https://www.federalreserve.gov/feeds/press_all.xml',
     ],
     beaRss: 'https://apps.bea.gov/rss/rss.xml',
+    // Fed Board speeches and testimony (Board members only; Reserve Bank presidents are outside the licence).
+    fedSpeechRss: 'https://www.federalreserve.gov/feeds/speeches.xml',
+    // SEC press releases (US government work; feed text only, copy limit 10 words to stay safe).
+    secPressRss: 'https://www.sec.gov/news/pressreleases.rss',
     fredObservations: 'https://api.stlouisfed.org/fred/series/observations',
     treasuryCsv: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv',
   },
   macroSeries: ['DGS2', 'DGS10', 'DFF', 'CPIAUCSL', 'UNRATE', 'DCOILWTICO',
-    'GASREGW', 'ICSA', 'RSAFS', 'HOUST', 'PAYEMS', 'A191RL1Q225SBEA'],
+    'GASREGW', 'ICSA', 'RSAFS', 'HOUST', 'PAYEMS', 'A191RL1Q225SBEA',
+    // Finance and rates (2026-11-08): all Federal Reserve Board H.15 series. SPREAD_10Y2Y is not fetched: it is
+    // computed from DGS10 and DGS2 (FRED's own T10Y2Y and SOFR pages carry a copyright flag, so they stay out).
+    // Check each series' notes on its FRED page for a "Copyright" line before enabling in production.
+    'DGS3MO', 'DGS5', 'DGS30', 'EFFR', 'DFEDTARU', 'DFEDTARL'],
+  // Derived series: id -> [minuend, subtrahend] (both must be fetched in the same run).
+  derivedSeries: { SPREAD_10Y2Y: ['DGS10', 'DGS2'] } as Record<string, [string, string]>,
   // FRED series that must never be fetched or shown (not public domain). MORTGAGE30US: Freddie Mac copyright.
   forbiddenSeries: ['MORTGAGE30US'],
   // A data card is published only for a new observation that moved at least this much
@@ -207,6 +219,14 @@ export const config = {
     DCOILWTICO: 2.0,     // percent
     GASREGW: 1.0,        // percent, weekly
     ICSA: 5.0,           // percent, weekly
+    DGS3MO: 0.10,        // percentage points
+    DGS5: 0.10,
+    DGS30: 0.10,
+    EFFR: 99,            // numbers panel only: DFF already carries the fed funds card
+    DFEDTARU: 0.05,      // the rate-range upper limit changes only at FOMC decisions (one card per change)
+    DFEDTARL: 99,        // lower limit moves together with the upper one: numbers only
+    SPREAD_10Y2Y: 99,    // numbers only
+    TREAS_DEBT: 1e9,     // grows every day: numbers only
   } as Record<string, number>,
   fredLookbackDays: 500,                       // enough history for CPI year-over-year
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
@@ -215,6 +235,29 @@ export const config = {
   // BEA releases come 2-5 a week; on 2026-10-17 the newest was 11 days old, so 7 days would show none.
   beaMaxAgeDays: 120,
   beaAttribution: 'Source: U.S. Bureau of Economic Analysis',
+  // Fed speeches and testimony: feed title + description only (no page download). Items dated in the
+  // future (embargo timestamps) are held back until their pubDate.
+  fedSpeechMaxAgeDays: 30,
+  fedSpeechAttribution: 'Source: Board of Governors of the Federal Reserve System',
+  // SEC press releases: feed text only. Copy limit follows the filing class (10 words).
+  secPressMaxAgeDays: 14,
+  secPressAttribution: 'Source: U.S. Securities and Exchange Commission',
+  // Treasury FiscalData (JSON API, no key, no stated limit; one call per dataset per run, daily at most).
+  // Values arrive as strings and "null". Cite the agency even though attribution is not required (Rule 8).
+  fiscalData: {
+    base: 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service',
+    avgRatesPath: '/v2/accounting/od/avg_interest_rates?sort=-record_date&page[size]=100',
+    debtPath: '/v2/accounting/od/debt_to_penny?sort=-record_date&fields=record_date,tot_pub_debt_out_amt&page[size]=2',
+    attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    // Which security descriptions become which series (all with security_type_desc "Marketable").
+    avgRateSeries: {
+      'Treasury Bills': 'TREAS_AVG_BILLS',
+      'Treasury Notes': 'TREAS_AVG_NOTES',
+      'Treasury Bonds': 'TREAS_AVG_BONDS',
+    } as Record<string, string>,
+    // Only these series may become data cards (monthly series would otherwise give one card each per month).
+    cardSeries: ['TREAS_AVG_NOTES'] as string[],
+  },
   // Federal Register final rules (JSON API, no key). The AI sees only each document's `abstract`;
   // documents without one are skipped. Reuse permitted (1 CFR 2.6); public-domain copy limit.
   fedRegister: {
