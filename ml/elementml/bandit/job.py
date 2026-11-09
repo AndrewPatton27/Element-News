@@ -60,9 +60,10 @@ def _load(data: Path):
         cards[c["id"]] = RefCard(id=c["id"], category=c["category"], typ=c.get("typ"), skey=c.get("skey"),
                                  headline=c.get("headline") or "", series=tuple(c.get("series") or ()),
                                  rank_score=float(c.get("rank_score") or 0), sort_at=iso_to_hours(c["sort_at"]),
-                                 published_at=iso_to_hours(c["published_at"]), words=int(c.get("word_count") or 0))
-    # the database's own tags win (core.v2_features); the Python rules are only a fallback
-    feats = {c["id"]: list(c["features"]) if c.get("features") else cards[c["id"]].features for c in _r(data / "cards.json")}
+                                 published_at=iso_to_hours(c["published_at"]), words=int(c.get("word_count") or 0),
+                                 tags=tuple(c["features"]) if c.get("features") is not None else None)
+    # the database's own features (core.v2_features, exported) are used everywhere; Python rules only if missing
+    feats = {k: c.features for k, c in cards.items()}
     follows = {p["user_id"]: list(p.get("followed_categories") or []) for p in _r(data / "prefs.json")}
     return P, asof, ev, cards, feats, follows
 

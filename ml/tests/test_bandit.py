@@ -284,6 +284,29 @@ def test_synthetic_gate_logic():
     assert not G.synthetic_gate([])["passed"]
 
 
+def test_replay_ignores_what_happens_after_the_page():
+    cs = _world(12)
+    m = Model(prop={b: 1.0 / (1 + 0.1 * b) for b in range(21)})
+    page = {"user_id": U, "surface": "for_you", "as_of": NOW, "shown_at": NOW, "card_ids": [c.id for c in cs]}
+    hist = [card(100 + i, cat="world", head="Storm") for i in range(30)]              # evidence off the page
+    base = [Event(cs[11].id, "view", None, NOW + 0.1, 11), Event(cs[11].id, "like", None, NOW + 0.1)]
+    base += [Event(c.id, "like", None, NOW - 5) for c in hist]
+    later = base + [Event(c.id, "dislike", None, NOW + 3) for c in cs[:6]]            # after the page and its window
+    cards = {c.id: c for c in cs + hist}
+    P0 = params({"v2_explore": 0})
+    g1 = G.replay_gains([page], {U: base}, cards, {}, m, P0)[U][0]
+    g2 = G.replay_gains([page], {U: later}, cards, {}, m, P0)[U][0]
+    assert g1 == g2
+    no_hist = G.replay_gains([page], {U: base[:2]}, cards, {}, m, P0)[U][0]
+    assert no_hist != g1                                                                 # off-page evidence counts
+
+
+def test_refcard_uses_exported_features():
+    c = RefCard(id="x", category="tech", typ=None, skey=None, headline="", tags=("g:ai", "c:tech"))
+    assert c.features == ["c:tech", "g:ai"]
+    assert FT.card_features("", None, None, "") == []                                    # null category: no c: feature
+
+
 def test_replay_gate_needs_data_and_a_positive_lower_bound():
     pages = [{"surface": "for_you", "shown_at": NOW + d * 24} for d in range(20)]
     few = G.replay_gate(pages, {f"u{i}": [0.1] for i in range(50)})
@@ -399,19 +422,29 @@ def _parity_fixture(rng):
                 cards=cards, events=events, model_rows=rows, params={}, normal_features=["c:tech", "g:rates", "s:nasa"]), model
 
 
-@pytest.mark.parametrize("variant", ["follows", "cold", "hidden_source"])
+@pytest.mark.parametrize("variant", ["follows", "cold", "hidden_source", "unslotted"])
 def test_pglite_parity(variant, tmp_path):
     pj = os.environ.get("PGLITE_PACKAGE_JSON")
     if not pj or not shutil.which("node"):
+        if os.environ.get("REQUIRE_PGLITE"):
+            pytest.fail("REQUIRE_PGLITE is set but PGLITE_PACKAGE_JSON or node is missing")
         pytest.skip("PGLITE_PACKAGE_JSON not set or node missing: SQL parity not run")
     from elementml.bandit.supa import iso_to_hours
-    rng = np.random.default_rng({"follows": 11, "cold": 12, "hidden_source": 13}[variant])
+    rng = np.random.default_rng({"follows": 11, "cold": 12, "hidden_source": 13, "unslotted": 14}[variant])
     fx, model = _parity_fixture(rng)
     if variant == "cold":
         fx["prefs"]["followed"] = []
         fx["events"] = [e for e in fx["events"] if e["kind"] != "like"][:3]
     if variant == "hidden_source":
         fx["prefs"]["hidden_sources"] = ["sec"]
+    if variant == "unslotted":                         # views with no slot, and likes with no view at all
+        for e in fx["events"][::2]:
+            e["slot"] = None
+        fx["events"] = [e for e in fx["events"] if not (e["kind"] == "view" and e["blurb_id"] in
+                                                        {x["blurb_id"] for x in fx["events"] if x["kind"] == "like"}
+                                                        and int(e["blurb_id"][-1], 16) % 2 == 0)]
+        fx["events"].append(dict(blurb_id=fx["cards"][7]["id"], kind="like", dwell_ms=None,
+                                 created_at=_iso(NOW - 3), slot=None))
     (tmp_path / "fx.json").write_text(json.dumps(fx), encoding="utf-8")
     run = subprocess.run(["node", str(ML / "tests" / "pglite_parity.mjs"), str(REPO), str(tmp_path / "fx.json")],
                          capture_output=True, text=True, timeout=600)
@@ -440,3 +473,34 @@ def test_pglite_parity(variant, tmp_path):
         assert a["s0"] == pytest.approx(b.s0, abs=2e-5)
         assert a["ps"] == pytest.approx(b.ps, abs=2e-5)
     assert any(abs(b.bandit) > 0.5 for b in py)                                          # the personal term is not trivially 0
+
+
+# ---- the weekly job on an offline data folder ------------------------------------------------------------
+def test_job_steps_offline(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    from elementml.bandit import job
+    from elementml.bandit.supa import Supa, SupaError, hours_to_iso
+    rng = np.random.default_rng(5)
+    cs, ev = _population(30, rng)
+    flat = [(u, e) for u, es in ev.items() for e in es]
+    events = [{"id": k, "user_id": u, "blurb_id": e.card, "kind": e.kind, "dwell_ms": e.ms, "created_at": hours_to_iso(e.t),
+               "page_id": None, "slot": e.slot, "surface": "for_you" if e.slot is not None else None}
+              for k, (u, e) in enumerate(flat)]
+    cards = [{"id": c.id, "category": c.category, "typ": c.typ, "skey": c.skey, "features": c.features, "word_count": c.words,
+              "rank_score": c.rank_score, "sort_at": hours_to_iso(c.sort_at), "published_at": hours_to_iso(c.published_at)} for c in cs]
+    files = {"events": events, "pages": [], "prefs": [{"user_id": "u000", "followed_categories": ["tech"]}], "cards": cards,
+             "params": dict(DEFAULTS), "meta": {"asof": hours_to_iso(NOW)}}
+    for k, v in files.items():
+        (tmp_path / f"{k}.json").write_text(json.dumps(v), encoding="utf-8")
+    rep = job.train(tmp_path)
+    assert rep["readers"] == 30 and rep["features"] >= 2
+    synth = tmp_path / "synthetic.json"
+    synth.write_text(json.dumps({"runs": _runs("normal") + _runs("stress") + _runs("wild")}), encoding="utf-8")
+    g = job.gate(tmp_path, synth)
+    assert g["synthetic"]["passed"] and not g["replay"]["passed"] and g["gate_passed"] is False   # no real pages yet
+    printed = capsys.readouterr().out
+    assert "u000" not in printed and "00000000-0000" not in printed                                # counts only, no ids
+    with pytest.raises(SupaError):
+        Supa(url="", key="")
+    assert "secret" not in repr(Supa(url="https://example.invalid", key="secret"))

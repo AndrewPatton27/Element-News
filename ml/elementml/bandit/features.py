@@ -78,7 +78,7 @@ def tags_of(category: str, typ: Optional[str], headline: str, series: Iterable[s
 def card_features(category: str, typ: Optional[str], skey: Optional[str], headline: str = "",
                   series: Iterable[str] = (), rules: list[tuple[str, str, str]] = TAG_RULES) -> list[str]:
     """Sorted feature names of one card (mirror of core.v2_features)."""
-    f = {"c:" + category}
+    f = {"c:" + category} if category else set()       # SQL: no c: feature for a null category
     if typ:
         f.add("t:" + typ)
     if skey:
