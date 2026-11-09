@@ -96,6 +96,15 @@ Element includes end-to-end unit, contract, and parsing test suites across the e
 npm run test:app
 
 # Ingestion pipeline, validator and allowlist tests (301 tests)
+# Run app logic, contract, and formatting tests (346 tests pass)
+npm run test:app
+
+# Browser smoke test on sample data, phone and desktop viewports (feed, next card,
+# like/dislike, sources sheet, share link, delayed banner). Starts the web app itself.
+# First time: `npx playwright install chromium` (or PW_CHANNEL=chrome to use installed Chrome).
+npm run test:e2e
+
+# Run ingestion pipeline, validator, and allowlist tests
 npm run test:ingest
 
 # Edge Functions (budget, usage caps, run log, deadline) (39 tests)

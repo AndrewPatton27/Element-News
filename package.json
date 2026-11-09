@@ -31,6 +31,7 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3",
     "wrangler": "^4.151.1"
@@ -43,6 +44,7 @@
     "lint": "expo lint",
     "export:web": "expo export -p web --output-dir dist-pages && node scripts/fix-pages-assets.mjs dist-pages",
     "test:app": "node --experimental-strip-types --test \"lib/__tests__/*.test.ts\"",
+    "test:e2e": "playwright test",
     "test:ingest": "npm --prefix ingest test",
     "test:functions": "node --experimental-strip-types --test \"supabase/functions/**/*.test.ts\"",
     "test:worker": "npm --prefix workers/watchdog test",
