@@ -213,3 +213,28 @@ test('no stray encoding characters (Â·, â€) in app, component or library so
   for (const d of ['app', 'components', 'lib', 'contract']) walk(new URL(d, root).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
   assert.deepEqual(hits, []);
 });
+
+test('sample Following: a followed company brings cards that mention it, with a company note; capped at 100 tickers', async () => {
+  const { createMockFeatureApi } = await import('../api/api.mockFeatures.ts');
+  const cards = fixtureCards();
+  const f = createMockFeatureApi(cards, [], []);
+  const recall = cards.find((c) => /Contoso recalls/.test(c.headline))!;
+  assert.ok(recall && recall.tickers.length === 0, 'fixture recall has no tickers of its own');
+  const items = f.followingFeed({ topics: [], sources: [], tickers: ['ctse'], limit: 30 }).items;
+  const hit = items.find((c) => c.id === recall.id);
+  assert.equal(hit?.follow_match, 'company');
+  assert.equal(hit?.follow_ticker, 'CTSE');
+  assert.equal(hit?.follow_reason, 'Because you follow CTSE (mentions Contoso)');
+  // the company's own-ticker card keeps the plain reason
+  const own = items.find((c) => c.tickers.some((t) => t.symbol === 'CTSE'));
+  assert.equal(own?.follow_reason, 'Because you follow CTSE');
+  assert.equal(own?.follow_match, 'ticker');
+  // Northwind Island is a place: following Northwind Corp does not make it a direct match
+  const island = cards.find((c) => /Northwind Island/.test(c.headline))!;
+  const nw = f.followingFeed({ topics: [], sources: [], tickers: ['NWND'], limit: 30 }).items.find((c) => c.id === island.id);
+  assert.notEqual(nw?.follow_match, 'company');
+  // only the first 100 followed tickers count
+  const junk = Array.from({ length: 120 }, (_, i) => `Q${i}`);
+  assert.equal(f.followingFeed({ topics: [], sources: [], tickers: [...junk, 'CTSE'], limit: 30 }).items.find((c) => c.id === recall.id)?.follow_match, undefined);
+  assert.equal(f.followingFeed({ topics: [], sources: [], tickers: ['CTSE', ...junk], limit: 30 }).items.find((c) => c.id === recall.id)?.follow_match, 'company');
+});

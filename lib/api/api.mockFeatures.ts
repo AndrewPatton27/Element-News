@@ -4,6 +4,11 @@ import type { BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, Br
 import { mockRankScore } from '../feed/feedLogic.ts';
 import { rankSearch } from '../search/searchLogic.ts';
 import { isValidBriefInput, normalizeBriefEmail } from '../shared/types.ts';
+import { tagSampleCards } from '../companies/companyApi.ts';
+import type { CardCompany } from '../companies/companyLogic.ts';
+
+/** api.following_feed counts at most this many followed tickers (20261119000000_following_companies.sql). */
+export const FOLLOWED_TICKER_CAP = 100;
 
 export const MARKET_CATEGORIES = new Set(['markets', 'earnings', 'deals']);
 export const MARKET_SERIES = ['DGS10', 'DGS2', 'DFF', 'DCOILWTICO'];
@@ -19,6 +24,8 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
     if (!anchor || updates.length < 2 || !angle) return storyLinks;
     return [{ card_id: updates[0].id, related_id: anchor.id, kind: 'update' as const }, { card_id: updates[1].id, related_id: anchor.id, kind: 'related' as const }, { card_id: angle.id, related_id: anchor.id, kind: 'angle' as const }];
   })();
+  let tagCache: Map<string, CardCompany[]> | null = null;
+  const companyTags = () => (tagCache ??= tagSampleCards(cards));
   const page = (items: BlurbCard[], cursor?: string | null, limit = 20): FeedPage => {
     const start = Math.max(0, Number.parseInt(cursor ?? '0', 10) || 0);
     const slice = items.slice(start, start + limit);
@@ -140,9 +147,13 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
     followingFeed(f: { topics: string[]; sources: string[]; tickers: string[]; cursor?: string | null; limit?: number }) {
       const topics = new Set(f.topics.map((x) => x.toLocaleLowerCase()));
       const sources = new Set(f.sources.map((x) => x.toLocaleLowerCase()));
-      const tickers = new Set(f.tickers.map((x) => x.toLocaleLowerCase()));
+      // Same cap as api.following_feed (20261119000000_following_companies.sql): the first 100 distinct tickers.
+      const tickers = new Set([...new Set(f.tickers.map((x) => x.trim().toLocaleLowerCase()).filter(Boolean))].slice(0, FOLLOWED_TICKER_CAP));
       if (!topics.size && !sources.size && !tickers.size) return page([...cards].sort((a,b) => Date.parse(b.sort_at) + 8 * 3_600_000 * Math.log2(Math.max(b.importance ?? 1,0.1)) - Date.parse(a.sort_at) - 8 * 3_600_000 * Math.log2(Math.max(a.importance ?? 1,0.1))), f.cursor, f.limit);
-      const direct = cards.filter((c) => topics.has(c.category.toLocaleLowerCase()) || c.sources.some((s) => sources.has(s.name.toLocaleLowerCase())) || c.tickers.some((t) => tickers.has(t.symbol.toLocaleLowerCase())));
+      // A followed company also matches cards that mention it (company tags, same matcher as core.card_companies).
+      const tags = companyTags();
+      const mentioned = (c: BlurbCard) => (tags.get(c.id) ?? []).find((t) => tickers.has(t.ticker.toLocaleLowerCase()));
+      const direct = cards.filter((c) => topics.has(c.category.toLocaleLowerCase()) || c.sources.some((s) => sources.has(s.name.toLocaleLowerCase())) || c.tickers.some((t) => tickers.has(t.symbol.toLocaleLowerCase())) || !!mentioned(c));
       const directIds = new Set(direct.map((c) => c.id));
       const linkedFollow = sampleLinks.flatMap((l) => { const follows=directIds.has(l.related_id)?l.related_id:directIds.has(l.card_id)?l.card_id:null; const id=follows===l.related_id?l.card_id:l.related_id; const c=cards.find((x)=>x.id===id); const target=cards.find((x)=>x.id===follows); return c&&target?[{...c,story_link:{kind:l.kind,related_id:target.id,related_headline:target.headline},follow_reason:l.kind==="update"?"Update to a story you follow":l.kind==="angle"?"Another angle on a story you follow":"Related to something you follow"}]:[]; });
       const linkedIds=new Set(linkedFollow.map(c=>c.id));
@@ -151,7 +162,15 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       const freshness = (c: BlurbCard) => Math.pow(0.5, Math.max(0, Date.now() - Date.parse(c.sort_at)) / 43_200_000);
       const relevance = (c: BlurbCard, directMatch: boolean) => (directMatch ? 1 : 0.6) * freshness(c) * (c.importance ?? 1);
       const items = [
-        ...direct.sort((a,b) => relevance(b,true)-relevance(a,true)).map((c) => ({ ...c, follow_reason: topics.has(c.category.toLocaleLowerCase()) ? `Because you follow ${c.category}` : `Because you follow ${c.tickers.find((t) => tickers.has(t.symbol.toLocaleLowerCase()))?.symbol ?? c.sources.find((s) => sources.has(s.name.toLocaleLowerCase()))?.name ?? 'this story'}` })),
+        ...direct.sort((a,b) => relevance(b,true)-relevance(a,true)).map((c): BlurbCard => {
+          if (topics.has(c.category.toLocaleLowerCase())) return { ...c, follow_reason: `Because you follow ${c.category}`, follow_match: 'topic' };
+          const own = c.tickers.find((t) => tickers.has(t.symbol.toLocaleLowerCase()));
+          if (own) return { ...c, follow_reason: `Because you follow ${own.symbol}`, follow_match: 'ticker', follow_ticker: own.symbol };
+          const src = c.sources.find((s) => sources.has(s.name.toLocaleLowerCase()));
+          if (src) return { ...c, follow_reason: `Because you follow ${src.name}`, follow_match: 'source' };
+          const m = mentioned(c);
+          return m ? { ...c, follow_reason: `Because you follow ${m.ticker} (mentions ${m.short_name})`, follow_match: 'company', follow_ticker: m.ticker } : { ...c, follow_reason: 'Because you follow this story' };
+        }),
         ...linkedFollow.sort((a,b) => ["update","angle","related"].indexOf(a.story_link!.kind) - ["update","angle","related"].indexOf(b.story_link!.kind)),
         ...related.sort((a,b) => relevance(b,false)-relevance(a,false)).map((c) => ({ ...c, follow_reason: `Related to ${c.tickers[0]?.symbol ?? c.category}` })),
       ];

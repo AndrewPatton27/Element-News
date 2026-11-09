@@ -88,6 +88,7 @@ Files in `lib/__tests__/`: `account`, `api`, `detail`, `dwell`, `feedLogic`, `fi
 - `followingLogic.ts`: the three follow lists (topics, sources, tickers), parse / toggle / ticker check, which topics come from the account, the "Because you follow X" text with topic slugs turned into names. Tests: `__tests__/followingLogic.test.ts` (includes the mock search and following feed).
 - `companyLogic.ts`: reads the company RPC answers (no prices kept), the Companies screen grouping (followed first, then sectors, most cards first, typo-tolerant filter), the "About: Apple" chips (server tags, else the card's tickers), card-count wording and the search helpers `companyRowsFor` / `companyCardsFirst`.
 - `companyApi.ts`: `CompanyApi` (search, cards, directory, tags) over the Supabase RPCs of `20261115000000_companies.sql`, and the sample version over the fixture cards with the same matcher (`SAMPLE_COMPANIES`).
+- Following and companies: `api.mockFeatures.ts` `followingFeed` also matches cards that mention a followed company (sample tags from `tagSampleCards`), with `follow_match: 'company'`, `follow_ticker` and the reason "Because you follow CTSE (mentions Contoso)", capped at `FOLLOWED_TICKER_CAP` (100) tickers like the SQL.
 - `tagBatcher.ts`: collects card ids for ~25 ms and asks `api.card_companies` once (<= 50 ids); answers cached, failures cached as no tags.
 - `useCardCompanies.ts`: the hook the card chips use (one batcher per API).
 - `useFollows.ts`: the follow lists for the screens (account topics when signed in, device storage otherwise).

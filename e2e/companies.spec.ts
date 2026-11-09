@@ -43,3 +43,11 @@ test('unknown company shows a friendly page with a way back', async ({ page }) =
   await page.getByRole('link', { name: 'Browse companies' }).click();
   await expect(page).toHaveURL(/\/companies$/);
 });
+
+test('following a company brings news that mentions it into Following, with a note', async ({ page }) => {
+  await page.goto('/company/CTSE');
+  await expect(page.getByRole('heading', { name: 'Contoso Energy' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Follow Contoso' }).filter({ visible: true }).first().click();
+  await page.goto('/following');
+  await expect(page.getByText('Because you follow CTSE (mentions Contoso)').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 });
+});
