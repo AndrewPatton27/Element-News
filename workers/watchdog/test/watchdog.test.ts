@@ -212,3 +212,12 @@ test('the Worker has no HTTP surface: fetch answers 404', async () => {
   const mod = (await import('../src/index.ts')).default;
   assert.equal((await mod.fetch()).status, 404);
 });
+
+test('no HEALTHCHECK_URL: runs, alerts through GitHub, and never calls a ping service', async () => {
+  const w = world();
+  const { HEALTHCHECK_URL: _unused, ...envNoPing } = ENV;
+  const r = await runWatchdog(envNoPing as typeof ENV, T0, w.fetchImpl);
+  assert.equal(r.pinged, 'none');
+  assert.equal(w.pings.length, 0);
+  assert.equal(w.seen.some((s) => s.url.includes('hc-ping.com')), false);
+});

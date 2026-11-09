@@ -106,7 +106,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the secret scan, type checks an
 
 ## If it breaks
 
-The watchdog (`workers/watchdog`) checks the pipeline every hour. When it sees a problem it opens an issue in the private repo `element-ops` (one issue per kind, labels `wd:stale`, `wd:quiet`, `wd:jobs`, `wd:cron`, `wd:hung`, `wd:model`, `wd:ai`, `wd:db`, `wd:supabase`; GitHub emails the owner). A Healthchecks.io check emails if the watchdog itself stops or GitHub refuses its token.
+The watchdog (`workers/watchdog`) checks the pipeline every hour. When it sees a problem it opens an issue in the private repo `element-ops` (one issue per kind, labels `wd:stale`, `wd:quiet`, `wd:jobs`, `wd:cron`, `wd:hung`, `wd:model`, `wd:ai`, `wd:db`, `wd:supabase`; GitHub emails the owner). Alerts are GitHub issues only (no Healthchecks.io). If the GitHub token expires, alerts stop, but the app's "updates delayed" banner keeps working.
 
 1. Read the open issues in `element-ops`. The label says what is wrong.
 2. In the Supabase SQL editor: `select * from ingest.run_log order by started_at desc limit 20;` (error column, `detail->'log_tail'`).
