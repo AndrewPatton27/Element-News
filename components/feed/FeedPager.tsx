@@ -61,6 +61,8 @@ interface Props {
   categories: Category[];
   loadingMore: boolean;
   done: boolean;
+  /** Cards shown again because the reader had already seen them (the feed ran out of new ones). */
+  reshownIds?: ReadonlySet<string>;
   onEndReached: () => void;
   onShowSources: (card: BlurbCard) => void;
   onOpenDetail?: (card: BlurbCard) => void;
@@ -203,6 +205,7 @@ export function FeedPager({
   categories,
   loadingMore: _loadingMore,
   done,
+  reshownIds,
   onEndReached,
   onShowSources,
   onOpenDetail,
@@ -456,6 +459,11 @@ export function FeedPager({
           </Pressable>
         </View>
       ) : null}
+      {reshownIds && items[index] && reshownIds.has(items[index].id) ? (
+        <View style={styles.caughtUpDock} pointerEvents="none" accessibilityLiveRegion="polite">
+          <Text style={[styles.caughtUp, { backgroundColor: p.ink, color: p.bg }]}>You’re all caught up. These are stories you’ve already seen.</Text>
+        </View>
+      ) : null}
       <UndoToast message={undo?.message ?? null} onUndo={undoSwipe} onDone={clearUndo} />
     </View>
   );
@@ -465,6 +473,8 @@ const styles = StyleSheet.create({
   end: { height: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   endText: { fontFamily: fonts.sansMedium, fontSize: 14, textAlign: 'center' },
   fill: { flex: 1 },
+  caughtUpDock: { position: 'absolute', top: 8, left: 0, right: 0, alignItems: 'center', paddingHorizontal: 24 },
+  caughtUp: { fontFamily: fonts.sansMedium, fontSize: 13, textAlign: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, overflow: 'hidden' },
   cardArea: { flex: 1 },
   // Phones: the card, the next card's edge and the disclaimer line all sit inside the page.
   page: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },
