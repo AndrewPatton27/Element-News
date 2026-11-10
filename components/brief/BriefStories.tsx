@@ -1,20 +1,22 @@
 // Story lists on the Brief screen. The ranked list ("Today in a minute", "Top stories ·
 // last week": a big accent number, meta line, serif headline, optional one-line teaser) and
 // the plain category sections. The headline opens the card's DetailSheet; under it every row
-// carries a small source chip and one muted labels line (rule 5), so no row is unlabelled.
+// carries the same one-line bar as the feed cards: source and time (opens the original, rule 5)
+// and like / dislike / follow / share. The AI notice and the disclaimer are the Brief screen's
+// persistent strip (D-80); a FRED-based row still shows the FRED notice (rule 8).
 
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard, Category } from '../../contract/types.ts';
 import { briefRowLabels, seeAllLabel, splitSection, teaser } from '../../lib/brief/briefLogic';
-import { cardTime, categoryName, clampHeadline } from '../../lib/shared/format';
+import { categoryName, clampHeadline } from '../../lib/shared/format';
 import { openUrl } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { badgeLabel } from '../card/Card';
-import { LinkIcon } from '../shell/Icons';
 import { ShareAlikeLine } from '../card/Labels';
 import { CardActionRow } from '../card/CardActionRow';
+import { CardBar } from '../card/CardBar';
 
 export function BriefLabel({ text, right, onRight, rightA11y }: { text: string; right?: string; onRight?: () => void; rightA11y?: string }) {
   const p = usePalette();
@@ -65,7 +67,7 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
       />
       {cards.map((c, i) => {
         const line = ranked && showTeaser ? teaser(c.body, wide ? 150 : 90) : '';
-        const meta = [badgeLabel(c), ...(ranked ? [categoryName(c.category, categories)] : []), cardTime(c)].filter(Boolean).join(' · ');
+        const meta = [badgeLabel(c), ...(ranked ? [categoryName(c.category, categories)] : [])].filter(Boolean).join(' · ');
         return (
           <View key={c.id} style={[styles.row, wide && styles.rowWide, { borderTopColor: p.border }]}>
             {ranked ? <Text style={[styles.rank, wide && styles.rankWide, { color: p.accent }]}>{i + 1}</Text> : null}
@@ -73,17 +75,16 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
               <Pressable
                 onPress={() => onOpen(c)}
                 accessibilityRole="button"
-                accessibilityLabel={`${ranked ? `${i + 1}. ` : ''}${clampHeadline(c.headline)}. ${meta}. Opens more detail`}
+                accessibilityLabel={`${ranked ? `${i + 1}. ` : ''}${clampHeadline(c.headline)}. ${meta ? `${meta}. ` : ''}Opens more detail`}
                 style={({ pressed }) => [styles.open, { opacity: pressed ? 0.7 : 1 }]}
               >
-                <Text style={[styles.meta, wide && styles.metaWide, { color: p.muted }]}>{meta}</Text>
+                {meta ? <Text style={[styles.meta, wide && styles.metaWide, { color: p.muted }]}>{meta}</Text> : null}
                 <Text style={[ranked ? styles.title : styles.titlePlain, wide && (ranked ? styles.titleWide : styles.titlePlainWide), { color: p.ink }]}>
                   {clampHeadline(c.headline)}
                 </Text>
                 {line ? <Text style={[styles.line, wide && styles.lineWide, { color: p.inkSoft }]}>{line}</Text> : null}
               </Pressable>
-              <RowLabels card={c} config={config} />
-              <CardActionRow card={c} compact />
+              <RowLabels card={c} config={config} wide={wide} />
             </View>
           </View>
         );
@@ -103,30 +104,18 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
   );
 }
 
-// Rule 5, per row: a small source chip (opens the original, https only) and one muted line
-// with the AI label (AI-written cards only) and the disclaimer, once.
-function RowLabels({ card, config }: { card: BlurbCard; config: AppConfig | null }) {
+// Rule 5, per row: the bar's source opens the original (https only; briefRowLabels checks it),
+// then the action buttons. Rows from FRED add the FRED notice above the bar.
+function RowLabels({ card, config, wide }: { card: BlurbCard; config: AppConfig | null; wide: boolean }) {
   const p = usePalette();
   const { source, line, credit } = briefRowLabels(card, config);
   return (
     <View style={styles.labels}>
-      {source ? (
-        <Pressable
-          onPress={() => openUrl(source.url, card.id)}
-          accessibilityRole="link"
-          accessibilityLabel={`Source: ${source.label}${source.count > 1 ? `, ${source.count} sources` : ''}. Opens the original.`}
-          hitSlop={{ top: 11, bottom: 11, left: 4, right: 4 }}
-          style={({ pressed }) => [styles.chip, { backgroundColor: p.surfaceMuted, opacity: pressed ? 0.75 : 1 }]}
-        >
-          <LinkIcon color={p.ink} size={12} />
-          <Text style={[styles.chipText, { color: p.ink }]} numberOfLines={1}>
-            {source.label}
-          </Text>
-          {source.count > 1 ? <Text style={[styles.chipCount, { color: p.muted }]}>+{source.count - 1}</Text> : null}
-        </Pressable>
-      ) : null}
       {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
-      <Text style={[styles.small, { color: p.muted }]}>{line}</Text>
+      {line ? <Text style={[styles.small, { color: p.muted }]}>{line}</Text> : null}
+      <CardBar card={card} onPress={() => (source ? openUrl(source.url, card.id) : undefined)} link={!!source} size={wide ? 'wide' : 'phone'} divider={false}>
+        <CardActionRow card={card} compact />
+      </CardBar>
     </View>
   );
 }
@@ -146,10 +135,7 @@ const styles = StyleSheet.create({
   rankWide: { fontSize: 34, lineHeight: 34, minWidth: 28 },
   text: { flex: 1, gap: 6 },
   open: { gap: 4, minHeight: 44 },
-  labels: { gap: 4, alignItems: 'flex-start' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 },
-  chipText: { flexShrink: 1, fontFamily: fonts.sansSemi, fontSize: 12 },
-  chipCount: { fontFamily: fonts.sans, fontSize: 12 },
+  labels: { gap: 2, alignSelf: 'stretch' },
   small: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17 },
   meta: { fontFamily: fonts.sans, fontSize: 12 },
   metaWide: { fontSize: 13 },
