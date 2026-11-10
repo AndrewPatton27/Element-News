@@ -65,30 +65,32 @@ test('the moving Numbers strip is one keyboard stop', async ({ browser }) => {
   await page.context().close();
 });
 
-test('arrow keys move instantly (no smooth scroll on a key press)', async ({ browser }) => {
+test('arrow keys glide to the next card (scroll animation)', async ({ browser }) => {
   const page = await open(browser, { width: 1280, height: 800 }, false);
   await expect(page.locator(H).first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(600);
-  const before = await page.evaluate((sel) => {
-    const el = Array.from(document.querySelectorAll(sel)).find((e) => { const b = e.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight; }) as HTMLElement | undefined;
-    return el?.innerText ?? '';
-  }, H);
+  const list = () => Array.from(document.querySelectorAll('*')).find((e) => e.scrollHeight > e.clientHeight + 50 && getComputedStyle(e).scrollSnapType.startsWith('y')) as HTMLElement;
+  const h = await page.evaluate(() => (Array.from(document.querySelectorAll('*')).find((e) => e.scrollHeight > e.clientHeight + 50 && getComputedStyle(e).scrollSnapType.startsWith('y')) as HTMLElement).clientHeight);
   await page.keyboard.press('ArrowDown');
-  // Two frames later the next card is already fully in place.
-  const after = await page.evaluate(
-    (sel) =>
-      new Promise<string>((done) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const el = Array.from(document.querySelectorAll(sel)).find((e) => { const b = e.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight; }) as HTMLElement | undefined;
-            done(el?.innerText ?? '');
-          }),
-        ),
-      ),
-    H,
+  // Sample the scroll position every frame: it must pass through in-between values, then land on card 2.
+  const samples = await page.evaluate(
+    (fn) =>
+      new Promise<number[]>((done) => {
+        const el = (new Function(`return (${fn})()`))() as HTMLElement;
+        const out: number[] = [];
+        const t0 = performance.now();
+        const tick = () => {
+          out.push(Math.round(el.scrollTop));
+          if (performance.now() - t0 < 900) requestAnimationFrame(tick);
+          else done(out);
+        };
+        tick();
+      }),
+    list.toString(),
   );
-  expect(after).not.toBe('');
-  expect(after).not.toBe(before);
+  const mid = samples.filter((y) => y > 0 && y < h);
+  expect(mid.length).toBeGreaterThan(1);
+  expect(samples[samples.length - 1]).toBe(h);
   await page.context().close();
 });
 
