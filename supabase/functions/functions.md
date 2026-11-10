@@ -40,6 +40,9 @@ lines; never keys or source text).
   `config.groq.alternativeModel` and sets `stats.model_missing` in the run summary (the watchdog opens `wd:model`).
   At the cap, or if the counter cannot be read, no AI call is made. The Groq report-card scorer counts
   against Groq too. Gemini pacing (5 s) and Groq pacing (30 s) apply within a call.
+  The report-card REVISE rewrite now goes through the shared chain (one attempt, every draft check), so it takes a
+  database unit like any writing call. Extra requests inside one call (the retired-model repeat, Groq's
+  json_schema -> json_object retry) are counted only in the run's local view, not with a second database take.
 - **Caller check:** the `Authorization: Bearer` token must equal the project's service-role key
   (`SUPABASE_SERVICE_ROLE_KEY`) or the function secret `CRON_SECRET` (24+ characters; the watchdog Worker uses it, so the
   Worker never holds the service-role key); anything else gets HTTP 401. Because a `CRON_SECRET` bearer is not a JWT,
