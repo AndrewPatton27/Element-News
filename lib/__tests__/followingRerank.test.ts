@@ -7,7 +7,7 @@ import type { BlurbCard } from '../../contract/types.ts';
 
 const at = (h: number) => new Date(Date.UTC(2026, 9, 17, h)).toISOString();
 const c = (id: string, category: string, hour: number, reason: string, extra: Partial<BlurbCard> = {}) =>
-  card({ id, category: category as BlurbCard['category'], sort_at: at(hour), published_at: at(hour), follow_reason: reason, ...extra });
+  card({ id, headline: `headline ${id} here`, category: category as BlurbCard['category'], sort_at: at(hour), published_at: at(hour), follow_reason: reason, ...extra });
 const ids = (cards: BlurbCard[]) => cards.map((x) => x.id);
 
 test('a liked topic rises and a disliked topic falls within the direct tier', () => {
