@@ -36,6 +36,7 @@ begin
   perform api.subscribe_brief('secfix-active@example.com','daily',7,'UTC');
   select token into t1 from core.brief_subscriptions where email='secfix-active@example.com' and kind='daily';
   perform api.confirm_brief(t1);
+  update core.subscribe_attempts set created_at=created_at-interval '30 minutes';
   r:=api.subscribe_brief('secfix-active@example.com','daily',9,'UTC');
   if r->>'status'<>'pending' then raise exception 'FAIL: response must stay uniform pending: %',r; end if;
   select status,token into st,t2 from core.brief_subscriptions where email='secfix-active@example.com' and kind='daily';
@@ -48,6 +49,7 @@ begin
   if not exists(select 1 from core.brief_email_suppressions where email='secfix-active@example.com') then
     raise exception 'FAIL: unsubscribe must suppress';
   end if;
+  update core.subscribe_attempts set created_at=created_at-interval '30 minutes';
   perform api.subscribe_brief('secfix-active@example.com','weekly',7,'UTC');
   if not exists(select 1 from core.brief_email_suppressions where email='secfix-active@example.com') then
     raise exception 'FAIL: unverified subscribe lifted the suppression';
