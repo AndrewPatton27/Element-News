@@ -1,5 +1,5 @@
 // Runs supabase/tests/*_check.sql offline in PGlite (in-memory Postgres). Exit 0 only if every check passed.
-// Usage: node supabase/tests/run-pglite.mjs [name-filter ...]     (e.g. node supabase/tests/run-pglite.mjs watchdog)
+// Usage: node supabase/tests/run-pglite.mjs [--trgm] [name-filter ...]     (e.g. node supabase/tests/run-pglite.mjs watchdog)
 //
 // Setup, once: stand-ins for Supabase's roles, auth.users, auth.uid() and the realtime publication, then every
 // migration in order except the pg_cron / pg_net ones (not available in PGlite). The two test users the checks
@@ -14,9 +14,16 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const migDir = path.join(root, 'supabase/migrations');
 const testDir = path.join(root, 'supabase/tests');
-const filters = process.argv.slice(2);
+// --trgm: load PGlite's pg_trgm contrib (schema extensions, as on Supabase), so search runs its pg_trgm typo path
+const trgm = process.argv.includes('--trgm');
+const filters = process.argv.slice(2).filter((a) => a !== '--trgm');
 
-const base = new PGlite();
+let base;
+if (trgm) {
+  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
+  base = new PGlite({ extensions: { pg_trgm } });
+  await base.exec('create schema extensions');
+} else base = new PGlite();
 await base.exec(`
 create role anon nologin; create role authenticated nologin; create role service_role nologin;
 create schema auth;
