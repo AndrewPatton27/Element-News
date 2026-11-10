@@ -4,6 +4,7 @@
 
 import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
+import { isValidReport, type ReportResult } from './report.ts';
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
 import { takeEarly, type EarlyHolder } from '../feed/earlyFeed.ts';
@@ -246,6 +247,20 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const brief = parseBrief(raw);
       const movers = raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).movers) ? parseNumberTrends((raw as Record<string, unknown>).movers) : [];
       return { ...brief, window_hours: 168, movers };
+    },
+    async reportBlurb(cardId, reason): Promise<ReportResult> {
+      if (!isValidReport(cardId, reason)) return { ok: false, status: 'invalid' };
+      const token = opts.getToken ? await opts.getToken() : null;
+      const headers: Record<string, string> = { apikey: opts.key, 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      try {
+        // a void RPC answers with an empty body, so read only the status (not call(), which parses JSON)
+        const res = await doFetch(`${opts.url}/rest/v1/rpc/report_blurb`, { method: 'POST', headers, body: JSON.stringify({ p_id: cardId, p_reason: reason }) });
+        if (res.ok) return { ok: true, status: 'ok' };
+        return { ok: false, status: res.status === 404 ? 'unavailable' : 'error' };
+      } catch {
+        return { ok: false, status: 'error' };
+      }
     },
     async subscribeBrief(i) {
       const email = normalizeBriefEmail(i?.email);
