@@ -22,16 +22,18 @@ interface SourceProps {
   timeLabel?: 'added';
   size?: BarSize;
   link?: boolean; // onPress opens the original page (no sources sheet on that screen)
+  showDoc?: boolean; // wide only: add the document label (off when the bar also carries the Next hint)
 }
 
 // "🔗 Fed · 1 d" on phones (usual short agency names), "🔗 Fed · H.15 release · 1 d ago" on wide web.
-export function BarSource({ card, onPress, timeLabel, size = 'phone', link }: SourceProps) {
+export function BarSource({ card, onPress, timeLabel, size = 'phone', link, showDoc = true }: SourceProps) {
   const p = usePalette();
   const m = cardBarMeta(card, { timeLabel });
   if (!m) return null;
   const wide = size === 'wide';
-  // Wide web adds the document label; it truncates before the agency name does.
-  const doc = wide && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? m.docLabel : null;
+  // Wide web adds the document label where there is room (not on the feed card, whose bar
+  // also holds the Next hint and would cut it to a stub); it truncates before the agency name.
+  const doc = wide && showDoc && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? m.docLabel : null;
   const name = m.shortName;
   const time = wide ? m.time : m.timeShort;
   return (
@@ -79,7 +81,7 @@ export function CardBar({ card, onPress, timeLabel, size = 'phone', link, childr
   return (
     <View style={[styles.bar, divider && { borderTopWidth: 1, borderTopColor: p.divider }, size === 'wide' && styles.barWide]}>
       <View style={styles.sourceSlot}>
-        <BarSource card={card} onPress={onPress} timeLabel={timeLabel} size={size} link={link} />
+        <BarSource card={card} onPress={onPress} timeLabel={timeLabel} size={size} link={link} showDoc={!trailing} />
       </View>
       {children ? <View style={styles.actions}>{children}</View> : null}
       {trailing}

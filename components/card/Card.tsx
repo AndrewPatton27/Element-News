@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   middleScroll: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   middleContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: 8 },
   fill: { flex: 1 },
-  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 28 },
   group: { gap: 16 },
   middlePressable: { gap: 16 },
   spacer: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
