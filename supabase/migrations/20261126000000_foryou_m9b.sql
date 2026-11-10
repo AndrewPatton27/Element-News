@@ -34,7 +34,8 @@
 --      liked_topic | key_release | authority | new_topic | top_story; the app renders "Because you follow
 --      Economy" (lib/feed/reasonLine.ts). (2) A-14: in the first fy_company_cap_top (9) slots at most
 --      fy_company_cap (1) single-company card in any fy_company_cap_window (3) in a row (soft: when no other card
---      is left, the next one is taken; cards of followed companies are exempt). Only the order inside the page
+--      is left, the next one is taken; cards of followed companies are exempt). (3) F3: at most fy_family_cap (2)
+--      cards of one series family (every Treasury yield is one family) in any fy_family_window (10) in a row. Only the order inside the page
 --      changes, so paging never repeats or loses a card. api.feed_for_you(text, int) calls it before the
 --      ml_pages log (the v3 terms are permuted the same way); an error leaves the page as it was.
 --   F  api.feed_for_you(text, int, uuid[], text[]): p_tickers = followed tickers (on the device). Old 2- and
@@ -93,6 +94,8 @@ insert into core.rank_params (key, value) values
   ('fy_company_cap',                  1),    -- A-14: at most 1 single-company card ...
   ('fy_company_cap_window',           3),    -- ... in any 3 in a row ...
   ('fy_company_cap_top',              9),    -- ... in the first 9 slots of a page
+  ('fy_family_cap',                   2),    -- F3: at most 2 cards of one series family (all yields = one) ...
+  ('fy_family_window',               10),    -- ... in any 10 in a row on a For you page
   ('fy_reason_on',                    1)     -- A-16: 1 = reason per card; 0 = no reason field (cap still applies)
 on conflict (key) do update set value = excluded.value;
 
@@ -104,7 +107,7 @@ alter table core.rank_params add constraint rank_params_m9b_range check (
   and (key not in ('fy_follow_company_max', 'fy_follow_tickers_max') or value between 0 and 500)
   and (key <> 'fy_key_series_max_days' or value between 1 and 365)
   and (key <> 'fy_release_shift_max_hours' or value between 0 and 4320)
-  and (key not in ('fy_company_cap', 'fy_company_cap_window', 'fy_company_cap_top') or value between 0 and 30)
+  and (key not in ('fy_company_cap', 'fy_company_cap_window', 'fy_company_cap_top', 'fy_family_cap', 'fy_family_window') or value between 0 and 30)
   and (key <> 'fy_reason_on' or value in (0, 1)));
 
 -- ml_purge_events_days must stay above seen_exclude_days (the seen exclusion reads that many days of views)
@@ -167,6 +170,10 @@ declare
   v_asrc   text[];
   v_reason jsonb[];
   v_co     boolean[];
+  v_fam    text[];
+  v_fcap   int; v_fwin int;
+  v_ok     boolean;
+  q        int;
   v_left   int[];
   v_perm   int[] := '{}';
   v_pick   int;
@@ -185,8 +192,10 @@ begin
          greatest(coalesce(max(value) filter (where key = 'fy_company_cap_window'), 3), 1)::int,
          greatest(coalesce(max(value) filter (where key = 'fy_company_cap_top'), 9), 0)::int,
          coalesce(max(value) filter (where key = 'fy_reason_on'), 1) = 1,
+         greatest(coalesce(max(value) filter (where key = 'fy_family_cap'), 2), 1)::int,
+         greatest(coalesce(max(value) filter (where key = 'fy_family_window'), 10), 1)::int,
          coalesce(array_agg(substr(key, length('fy_authority_source:') + 1)) filter (where key like 'fy\_authority\_source:%' and value > 0), '{}')
-    into v_days, v_chalf, v_exmin, v_cap, v_win, v_top, v_on, v_asrc
+    into v_days, v_chalf, v_exmin, v_cap, v_win, v_top, v_on, v_fcap, v_fwin, v_asrc
     from core.rank_params;
   v_tmin := coalesce((select value from core.company_params where key = 'tag_min_confidence'), 0.60);
   v_taste := core.user_taste(p_uid, clock_timestamp());
@@ -229,7 +238,11 @@ begin
             and (jsonb_array_length(coalesce(it.c -> 'tickers', '[]'::jsonb)) > 0 or it.category in ('earnings', 'deals'))
             and not exists (select 1 from jsonb_array_elements(coalesce(it.c -> 'tickers', '[]'::jsonb)) s
                              where upper(s ->> 'symbol') = any (v_tick))
-            and not exists (select 1 from tk t where t.o = it.o and t.ticker = any (v_tick))) as co
+            and not exists (select 1 from tk t where t.o = it.o and t.ticker = any (v_tick))) as co,
+           case when b.kind <> 'data' then null                            -- series family (F3): every yield is one
+                when split_part(b.dedupe_key, ':', 1) ~ '^(DGS[0-9]|DTB|DFF|DFEDTAR|SOFR|T[0-9]+Y)'
+                  or it.c ->> 'headline' ~* '[0-9]+-(year|month|week) treasury|treasury (yield|note|bill)' then 'g:rates'
+                else 's:' || split_part(b.dedupe_key, ':', 1) end as fam
       from it left join core.blurbs b on b.id = it.id
   )
   select array_agg(case
@@ -241,24 +254,31 @@ begin
            when r.auth            then jsonb_build_object('code', 'authority', 'arg', null)
            when r.newt            then jsonb_build_object('code', 'new_topic', 'arg', it2.category)
            else                        jsonb_build_object('code', 'top_story', 'arg', null) end order by r.o),
-         array_agg(coalesce(r.co, false) order by r.o)
-    into v_reason, v_co
+         array_agg(coalesce(r.co, false) order by r.o),
+         array_agg(r.fam order by r.o)
+    into v_reason, v_co, v_fam
     from r join (select x.o::int as o, x.c ->> 'category' as category
                    from jsonb_array_elements(v_items) with ordinality as x(c, o)) it2 on it2.o = r.o;
 
-  -- A-14: greedy, slot by slot; soft (no other card left: the next one is taken)
+  -- A-14 + F3: greedy, slot by slot; soft (when no card fits, the rule is relaxed, never a card dropped):
+  --   at most v_fcap cards of one series family in any v_fwin in a row (whole page);
+  --   in the first v_top slots, at most v_cap single-company card in any v_win in a row.
   v_left := array(select g from generate_series(1, v_n) g);
   while cardinality(v_left) > 0 loop
-    v_pick := v_left[1];
-    if cardinality(v_perm) < v_top and v_co[v_pick] then
-      select count(*) into v_cnt
-        from unnest(v_perm[greatest(cardinality(v_perm) - v_win + 2, 1):cardinality(v_perm)]) as q(k)
-       where v_co[q.k];
-      if v_cnt >= v_cap then
-        select q.k into v_pick from unnest(v_left) with ordinality as q(k, o) where not v_co[q.k] order by q.o limit 1;
-        v_pick := coalesce(v_pick, v_left[1]);
-      end if;
-    end if;
+    v_pick := null;
+    for pass in 1 .. 2 loop
+      foreach q in array v_left loop
+        v_ok := v_fam[q] is null or (select count(*) from unnest(v_perm[greatest(cardinality(v_perm) - v_fwin + 2, 1):cardinality(v_perm)]) as z(k)
+                                       where v_fam[z.k] = v_fam[q]) < v_fcap;
+        if v_ok and pass = 1 and cardinality(v_perm) < v_top and v_co[q] then
+          v_ok := (select count(*) from unnest(v_perm[greatest(cardinality(v_perm) - v_win + 2, 1):cardinality(v_perm)]) as z(k)
+                    where v_co[z.k]) < v_cap;
+        end if;
+        if v_ok then v_pick := q; exit; end if;
+      end loop;
+      exit when v_pick is not null;
+    end loop;
+    v_pick := coalesce(v_pick, v_left[1]);
     v_perm := v_perm || v_pick;
     v_left := array_remove(v_left, v_pick);
   end loop;
