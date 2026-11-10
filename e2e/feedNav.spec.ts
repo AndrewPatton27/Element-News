@@ -194,6 +194,9 @@ test('the like toast sits bottom-left, small, and covers no card text or buttons
 
 test('the hide-topic toast uses the same corner and covers nothing', async ({ page }, info) => {
   await ready(page);
+  // Data cards have no "Hide <topic>" item (M9): move to a news card first.
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(900);
   const idx = await page.evaluate(() =>
     Array.from(document.querySelectorAll('[aria-label="More options for this card"]')).findIndex((el) => {
       const r = el.getBoundingClientRect();
