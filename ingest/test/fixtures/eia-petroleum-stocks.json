@@ -1,0 +1,7 @@
+{"response":{"total":"6","data":[
+{"period":"2026-11-06","series":"WCESTUS1","value":"421200","units":"MBBL"},
+{"period":"2026-11-06","series":"WGTSTUS1","value":"215100","units":"MBBL"},
+{"period":"2026-11-06","series":"WDISTUS1","value":"112300","units":"MBBL"},
+{"period":"2026-10-30","series":"WCESTUS1","value":"424600","units":"MBBL"},
+{"period":"2026-10-30","series":"WGTSTUS1","value":"214000","units":"MBBL"},
+{"period":"2026-10-30","series":"WDISTUS1","value":"113000","units":"MBBL"}]}}

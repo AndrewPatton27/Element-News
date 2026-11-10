@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa),
+// ingest-source: ONE ingest source per call (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
@@ -101,6 +101,8 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       providers,
       counter: tracker.counter,
       fredApiKey: env.fredApiKey,
+      eiaApiKey: env.eiaApiKey,
+      censusApiKey: env.censusApiKey,
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
       reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed, scorerMaxPerRun: config.reportCard.scorerMaxPerRun } : undefined,

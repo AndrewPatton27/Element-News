@@ -172,7 +172,8 @@ test('migration 20261111000000: series rows match the code, cron jobs match the 
     assert.ok((SOURCE_NAMES as readonly string[]).includes(name));
   }
   const check = /check \(source in \(([^)]*)\)\)/.exec(sql)![1].replace(/'/g, '').split(',').map((s) => s.trim());
-  assert.deepEqual(check.filter((s) => s !== 'brief-summary').sort(), [...SOURCE_NAMES].sort(), 'run_log accepts exactly the pipeline sources');
+  // later migrations add sources (20261128000000 adds eia, census, auctions, fomc): this migration lists the sources it knew
+  assert.deepEqual(check.filter((s) => s !== 'brief-summary').sort(), [...SOURCE_NAMES].filter((s) => !['eia', 'census', 'auctions', 'fomc'].includes(s)).sort(), 'run_log accepts the pipeline sources known at this migration');
   assert.ok(/'(\d+) \* \* \* \*'|\* \* \*/.test(sql));
 });
 

@@ -19,6 +19,7 @@ import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/f
 import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
 import { runMacro, runTreasury } from './macroRun.ts';
+import { runAuctions, runCensus, runEia, runFomc } from './agencyRun.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -31,8 +32,10 @@ import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, typ
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
-export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
-export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
+export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa'
+  | 'eia' | 'census' | 'auctions' | 'fomc';
+export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa',
+  'eia', 'census', 'auctions', 'fomc'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -41,6 +44,9 @@ export interface Deps {
   providers: Summarizer[];
   counter: UsageCounter;
   fredApiKey: string | null;
+  /** EIA open data key (EIA_API_KEY) and optional Census key (CENSUS_API_KEY); null/undefined = that source skips */
+  eiaApiKey?: string | null;
+  censusApiKey?: string | null;
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -144,6 +150,10 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
+  if (only.has('eia')) await runEia(deps, stats);
+  if (only.has('census')) await runCensus(deps, stats);
+  if (only.has('auctions')) await runAuctions(deps, stats);
+  if (only.has('fomc')) await runFomc(deps, stats);
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;

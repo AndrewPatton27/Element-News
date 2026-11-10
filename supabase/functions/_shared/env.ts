@@ -2,7 +2,7 @@
 // files pass Deno.env.get in), so Node tests cover it.
 // Env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase into every Edge
 // Function (names starting with SUPABASE_ cannot be set as custom secrets). Custom secrets:
-// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
+// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, EIA_API_KEY, CENSUS_API_KEY (optional), SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
 // Outputs: FunctionEnv (key values are never logged; describe() prints [set]/[missing] only).
 
 export type EnvGet = (name: string) => string | undefined;
@@ -21,6 +21,8 @@ export interface FunctionEnv {
   geminiApiKey: string | null;
   groqApiKey: string | null;
   fredApiKey: string | null;
+  eiaApiKey: string | null;
+  censusApiKey: string | null;
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -39,6 +41,8 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     geminiApiKey: clean(get('GEMINI_API_KEY')),
     groqApiKey: clean(get('GROQ_API_KEY')),
     fredApiKey: clean(get('FRED_API_KEY')),
+    eiaApiKey: clean(get('EIA_API_KEY')),
+    censusApiKey: clean(get('CENSUS_API_KEY')),
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };
