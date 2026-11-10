@@ -15,7 +15,7 @@ declare
     "api.top_stories()": "a", "api.unsubscribe_brief(uuid)": "a", "api.update_brief_subscription(uuid,text,integer,text)": "a",
     "api.weekly_brief()": "a",
     "api.delete_account()": "u", "api.delete_my_data()": "u", "api.feed_for_you(text,integer)": "u",
-    "api.feed_for_you(text,integer,uuid[])": "u", "api.get_prefs()": "u", "api.my_brief_subscriptions()": "u",
+    "api.feed_for_you(text,integer,uuid[])": "u", "api.feed_for_you(text,integer,uuid[],text[])": "u", "api.get_prefs()": "u", "api.my_brief_subscriptions()": "u",
     "api.my_categories()": "u", "api.set_prefs(text[],text[],text[])": "u", "api.track(uuid,text,integer,uuid,integer,text)": "u",
     "api.unsubscribe_my_brief(text)": "u", "api.update_my_brief_time(text,integer,text)": "u"
   }';
