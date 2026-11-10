@@ -133,6 +133,13 @@ function readEnvValue(name) {
   } catch { return ''; }
 }
 
+function tourPreloadScript(href) {
+  // Function-scoped: the script body above runs before module-level consts would be initialised.
+  const TOUR_SEEN_KEY = 'element.tutorial-seen.v1';
+  const TOUR_NO_AUTO_SHOW = ['/tutorial', '/reset-password'];
+  return `<script>(function(){try{var p=location.pathname,s=null;try{s=localStorage.getItem(${JSON.stringify(TOUR_SEEN_KEY)})}catch(x){return}if(s!==null)return;if(${JSON.stringify(TOUR_NO_AUTO_SHOW)}.some(function(n){return p===n||p.indexOf(n+'/')===0}))return;var l=document.createElement('link');l.rel='preload';l.as='script';l.href=${JSON.stringify(href)};document.head.appendChild(l)}catch(x){}})()</script>`;
+}
+
 function injectEarlyLoad(outDir) {
   const htmlPath = join(outDir, 'index.html');
   if (!existsSync(htmlPath)) return;
@@ -145,6 +152,12 @@ function injectEarlyLoad(outDir) {
       const f = readdirSync(jsDir).find((n) => n.startsWith(prefix) && n.endsWith('.js'));
       if (f) tags += `<link rel="preload" as="script" href="/_expo/static/js/web/${f}" />`;
     }
+    // The first-run tour chunk is otherwise requested only after the main bundle has run, so it
+    // showed up a round trip after the first card. Preload it only for readers who have not seen
+    // the tour (same key and skipped paths as lib/tutorial/tutorialLogic.ts; app/_layout.tsx does
+    // not load the chunk at all for readers who have seen it).
+    const tour = readdirSync(jsDir).find((n) => n.startsWith('Tutorial-') && n.endsWith('.js'));
+    if (tour) tags += tourPreloadScript(`/_expo/static/js/web/${tour}`);
   }
   const url = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
   const key = readEnvValue('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
