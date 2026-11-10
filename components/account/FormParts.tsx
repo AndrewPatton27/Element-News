@@ -44,7 +44,7 @@ export function OutlineButton({ label, onPress, color, border }: { label: string
 export function SectionLabel({ children }: { children: string }) {
   const p = usePalette();
   return (
-    <Text accessibilityRole="header" style={[styles.sectionLabel, { color: p.muted }]}>
+    <Text accessibilityRole="header" aria-level={2} style={[styles.sectionLabel, { color: p.muted }]}>
       {children.toUpperCase()}
     </Text>
   );

@@ -71,7 +71,7 @@ export function FollowingManager({
   return (
     <View style={[styles.panel, wide ? styles.panelWide : styles.panelNarrow, { backgroundColor: p.surface, borderColor: p.border }]}>
       <View style={styles.head}>
-        <Text style={[styles.title, { color: p.ink }]} accessibilityRole="header">
+        <Text style={[styles.title, { color: p.ink }]} accessibilityRole="header" aria-level={2}>
           {count > 0 ? 'You follow' : 'Pick what to follow'}
         </Text>
         {count > 0 ? (

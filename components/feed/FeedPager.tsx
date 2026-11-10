@@ -16,11 +16,19 @@
 // width or a fast fling the card flies off, the reaction is saved, an Undo toast
 // shows and the feed moves on; otherwise it springs back. Reduced motion: no tilt
 // or fly-off, just the reaction. Pure rules: lib/swipeLogic.ts.
+//
+// Motion (ui-polish-m8): while the finger is down the card is the finger (1:1, from wherever
+// the card was when it was caught, so a card grabbed mid spring-back does not jump). On release
+// the fly-off continues at the finger's speed (lib/theme/motion.ts flingDuration, strong
+// ease-out) and the spring-back is a damping-0.8 spring seeded with the release velocity.
+// Keyboard moves (arrow keys) are instant: no smooth scroll on a key press. Buttons and swipes
+// still glide to the next card.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Easing,
   FlatList,
   PanResponder,
   Platform,
@@ -77,6 +85,7 @@ import { ThumbDownIcon, ThumbUpIcon } from '../shell/Icons';
 import { UndoToast } from './UndoToast';
 import { cornerToastText } from '../../lib/feed/toastPlacement';
 import { shouldUseCompactCard } from '../../lib/feed/cardFit';
+import { flingDuration, motion as m } from '../../lib/theme/motion';
 
 interface Props {
   items: BlurbCard[];
@@ -155,12 +164,14 @@ function SwipeCard({
   const p = usePalette();
   const drag = useRef(new Animated.Value(0)).current;
   const axis = useRef<Axis | null>(null);
+  const grabbed = useRef(0); // where the card was when the finger landed
   const live = useRef({ enabled, reduced, width, onSwipe });
   live.current = { enabled, reduced, width, onSwipe };
   const nativeDriver = Platform.OS !== 'web';
 
   const responder = useMemo(() => {
-    const springBack = () => Animated.spring(drag, { toValue: 0, useNativeDriver: nativeDriver, friction: 7 }).start();
+    // px/ms from the responder -> px/s for the spring
+    const springBack = (vx = 0) => Animated.spring(drag, { toValue: 0, velocity: vx * 1000, ...m.springSnap, useNativeDriver: nativeDriver }).start();
     return PanResponder.create({
       // Every touch starts undecided; the axis is picked once, after a few px.
       onStartShouldSetPanResponderCapture: () => {
@@ -173,13 +184,19 @@ function SwipeCard({
         return axis.current === 'x';
       },
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => drag.stopAnimation(),
-      onPanResponderMove: (_, g) => drag.setValue(g.dx),
+      onPanResponderGrant: () => {
+        grabbed.current = 0;
+        drag.stopAnimation((v) => {
+          grabbed.current = v;
+        });
+      },
+      onPanResponderMove: (_, g) => drag.setValue(grabbed.current + g.dx),
       onPanResponderRelease: (_, g) => {
         axis.current = null;
         const { width: w, reduced: still, onSwipe: done } = live.current;
-        const decision = swipeDecision(g.dx, g.vx, w);
-        if (!decision) return springBack();
+        const dx = grabbed.current + g.dx;
+        const decision = swipeDecision(dx, g.vx, w);
+        if (!decision) return springBack(g.vx);
         if (still) {
           drag.setValue(0);
           done(decision);
@@ -188,8 +205,14 @@ function SwipeCard({
         // Decide (react + move on) at release, so the move is locked in before the fly-off
         // animation; a second swipe during it is dropped by the navigation lock.
         const moved = done(decision);
-        if (!moved) return springBack();
-        Animated.timing(drag, { toValue: (decision === 'like' ? 1 : -1) * w * 1.3, duration: 200, useNativeDriver: nativeDriver }).start(() => {
+        if (!moved) return springBack(g.vx);
+        const target = (decision === 'like' ? 1 : -1) * w * 1.3;
+        Animated.timing(drag, {
+          toValue: target,
+          duration: flingDuration(Math.abs(target - dx), g.vx, 140, 260),
+          easing: Easing.bezier(...m.easeOut),
+          useNativeDriver: nativeDriver,
+        }).start(() => {
           // Moved on: put the card back while it is off screen.
           setTimeout(() => drag.setValue(0), 450);
         });
@@ -299,11 +322,12 @@ export function FeedPager({
   }, []);
 
   const apply = useCallback(
-    (r: NavResult) => {
+    (r: NavResult, viaKey = false) => {
       if (!r.accepted) return false;
       nav.current = r.state;
       const i = currentIndex(r.state);
-      if (r.cause === 'step' || r.cause === 'undo') scrollToRow(i, !reducedRef.current);
+      // Arrow keys move instantly (no animation on a keyboard action); buttons and swipes glide.
+      if (r.cause === 'step' || r.cause === 'undo') scrollToRow(i, !reducedRef.current && !viaKey);
       else if (r.cause === 'settle') listAt.current = i;
       rerender();
       return true;
@@ -344,7 +368,7 @@ export function FeedPager({
   );
   useEffect(() => () => { if (restTimer.current) clearTimeout(restTimer.current); }, []);
 
-  const step = useCallback((dir: 1 | -1) => apply(stepNav(nav.current!, dir, Date.now())), [apply]);
+  const step = useCallback((dir: 1 | -1, viaKey = false) => apply(stepNav(nav.current!, dir, Date.now()), viaKey), [apply]);
   const next = useCallback(() => void step(1), [step]);
 
   const [touch] = useState(detectTouch);
@@ -380,7 +404,7 @@ export function FeedPager({
   // A completed swipe or a like / dislike arrow key: only for the card on screen and outside the
   // navigation lock. Sets the reaction (never toggles it off), offers Undo, moves on exactly one.
   const swiped = useCallback(
-    (card: BlurbCard, r: Feedback): boolean => {
+    (card: BlurbCard, r: Feedback, viaKey = false): boolean => {
       dismissCoach();
       if (!onReact) return false;
       const now = Date.now();
@@ -394,7 +418,7 @@ export function FeedPager({
         setUndo({ card, previous, sent, message: t.text, label: t.label, seq: ++undoSeq.current });
       }
       const res = reactNav(nav.current!, card.id, now);
-      apply(res);
+      apply(res, viaKey);
       return res.accepted && res.cause === 'step';
     },
     [onReact, dismissCoach, apply],
@@ -435,13 +459,13 @@ export function FeedPager({
       // Holding a key fires auto-repeat keydowns: one press, one card.
       if (isKeyRepeat(e)) return;
       const a = keyActions.current;
-      if (e.key === 'ArrowDown') a.step(1);
-      else if (e.key === 'ArrowUp') a.step(-1);
+      if (e.key === 'ArrowDown') a.step(1, true);
+      else if (e.key === 'ArrowUp') a.step(-1, true);
       else {
         // Drew: the right arrow is a right swipe (like) and the left arrow a left swipe (dislike).
         const id = nav.current?.currentId;
         const card = id ? a.byId.get(id) : undefined;
-        if (card) a.swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike');
+        if (card) a.swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike', true);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -490,8 +514,6 @@ export function FeedPager({
       {height > 0 ? (
         <FlatList
           ref={list}
-          // Smooth, eased paging between cards on the web (arrow keys, buttons and swipes).
-          style={Platform.OS === 'web' ? ({ scrollBehavior: 'smooth' } as object) : undefined}
           data={rows}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}

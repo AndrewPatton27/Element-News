@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   switch: { minHeight: 44 },
   sourceName: { fontFamily: fonts.sansSemi, fontSize: font.nav },
   links: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, paddingTop: 2 },
-  link: { fontFamily: fonts.sansSemi, fontSize: font.meta, textDecorationLine: 'underline', paddingVertical: 10 },
+  link: { fontFamily: fonts.sansSemi, fontSize: font.meta, lineHeight: 18, textDecorationLine: 'underline', paddingVertical: 13 }, // 44 px tall target
   tint: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14 },
   tintWide: { paddingVertical: 18, paddingHorizontal: 22, borderRadius: 16 },
 });

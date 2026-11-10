@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 // which card headline is on screen and the order of the rendered cards; the tests then press keys
 // fast, hold them (auto-repeat), swipe, and check the recorded sequence.
 
-const H = '[role="heading"][aria-level="1"], h1';
+const H = '[data-testid="card-headline"]';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((sel) => {

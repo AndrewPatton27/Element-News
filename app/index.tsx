@@ -41,7 +41,7 @@ import { DetailSheet } from '../components/card/DetailSheet';
 import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
-import { EmptyState, ErrorState, LoadingState } from '../components/shell/States';
+import { CardSkeleton, EmptyState, ErrorState } from '../components/shell/States';
 
 // Below this window width the right column is dropped.
 const ASIDE_MIN_WIDTH = 1180;
@@ -60,6 +60,9 @@ export default function FeedScreen() {
   // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
   // nudge stays hidden there (the Me tab and the top bar still offer sign-in).
   const shortPhone = !wide && windowHeight > 0 && windowHeight < 700;
+  // Landscape phones and 200% zoom (under 520 px tall): the category chips step aside too, so the
+  // card keeps enough height to read; categories stay reachable by widening or rotating.
+  const tinyHeight = !wide && windowHeight > 0 && windowHeight < 520;
   const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' ? 'for_you' : 'top');
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
@@ -296,11 +299,12 @@ export default function FeedScreen() {
   let body;
   if (locked) body = <ForYouWarmup progress={gate} onBack={() => setMode('top')} />;
   else if (first && state.error) body = <ErrorState message={state.error} onRetry={retry} />;
-  else if (first && (state.loading || !state.done)) body = <LoadingState label="Loading the feed…" />;
+  else if (first && (state.loading || !state.done)) body = <CardSkeleton wide={wide} />;
   else if (first) {
     body = (
       <EmptyState
-        message={forYou ? 'Nothing new in your topics yet.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
+        title={forYou ? 'Your topics are quiet' : category ? 'Nothing here yet' : 'No stories yet'}
+        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
         actionLabel={forYou ? 'Show Trending' : category ? 'Show all categories' : undefined}
         onAction={forYou ? () => setMode('top') : category ? () => setCategory(null) : undefined}
       />
@@ -447,13 +451,19 @@ export default function FeedScreen() {
               <SortToggle mode={mode} onChange={setMode} forYou />
             </View>
           </View>
-          <View style={[styles.ticker, { borderBottomColor: p.border }]}>
-            <NumbersTicker api={api} config={config} />
-          </View>
-          {chips}
+          {/* Short phones (under 700 px tall): the ticker steps aside so a data card's change and
+              agency citation fit on screen; Numbers stays reachable from Brief ("See all numbers"). */}
+          {shortPhone ? null : (
+            <View style={[styles.ticker, { borderBottomColor: p.border }]}>
+              <NumbersTicker api={api} config={config} />
+            </View>
+          )}
+          {tinyHeight ? null : chips}
           {prompt}
         </>
       )}
+      {/* One page heading for screen readers; each card headline is a level-2 heading under it. */}
+      <Text role="heading" aria-level={1} style={styles.srOnly}>{`Element: ${mode === 'latest' ? 'Latest' : forYou ? 'For you' : 'Trending'} stories`}</Text>
       {inlineError}
       <View style={styles.fill}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
@@ -480,17 +490,18 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'flex-end', height: MOBILE_HEADER_HEIGHT, paddingLeft: 16, paddingRight: 12, borderBottomWidth: 1 },
   brand: { height: MOBILE_HEADER_HEIGHT - 1, justifyContent: 'center', marginRight: 6 },
   tabs: { flexShrink: 1, marginBottom: -1 }, // the active underline sits on the header's bottom rule
   ticker: { height: 44, borderBottomWidth: 1, justifyContent: 'center', overflow: 'hidden' },
   inlineError: { alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, marginTop: 6 },
-  prompt: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingLeft: 14, paddingRight: 8, minHeight: 40 },
+  prompt: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingLeft: 14, paddingRight: 0, minHeight: 44 },
   promptWide: { marginTop: 16, paddingLeft: 12, minHeight: 0 },
   promptNarrow: { marginHorizontal: 16, marginTop: 8 },
   promptMain: { flex: 1, minHeight: 44, justifyContent: 'center' },
   promptText: { fontFamily: fonts.sansSemi, fontSize: 14 },
-  promptClose: { padding: 6 },
+  promptClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   forYouLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
   forYouWide: { flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12 },
   forYouText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
