@@ -33,7 +33,7 @@ async function current(page: Page): Promise<string> {
 
 test('search: suggestions when empty, company rows above the results, row opens the company', async ({ page }) => {
   await page.goto('/search');
-  await expect(page.getByTestId('search-suggestions').getByText('Suggested for you')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('search-suggestions').getByText('Popular right now')).toBeVisible({ timeout: 30_000 });
   const box = page.getByLabel('Search stories, companies and topics').filter({ visible: true }).first();
   await box.fill('Adatum');
   const companies = page.getByLabel('Matching companies').filter({ visible: true }).first();

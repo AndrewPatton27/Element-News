@@ -4,6 +4,7 @@ import type { BlurbCard } from '../../contract/types.ts';
 import { useAccount } from '../account/accountContext';
 import type { Feedback } from '../account/accountLogic';
 import { useFollowedStories } from '../following/useFollowedStories';
+import { browserShareDeps, shareLink } from '../share/shareFlow';
 import { shareUrl } from '../../components/card/cardFooter';
 
 export async function shareStory(card: BlurbCard): Promise<string | null> {
@@ -14,15 +15,7 @@ export async function shareStory(card: BlurbCard): Promise<string | null> {
     try { await Share.share({ message: url, url, title: card.headline }); return null; }
     catch { return 'Could not open sharing.'; }
   }
-  const nav = (globalThis as { navigator?: Navigator }).navigator;
-  if (nav && typeof nav.share === 'function') {
-    try { await nav.share({ title: card.headline, url }); return null; }
-    catch (e) { if ((e as { name?: string } | null)?.name === 'AbortError') return null; }
-  }
-  try {
-    await nav?.clipboard?.writeText(url);
-    return nav?.clipboard ? 'Link copied' : 'Could not copy link.';
-  } catch { return 'Could not copy link.'; }
+  return shareLink(card.headline, url, browserShareDeps());
 }
 
 export function useCardActions(card: BlurbCard) {

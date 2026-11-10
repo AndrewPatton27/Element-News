@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
 import { hostOf, relativeTime } from '../../lib/shared/format';
 import { CC_BY_SA_MARK, shareAlikeCredit } from '../../lib/shared/labels';
-import { openUrl } from '../../lib/shared/openUrl';
+import { linkProps, openUrl } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts } from '../../lib/theme/theme';
@@ -22,7 +22,7 @@ export function SourceList({ card, config, plain }: { card: BlurbCard; config: A
       {card.sources.map((s, i) => (
         <Pressable
           key={`${i}-${s.url}`}
-          onPress={() => openUrl(s.url, card.id)}
+          {...linkProps(s.url, card.id)}
           accessibilityRole="link"
           accessibilityLabel={`${s.name}${s.doc_label ? ', ' + s.doc_label : ''}, ${relativeTime(s.published_at)}. Opens the original.`}
           style={({ pressed }) => [styles.row, { borderColor: p.navBorder, opacity: pressed ? 0.75 : 1 }]}
@@ -46,7 +46,8 @@ export function SourceList({ card, config, plain }: { card: BlurbCard; config: A
               <Text
                 style={[styles.rowMeta, styles.licenseLink, { color: p.accentInk }]}
                 onPress={(e) => {
-                  e.stopPropagation?.(); // don't also open the article (the row's own link)
+                  e.stopPropagation?.();
+                  e.preventDefault?.(); // don't also open the article (the row's own link)
                   openUrl(credit.licenseUrl);
                 }}
                 accessibilityRole="link"
@@ -87,7 +88,7 @@ function PlainSourceList({ card, hidden, licenseUrl, p }: { card: BlurbCard; hid
       {card.sources.map((s, i) => (
         <Pressable
           key={`${i}-${s.url}`}
-          onPress={() => openUrl(s.url, card.id)}
+          {...linkProps(s.url, card.id)}
           accessibilityRole="link"
           accessibilityLabel={`${s.name}${s.doc_label ? ', ' + s.doc_label : ''}, ${relativeTime(s.published_at)}. Opens the original.`}
           style={({ pressed }) => [plainStyles.row, { borderColor: p.border, opacity: pressed ? 0.75 : 1 }]}
@@ -101,7 +102,8 @@ function PlainSourceList({ card, hidden, licenseUrl, p }: { card: BlurbCard; hid
               <Text
                 style={[plainStyles.meta, styles.licenseLink, { color: p.accentInk }]}
                 onPress={(e) => {
-                  e.stopPropagation?.(); // don't also open the article (the row's own link)
+                  e.stopPropagation?.();
+                  e.preventDefault?.(); // don't also open the article (the row's own link)
                   openUrl(licenseUrl);
                 }}
                 accessibilityRole="link"

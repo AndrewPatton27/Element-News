@@ -95,7 +95,7 @@ export default function CompanyScreen() {
         <FollowPill topic={company?.short_name ?? ticker} followed={followed} onPress={() => toggleTicker(ticker)} />
       </View>
       <Text style={[styles.help, styles.left, { color: p.muted }]}>
-        Cards about {company?.short_name ?? ticker}, newest first: SEC filings and news that names the company. Element shows news, not prices.
+        Cards about {company?.short_name ?? ticker}, newest first: SEC filings and news that names the company. Element shows news, no stock prices.
       </Text>
       <FollowingFeed
         items={visible(state.items)}

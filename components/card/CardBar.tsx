@@ -12,6 +12,7 @@ import { WIDE_DOC_LABEL_MAX_NAME, cardBarMeta } from '../../lib/shared/cardBody'
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { tip } from '../../lib/theme/tooltip';
+import { linkProps } from '../../lib/shared/openUrl';
 import { LinkIcon } from '../shell/Icons';
 
 export type BarSize = 'phone' | 'small' | 'wide';
@@ -21,12 +22,13 @@ interface SourceProps {
   onPress: () => void;
   timeLabel?: 'added';
   size?: BarSize;
+  linkUrl?: string; // with `link`: render a real <a href> (web) to this https URL; onPress is then unused
   link?: boolean; // onPress opens the original page (no sources sheet on that screen)
   showDoc?: boolean; // wide only: add the document label (off when the bar also carries the Next hint)
 }
 
 // "🔗 Fed · 1 d" on phones (usual short agency names), "🔗 Fed · H.15 release · 1 d ago" on wide web.
-export function BarSource({ card, onPress, timeLabel, size = 'phone', link, showDoc = true }: SourceProps) {
+export function BarSource({ card, onPress, timeLabel, size = 'phone', link, linkUrl, showDoc = true }: SourceProps) {
   const p = usePalette();
   const m = cardBarMeta(card, { timeLabel });
   if (!m) return null;
@@ -39,6 +41,7 @@ export function BarSource({ card, onPress, timeLabel, size = 'phone', link, show
   return (
     <Pressable
       onPress={onPress}
+      {...(link && linkUrl ? linkProps(linkUrl, card.id) : {})}
       accessibilityRole={link ? 'link' : 'button'}
       accessibilityLabel={link ? m.a11yLink : m.a11y}
       {...tip(link ? 'Open the original' : m.count > 1 ? `${m.count} sources: open the list` : 'Open the source')}
@@ -76,12 +79,12 @@ interface BarProps extends SourceProps {
   divider?: boolean; // a hairline above the bar (feed cards)
 }
 
-export function CardBar({ card, onPress, timeLabel, size = 'phone', link, children, trailing, divider = true }: BarProps) {
+export function CardBar({ card, onPress, timeLabel, size = 'phone', link, linkUrl, children, trailing, divider = true }: BarProps) {
   const p = usePalette();
   return (
     <View style={[styles.bar, divider && { borderTopWidth: 1, borderTopColor: p.divider }, size === 'wide' && styles.barWide]}>
       <View style={styles.sourceSlot}>
-        <BarSource card={card} onPress={onPress} timeLabel={timeLabel} size={size} link={link} showDoc={!trailing} />
+        <BarSource card={card} onPress={onPress} timeLabel={timeLabel} size={size} link={link} linkUrl={linkUrl} showDoc={!trailing} />
       </View>
       {children ? <View style={styles.actions}>{children}</View> : null}
       {trailing}

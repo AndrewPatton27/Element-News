@@ -3,7 +3,7 @@
 
 import { StyleSheet, Text } from 'react-native';
 import { CC_BY_SA_MARK, disclaimerText, type ShareAlikeCredit } from '../../lib/shared/labels';
-import { openUrl } from '../../lib/shared/openUrl';
+import { linkProps } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import { font, fonts } from '../../lib/theme/theme';
 
@@ -30,11 +30,11 @@ export function ShareAlikeLine({ credit, cardId }: { credit: ShareAlikeCredit; c
   const lead = at >= 0 ? credit.text.slice(0, at) : credit.text + ' · ';
   return (
     <Text style={[styles.small, { color: p.muted }]}>
-      <Text onPress={() => openUrl(credit.articleUrl, cardId)} accessibilityRole="link" style={styles.link}>
+      <Text {...linkProps(credit.articleUrl, cardId)} accessibilityRole="link" style={styles.link}>
         {lead.replace(/\s*·\s*$/, '')}
       </Text>
       {' · '}
-      <Text onPress={() => openUrl(credit.licenseUrl)} accessibilityRole="link" style={styles.link}>
+      <Text {...linkProps(credit.licenseUrl)} accessibilityRole="link" style={styles.link}>
         {CC_BY_SA_MARK}
       </Text>
     </Text>

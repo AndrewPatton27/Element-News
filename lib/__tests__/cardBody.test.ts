@@ -44,11 +44,11 @@ test('bottom bar: primary source name, time, count and a "Sources:" accessible n
   assert.ok(m);
   assert.equal(m.name, 'SEC');
   assert.equal(m.docLabel, 'Form 8-K');
-  assert.equal(m.time, '6 h ago');
-  assert.equal(m.timeShort, '6 h');
+  assert.equal(m.time, 'Filed 6 h ago'); // primary source is a filing
+  assert.equal(m.timeShort, 'Filed 6 h');
   assert.equal(m.count, 3);
-  assert.match(m.a11y, /^Sources: SEC · \+2 sources\. Published 6 h ago\. Opens/);
-  assert.equal(m.a11yLink, 'Source: SEC, 3 sources. Published 6 h ago. Opens the original.');
+  assert.match(m.a11y, /^Sources: SEC · \+2 sources\. Filed 6 h ago\. Opens/);
+  assert.equal(m.a11yLink, 'Source: SEC, 3 sources. Filed 6 h ago. Opens the original.');
 });
 
 test('bottom bar on the Latest tab says when we added the card', () => {

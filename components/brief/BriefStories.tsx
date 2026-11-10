@@ -113,7 +113,7 @@ function RowLabels({ card, config, wide }: { card: BlurbCard; config: AppConfig 
     <View style={styles.labels}>
       {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
       {line ? <Text style={[styles.small, { color: p.muted }]}>{line}</Text> : null}
-      <CardBar card={card} onPress={() => (source ? openUrl(source.url, card.id) : undefined)} link={!!source} size={wide ? 'wide' : 'phone'} divider={false}>
+      <CardBar card={card} onPress={() => (source ? openUrl(source.url, card.id) : undefined)} link={!!source} linkUrl={source?.url} size={wide ? 'wide' : 'phone'} divider={false}>
         <CardActionRow card={card} compact />
       </CardBar>
     </View>

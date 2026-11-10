@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BlurbCard, Category } from '../../contract/types.ts';
 import { cardTime, categoryName, clampHeadline } from '../../lib/shared/format';
 import { OPEN_DETAIL_HINT } from '../../lib/shared/detail';
-import { suggestionMeta } from '../../lib/search/suggestions';
+import { suggestionMeta, suggestionsHeading } from '../../lib/search/suggestions';
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts, radius } from '../../lib/theme/theme';
 
@@ -15,16 +15,17 @@ export interface SearchSuggestionsProps {
   categories: Category[];
   onOpen: (card: BlurbCard) => void;
   onPickTopic: (c: { slug: string; name: string }) => void;
+  signedIn?: boolean;
 }
 
-export function SearchSuggestions({ items, categories, onOpen, onPickTopic }: SearchSuggestionsProps) {
+export function SearchSuggestions({ items, categories, onOpen, onPickTopic, signedIn = false }: SearchSuggestionsProps) {
   const p = usePalette();
   const wide = useWide();
   if (items.length === 0) return null;
   return (
-    <View style={styles.section} accessibilityLabel="Suggested for you" testID="search-suggestions">
+    <View style={styles.section} accessibilityLabel={suggestionsHeading(signedIn)} testID="search-suggestions">
       <Text style={[styles.label, { color: p.muted }]} accessibilityRole="header" aria-level={2}>
-        Suggested for you
+        {suggestionsHeading(signedIn)}
       </Text>
       <View style={[styles.list, { borderColor: p.border, backgroundColor: p.surface }]} accessibilityRole="list">
         {items.map((c, i) => {

@@ -45,7 +45,7 @@ export default function CompaniesScreen() {
   return (
     <ScreenShell tab="search" title="Companies" meta={wide && list ? `${list.length} companies` : undefined} onBack={() => (router.canGoBack() ? router.back() : router.navigate('/search'))}>
       <Text style={[styles.intro, wide && styles.introWide, { color: p.inkBody }]}>
-        Cards grouped by the company they are about. Counts cover the last {days} days. Element shows news, not prices.
+        Cards grouped by the company they are about. Counts cover the last {days} days. Element shows news, no stock prices.
       </Text>
       <TextInput
         value={query}

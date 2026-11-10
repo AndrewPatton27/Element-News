@@ -27,7 +27,7 @@ test('cardTime: older cards fall back to a short date', () => {
 
 test('the feed card and the detail sheet both show time through the shared bar (cardBarMeta -> cardTime)', () => {
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
-  assert.match(read('../shared/cardBody.ts'), /cardTime\(card, opts\.now\)/);
+  assert.match(read('../shared/cardBody.ts'), /stampLabel\(card, /);
   assert.match(read('../../components/card/CardBar.tsx'), /cardBarMeta\(card/);
   assert.match(read('../../components/card/Card.tsx'), /<CardBar\b/);
   // the detail sheet's body lives in DetailBody.tsx (shared with the /b/<id> share page)

@@ -168,7 +168,7 @@ function SearchScreenBody() {
   if (target.kind === 'idle') {
     body = (
       <>
-        <SearchSuggestions items={suggestions.items} categories={categories} onOpen={openDetail} onPickTopic={browse} />
+        <SearchSuggestions items={suggestions.items} categories={categories} onOpen={openDetail} onPickTopic={browse} signedIn={signedIn} />
         <SearchIdle
           recent={recent}
           topics={topics}
