@@ -115,7 +115,7 @@ export default function FeedScreen() {
     [hidden, hiddenSources],
   );
   const local = acct.localPrefs;
-  // For you stays locked until 10 stories across 4 topics have been read or reacted to.
+  // For you stays locked until 3 stories have been read or reacted to, or one topic or company is followed (forYouGate.ts).
   const [seenList, setSeenList] = useState(() => readSeen(store));
   // "Clear data on this device" / delete: forget the For you history and the dismissed prompt at once.
   useEffect(
@@ -129,6 +129,8 @@ export default function FeedScreen() {
   const gate = forYouProgress({
     reacted: Object.entries(local.reactions).map(([id, v]) => ({ id, category: v.topic })),
     seen: seenList,
+    // One followed topic, company or source opens For you at once (M9 F4).
+    followed: local.follows.topics.length + local.follows.tickers.length + local.follows.sources.length + (acct.viewPrefs?.followed.length ?? 0),
   });
   const locked = forYou && !gate.ready;
   const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

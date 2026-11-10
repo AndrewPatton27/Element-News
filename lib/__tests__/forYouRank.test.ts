@@ -51,9 +51,9 @@ test('only one card: the guard does not drop it', () => {
   assert.equal(rankForYou([trending[0]], noPrefs, new Set(), 't1').length, 1);
 });
 
-test('gate unchanged and Trending order only goes through diversify', () => {
-  assert.equal(forYouProgress({ seen: Array.from({ length: 10 }, (_, i) => ({ id: `${i}`, category: `c${i % 4}` })) }).ready, true);
-  assert.equal(forYouProgress({ seen: Array.from({ length: 10 }, (_, i) => ({ id: `${i}`, category: 'c' })) }).ready, false);
+test('gate (3 stories / 1 topic) and Trending order only goes through diversify', () => {
+  assert.equal(forYouProgress({ seen: Array.from({ length: 3 }, (_, i) => ({ id: `${i}`, category: `c${i % 4}` })) }).ready, true);
+  assert.equal(forYouProgress({ seen: Array.from({ length: 2 }, (_, i) => ({ id: `${i}`, category: 'c' })) }).ready, false);
   assert.deepEqual(diversifyFeed(trending).map((c) => c.id), ['t1', 't2', 't3']);
 });
 
