@@ -159,7 +159,7 @@ test('Groq gets at most 6,000 characters of source text', async () => {
   await g.summarize({ item: gopro, text: long });
   const prompt = net.calls[0].body.messages[0].content as string;
   assert.doesNotMatch(prompt, /TAILMARK|B{10}/);
-  assert.ok(prompt.split('SOURCE TEXT:\n')[1].length <= 6000);
+  assert.ok(prompt.split('<<<SOURCE TEXT START>>>\n')[1].split('\n<<<SOURCE TEXT END>>>')[0].length <= 6000);
 });
 
 test('Groq adapter: key only in the Authorization header, never in the URL; JSON schema mode', async () => {
@@ -174,7 +174,7 @@ test('Groq adapter: key only in the Authorization header, never in the URL; JSON
   assert.equal(c.body.model, 'openai/gpt-oss-120b');
   assert.equal(c.body.response_format.type, 'json_schema');
   assert.equal(c.body.response_format.json_schema.strict, true);
-  assert.match(c.body.messages[0].content, /SOURCE TEXT:\nGoPro, Inc\. Form 8-K/);
+  assert.match(c.body.messages[0].content, /<<<SOURCE TEXT START>>>\nGoPro, Inc\. Form 8-K/);
 });
 
 test('Groq adapter: 400 on json_schema -> one retry in json_object mode', async () => {

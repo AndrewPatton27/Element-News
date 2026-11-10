@@ -116,7 +116,7 @@ async function rebuildItem(card: RevisableCard, deps: Pick<Deps, 'fetchText' | '
  *   3. rebuild the source item (rebuildItem); not possible -> kept
  *   4. template card -> rebuild with the current template (no AI)
  *   5. AI card       -> license gate, page text, summarizer chain:
- *                       low relevance -> hidden; no valid AI draft or failed publish check -> kept;
+ *                       low relevance -> hidden (until the hide cap config.rewriteHideMaxFraction, then kept); no valid AI draft or failed publish check -> kept;
  *                       otherwise revised in place
  * Any error leaves the old card unchanged (counted as failed).
  */
@@ -184,6 +184,13 @@ export async function runRewrite(deps: Deps, opts: { limit?: number } = {}): Pro
       });
       if (r.ai_generated) stats.ai++;
       if (r.low_relevance) {
+        // Hide cap (sum-v7: the new rubric re-gates the archive): once hidden / selected would pass config.rewriteHideMaxFraction,
+        // the card is kept as it is instead of hidden, so one bad scoring batch cannot empty the feeds.
+        if ((stats.hidden + 1) / Math.max(1, stats.selected) > config.rewriteHideMaxFraction) {
+          stats.kept++;
+          deps.log(`kept (hide cap ${config.rewriteHideMaxFraction} reached; would be hidden for low_relevance ${r.relevance}): ${card.headline}`);
+          continue;
+        }
         await revise(card, { id: card.id, action: 'hide', note: `low_relevance (${r.relevance})` }, r.provider);
         continue;
       }
@@ -205,7 +212,7 @@ export async function runRewrite(deps: Deps, opts: { limit?: number } = {}): Pro
       }
       const v = validatePublish(p);
       if (!v.ok) { stats.kept++; deps.log(`kept (publish check failed: ${v.errors.join('; ')}): ${card.headline}`); continue; }
-      await revise(card, { id: card.id, action: 'revise', headline: p.headline, body: p.body, ai_generated: true, model: r.model, prompt_version: config.promptVersion, detail: p.detail ?? null }, `${r.provider}, relevance ${r.relevance}${p.detail ? ', with detail' : ', no detail'}`);
+      await revise(card, { id: card.id, action: 'revise', headline: p.headline, body: p.body, ai_generated: true, model: r.model, prompt_version: config.promptVersion, detail: p.detail ?? null, everyday_relevance: p.everyday_relevance ?? null }, `${r.provider}, relevance ${r.relevance}${p.detail ? ', with detail' : ', no detail'}`);
     } catch (e) {
       stats.failed++;
       deps.log(`failed (old card unchanged): ${card.headline}: ${(e as Error).message}`);

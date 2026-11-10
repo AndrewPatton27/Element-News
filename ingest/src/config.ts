@@ -58,7 +58,10 @@ export const config = {
   // numbers/SKUs/UPCs/lot numbers in the headline or summary, sentence-case headlines.
   // v6 (2026-10-18): flow and no repetition (D-58): the first body sentence continues from the headline
   // instead of restating it, no sentence repeats another, no filler; the validator rejects repetition.
-  promptVersion: 'sum-v6',
+  // v7 (2026-11-10, D-111/D-123): readers who follow business, finance and investing (about 16-50, plain 8th-grade words),
+  // macro-first relevance rubric, defined jargon, one direction word, numerals for dates, no field labels, no speculation or
+  // relative time. Validators: style:, speculation:, relative_time:, event_type enum, extended repetition; fixProperNouns.
+  promptVersion: 'sum-v7',
   // Version stored on template and data cards (no AI). tpl-v2 = plain wording (2026-10-17).
   // `--rewrite` redoes every published card whose prompt_version is neither this nor promptVersion.
   // v4: plain USGS headline+body and plain Federal Register headline. v5: sentence-case template headlines,
@@ -156,6 +159,38 @@ export const config = {
   // Everywhere else they stay blocked. Investment words (buy, sell, price target, ...) are never
   // here, so investment advice stays blocked on safety cards too.
   safetyAdviceAllowlist: ['should'],
+  // Blocklist phrases that read as advice ONLY in market talk. "to the moon" is a stock-pump slogan, but also
+  // plain English in "missions to the Moon" (NASA cards were rejected for it, sum-v7 test). The phrase is blocked
+  // only when the same text also has one of these market words.
+  adviceMarketContext: {
+    'to the moon': /\b(stocks?|shares?|prices?|crypto|bitcoin|ethereum|tokens?|coins?|rally|rallies|market|markets|trad(?:e|es|ing|er|ers)|invest(?:or|ors|ing|ment|ments)?|portfolio)\b/i,
+  } as Readonly<Record<string, RegExp>>,
+
+  // sum-v7 validators (AI drafts only). Each word or phrase is an error when it is in the draft but NOT in the source text.
+  speculationWords: ['could', 'might', 'likely', 'is expected to', 'are expected to', 'is set to', 'are set to', 'poised to', 'may'] as readonly string[],
+  relativeTimeWords: ['today', 'yesterday', 'tomorrow', 'this week', 'next week', 'last week', 'this month', 'next month', 'last month', 'days away'] as readonly string[],
+  // Event types the AI may choose (schema enum and checkShape). Code sets world_event, recall, science and so on.
+  aiEventTypes: ['earnings', 'exec_change', 'deal', 'insider', 'macro_release', 'fed'] as readonly string[],
+  // Number tolerance (safety net, audit item 9): a draft figure that has a scale word ("1.5 billion") is also accepted when
+  // the source has the same value one scale step away ("1,500 million"). Percent figures stay exact. Never rounds.
+  numberScaleTolerance: true,
+  // fixProperNouns (text.ts): deterministic casing fixer for AI text, run after validation. Short, reviewed lists.
+  // acronyms: Title-case and lower-case forms become upper case ("Nasa" -> "NASA"). names: any non-upper-case spelling
+  // becomes the canonical one. Anything already correct is never changed.
+  properNounFixes: {
+    acronyms: ['NASA', 'FCC', 'FAA', 'FOMC', 'FDA', 'FDIC', 'CFPB', 'CFTC', 'CPSC', 'USGS', 'OPEC', 'FTC', 'IRS', 'EPA', 'DOJ', 'GDP', 'CPI', 'BLS', 'BEA'] as readonly string[],
+    // "Sec" is a real abbreviation too (seconds, "Sec. 5"), so it is fixed only as a bare word that is not followed by a period.
+    titleCaseOnlyAcronyms: ['SEC'] as readonly string[],
+    names: [
+      'United States', 'Federal Reserve', 'Federal Open Market Committee', 'Social Security', 'Wall Street', 'Medicare', 'Medicaid',
+      'Treasury Department', 'White House', 'Supreme Court', 'Congress',
+    ] as readonly string[],
+    usAbbreviation: true,                      // "u.s." -> "U.S."
+    // Mars and Moon are also common words: fixed only when a space or mission word is near.
+    spaceContext: /\b(nasa|moon|mars|lunar|astronauts?|missions?|rovers?|spacecraft|planets?|orbit|artemis|crew|rocket|rockets)\b/i,
+  },
+  // `--rewrite` stops hiding cards (keeps them) once hidden / selected passes this share (same idea as reportCard.auditHideMaxFraction).
+  rewriteHideMaxFraction: 0.4,
 
   // Candidate selection (run-wide budget): every source's candidates are collected first (no AI call), scored
   // without AI, and the run's budget (default 20 new items) is spent on the best ones. enabled=false = the old

@@ -187,6 +187,8 @@ export function buildPublishPayload(
     prompt_version: meta.aiGenerated ? config.promptVersion : config.templateVersion,
     // AI cards: the validated AI detail or null (dropped). Template cards: a factual detail from metadata.
     detail: meta.aiGenerated ? (draft.detail ?? null) : (draft.detail ?? templateDetail(item)),
+    // sum-v7: the AI's 1-5 relevance score goes on the card (template and data cards carry none)
+    everyday_relevance: meta.aiGenerated && Number.isInteger(draft.everyday_relevance) ? draft.everyday_relevance as number : null,
     attribution: item.attribution ?? null,
     sources: [{
       name: item.source_name, kind: item.source_kind, doc_label: item.doc_label, url: item.url,

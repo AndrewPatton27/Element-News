@@ -6,6 +6,7 @@
 
 import { config } from './config.ts';
 import { mentionsProductCodes } from './text.ts';
+import { checkRelativeTime, checkSpeculation, checkStyle } from './styleChecks.ts';
 
 /**
  * Categories the AI may choose (Gemini/Groq schema enum, SEC tiebreak). The original 9 business
@@ -73,7 +74,8 @@ export interface SourceText {
   tickers?: string[];            // tickers known from filing metadata
   category?: string;             // the card's real category in code (e.g. 'safety' for CPSC recalls)
   requireFigures?: boolean;      // the card's real event_type is earnings (set in code); default: draft.event_type === 'earnings'
-  checkFlow?: boolean;           // AI drafts only (the chain sets it): run the repetition check. Template/data wording is fixed and exempt.
+  checkFlow?: boolean;           // AI drafts only (the chain sets it): run the repetition, style, speculation and relative-time checks. Template/data wording is fixed and exempt.
+  headline?: string;             // the card headline (validateDetail with checkFlow: the detail must not restate it)
 }
 
 export interface Result {
@@ -112,6 +114,28 @@ export function extractNumbers(text: string): string[] {
   for (const m of cleaned.match(NUMBER) ?? []) {
     const n = Number(m.replace(/,/g, '').replace(/\.$/, ''));
     if (Number.isFinite(n)) out.push(String(n));
+  }
+  return out;
+}
+
+/**
+ * Numbers in `text` that the source does not have. Exact match first. Then, when config.numberScaleTolerance is on,
+ * a figure written with a scale word ("1.5 billion") is accepted if the source has the same value one scale step
+ * away ("1,500 million", or the reverse). Percent figures and figures without a scale word stay exact; nothing is rounded.
+ */
+export function missingNumbers(text: string, sourceText: string): string[] {
+  const src = new Set(extractNumbers(sourceText));
+  const cleaned = text.replace(FORM_TOKENS, ' ');
+  const out: string[] = [];
+  for (const m of cleaned.matchAll(NUMBER)) {
+    const n = Number(m[0].replace(/,/g, '').replace(/\.$/, ''));
+    if (!Number.isFinite(n) || src.has(String(n))) continue;
+    if (config.numberScaleTolerance && /^\s*(?:million|billion|trillion|thousand)/i.test(cleaned.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 14))) {
+      const up = String(Number((n * 1000).toPrecision(12)));
+      const down = String(Number((n / 1000).toPrecision(12)));
+      if (src.has(up) || src.has(down)) continue;
+    }
+    out.push(String(n));
   }
   return out;
 }
@@ -169,6 +193,8 @@ export function findAdvice(
   const hits: string[] = [];
   for (const phrase of blocklist) {
     if (allowed.has(phrase.toLowerCase())) continue;
+    const ctx = config.adviceMarketContext[phrase.toLowerCase()];
+    if (ctx && !ctx.test(text)) continue;                     // e.g. "missions to the Moon": blocked only in market talk
     const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
     if (new RegExp(`(^|[^a-z])${escaped}($|[^a-z])`, 'i').test(text)) hits.push(phrase);
   }
@@ -221,6 +247,8 @@ export function checkShape(obj: unknown): string[] {
   }
   if (d.event_type !== null && d.event_type !== undefined && typeof d.event_type !== 'string') {
     e.push('event_type must be a string or null');
+  } else if (typeof d.event_type === 'string' && !config.aiEventTypes.includes(d.event_type)) {
+    e.push(`event_type must be one of ${config.aiEventTypes.join(', ')} or null (was "${d.event_type.slice(0, 30)}")`);
   }
   if (!Array.isArray(d.tickers) || d.tickers.some((t) => typeof t !== 'string')) e.push('tickers must be an array of strings');
   else if (d.tickers.length > config.maxTickersPerCard) e.push(`more than ${config.maxTickersPerCard} tickers`);
@@ -373,6 +401,42 @@ export function checkRepetition(headline: string, body: string | null | undefine
   return errors;
 }
 
+/**
+ * Detail version of the flow check: the first sentence of paragraph 1 and key point 1 must not restate the headline
+ * (same content-word share and "starts with" rules as the body), and no key point may repeat the headline's main
+ * number without adding at least two new content words. Errors start with "detail repetition:".
+ */
+export function checkDetailRepetition(headline: string, detail: { paragraphs: string[]; key_points: string[] }): string[] {
+  const c = config.repetition;
+  const errors: string[] = [];
+  const h = plain(headline);
+  const hWords = contentWords(headline);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const probes: [string, string | undefined][] = [
+    ['paragraph 1', splitSentences(detail.paragraphs[0] ?? '')[0]],
+    ['key point 1', detail.key_points[0]],
+  ];
+  for (const [label, text] of probes) {
+    if (!text) continue;
+    const t = plain(text);
+    if (h.split(' ').length >= 3 && (t === h || t.startsWith(`${h} `))) {
+      errors.push(`detail repetition: ${label} starts with the headline; begin with the most useful fact not yet on the card`);
+    } else if (hWords.size >= c.minHeadlineWords) {
+      const share = shareIn(hWords, contentWords(text));
+      if (share >= c.headlineOverlapMax) errors.push(`detail repetition: ${label} repeats the headline (${pct(share)} of its key words, limit ${pct(c.headlineOverlapMax)})`);
+    }
+  }
+  const mainNumber = extractNumbers(headline)[0];
+  if (mainNumber !== undefined) {
+    for (const kp of detail.key_points) {
+      if (!extractNumbers(kp).includes(mainNumber)) continue;
+      const fresh = [...contentWords(kp)].filter((w) => !hWords.has(w)).length;
+      if (fresh < 2) { errors.push(`detail repetition: a key point repeats the headline number ${mainNumber} without a new fact: "${kp.slice(0, 40)}"`); break; }
+    }
+  }
+  return errors;
+}
+
 /** Full validation of a draft against the licensed source text it came from. */
 export function validateDraft(draft: Draft, source: SourceText): Result {
   const errors = checkShape(draft);
@@ -396,15 +460,20 @@ export function validateDraft(draft: Draft, source: SourceText): Result {
   // 1a. flow: the summary continues the headline and no sentence repeats another (AI drafts only;
   // template wording is fixed, e.g. "X reports a change in its top leaders" / "X told the SEC about a change
   // among its top leaders", and would fail the headline-overlap test)
-  if (source.checkFlow) errors.push(...checkRepetition(draft.headline, draft.body));
+  if (source.checkFlow) {
+    errors.push(...checkRepetition(draft.headline, draft.body));
+    // 1a2. sum-v7: style (dates as numerals, no field labels, one direction word, subject-first headline, no "pts"),
+    // no speculation and no relative time unless the source itself says it
+    errors.push(...checkStyle({ headline: draft.headline, body: draft.body }));
+    errors.push(...checkSpeculation(text, source.text), ...checkRelativeTime(text, source.text));
+  }
 
   // 1b. no model numbers, SKUs, UPCs or lot numbers in the headline or summary (key points only)
   const codes = mentionsProductCodes(text);
   if (codes.length) errors.push(`product codes in headline or body (${codes.join(', ')}): model, SKU, UPC and lot numbers go in detail key points only`);
 
   // 2. every number must appear in the source
-  const srcNums = new Set(extractNumbers(source.text));
-  const missing = extractNumbers(text).filter((n) => !srcNums.has(n));
+  const missing = missingNumbers(text, source.text);
   if (missing.length) errors.push(`numbers not in source: ${[...new Set(missing)].join(', ')}`);
 
   // 3. every ticker must appear in the source or its metadata
@@ -465,9 +534,15 @@ export function validateDetail(d: unknown, source: SourceText, category?: string
   const text = [...paragraphs, ...key_points].join('\n');
   const advice = findAdvice(text, category);
   if (advice.length) errors.push(`detail advice language: ${advice.join(', ')}`);
-  const srcNums = new Set(extractNumbers(source.text));
-  const missing = extractNumbers(text).filter((n) => !srcNums.has(n));
+  const missing = missingNumbers(text, source.text);
   if (missing.length) errors.push(`detail numbers not in source: ${[...new Set(missing)].join(', ')}`);
+  if (source.checkFlow) {
+    // sum-v7 (AI details only): same style, speculation and relative-time rules as the card, and the detail
+    // must not restate the headline (paragraph 1, key point 1) or repeat its number without a new fact
+    errors.push(...checkStyle({ paragraphs, keyPoints: key_points }));
+    errors.push(...checkSpeculation(text, source.text), ...checkRelativeTime(text, source.text));
+    if (source.headline) errors.push(...checkDetailRepetition(source.headline, { paragraphs, key_points }));
+  }
   const limit = config.copyLimitWords[source.licenseClass];
   if (limit === undefined) errors.push(`no copy limit for license class ${source.licenseClass}`);
   else {
