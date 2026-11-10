@@ -31,6 +31,9 @@ export interface Api {
   numberTrends(): Promise<NumberTrend[]>;
   search(q: string, cursor?: string | null, limit?: number): Promise<FeedPage>;
   relatedCards(cardId: string, limit?: number): Promise<BlurbCard[]>;
+  /** One published card by id (the /b/<id> share page). null when unknown, not published, or the server
+   *  has no api.card_by_id yet; throws on a network or server error (the page shows Try again). */
+  card(cardId: string): Promise<BlurbCard | null>;
   followingFeed(f: { topics: string[]; sources: string[]; tickers: string[]; cursor?: string | null; limit?: number }): Promise<FeedPage>;
   dailyBrief(): Promise<Brief>;
   weeklyBrief(): Promise<Brief & { movers: NumberTrend[] }>;
