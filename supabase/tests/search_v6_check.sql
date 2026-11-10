@@ -98,6 +98,30 @@ begin
     raise exception 'FAIL: with search_headline_weight 0 the fresher card must lead (v5 behaviour)'; end if;
   update core.rank_params set value = 0.15 where key = 'search_headline_weight';
 
+  -- 4b. interest-rate words ignore "unemployment rate"; rare words weigh more (IDF)
+  declare c_fed uuid; c_unemp uuid; c_pay uuid; c_rep uuid;
+  begin
+    insert into core.blurbs(dedupe_key,kind,headline,body,category,status,as_of,published_at,sort_at,importance,rank_score) values
+     ('sv6-fed','summary','Fed lowers federal funds rate target range','The central bank cut its policy rate.','policy','published',now(),now(),now()-interval '60 hours',10,base-60+26.6),
+     ('sv6-unemp','data','Unemployment rate falls to 4.1%','The unemployment rate fell as hiring picked up and job cuts slowed.','economy','published',now(),now(),now(),10,base+26.6),
+     ('sv6-pay','data','Nonfarm payroll jobs rise to 159.3M','Employers kept adding jobs.','economy','published',now(),now(),now()-interval '30 hours',10,base-30+26.6);
+    insert into core.blurbs(dedupe_key,kind,headline,body,category,status,as_of,published_at,sort_at,importance,rank_score)
+    select 'sv6-rep'||g,'summary','Firm '||g||' reports quarterly results','The report covers store sales and costs.','earnings','published',now(),now(),now(),6,base+20.7
+    from generate_series(1,12) g;
+    insert into core.blurb_sources(blurb_id,name,kind,url,license_class,is_primary)
+    select id,'SV6 Source','news','https://example.com/'||dedupe_key,'company_filing',true from core.blurbs where dedupe_key in ('sv6-fed','sv6-unemp','sv6-pay') or dedupe_key like 'sv6-rep%';
+    select id into c_fed from core.blurbs where dedupe_key='sv6-fed';
+    select id into c_unemp from core.blurbs where dedupe_key='sv6-unemp';
+    select id into c_pay from core.blurbs where dedupe_key='sv6-pay';
+    r := api.search('rate cut', null, 10);
+    if r->'items'->0->>'id' is distinct from c_fed::text then
+      raise exception 'FAIL: "rate cut" must put the Fed rate card first, not %', r->'items'->0->>'headline'; end if;
+    r := api.search('jobs report', null, 10);
+    if r->'items'->0->>'id' is distinct from c_pay::text then
+      raise exception 'FAIL: "jobs report" must put the payroll card first (rare word "jobs" decides), not %', r->'items'->0->>'headline'; end if;
+    update core.blurbs set status = 'hidden' where dedupe_key in ('sv6-fed','sv6-unemp','sv6-pay') or dedupe_key like 'sv6-rep%';
+  end;
+
   -- 5. industry words; typo, synonym and stem matches unchanged
   if not (api.search('bank earnings', null, 10)->'items' @> jsonb_build_array(jsonb_build_object('id',c_bank))) then
     raise exception 'FAIL: "bank earnings" must find the JPMorgan results'; end if;

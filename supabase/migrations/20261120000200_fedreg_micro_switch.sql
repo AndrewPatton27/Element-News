@@ -1,6 +1,6 @@
 -- Optional cap for non-economic Federal Register cards (FAA aircraft rules, FCC robocall rules ...): with the
 -- switch on they count as micro cards, so together with recalls and science at most micro_max_per_10 (1) of them
--- appear in any 10 cards in a row of Trending, Latest and For you. Open item from context/todo.md (Dec 11);
+-- appear in any 10 cards in a row of Trending, Latest and For you. Open item (Dec 11):
 -- Drew has not decided, so it SHIPS OFF: core.rank_params 'fedreg_noneconomic_micro' = 0 changes nothing.
 -- Must run after 20261116000000_macro_focus.sql. Idempotent. NOT applied.
 --
