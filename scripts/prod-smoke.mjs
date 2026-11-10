@@ -100,6 +100,13 @@ export async function runSmoke({ site = DEFAULT_SITE, supabaseUrl, key, now = ne
     const res = await fetchFn(url);
     if (res.status !== 200) return `bundle returned HTTP ${res.status}`;
     bundle = await res.text();
+    // the shared strings (feed notice) live in split chunks: read every JS chunk the page names
+    const chunks = [...new Set([...html.matchAll(/\/_expo\/static\/js\/web\/[\w.-]+\.js/g)].map((m) => m[0]))];
+    for (const c of chunks) {
+      const full = new URL(c, siteUrl).toString();
+      if (full === url) continue;
+      try { const r = await fetchFn(full); if (r.status === 200) bundle += ' ' + (await r.text()); } catch { /* best effort */ }
+    }
     return bundle.length > 1000 ? null : 'bundle is suspiciously small';
   });
   await step('feed returns cards', async () => {
