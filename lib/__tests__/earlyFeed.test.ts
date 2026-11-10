@@ -1,19 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { takeEarlyFeed, EARLY_FEED_MAX_AGE_MS } from '../feed/earlyFeed.ts';
+import { takeEarly, EARLY_FEED_MAX_AGE_MS } from '../feed/earlyFeed.ts';
 
-const mk = (body = '{"a":1}', t = 1000) => ({ __elementEarly: { body, t, p: Promise.resolve({ ok: 1 }) } });
+const K = 'k|{"a":1}';
+const mk = (n = 1, t = 1000) => ({ __elementEarly: { [K]: { t, n, p: Promise.resolve({ ok: 1 }) } } });
 
-test('early feed: same body, signed out, fresh -> used once', async () => {
+test('early: same key, signed out, fresh -> used once', async () => {
   const h = mk();
-  const p = takeEarlyFeed(h, '{"a":1}', false, 2000);
-  assert.deepEqual(await p, { ok: 1 });
-  assert.equal(takeEarlyFeed(h, '{"a":1}', false, 2000), null);
+  assert.deepEqual(await takeEarly(h, K, false, 2000), { ok: 1 });
+  assert.equal(takeEarly(h, K, false, 2000), null);
 });
-test('early feed: different body, token or stale -> ignored and cleared', () => {
-  assert.equal(takeEarlyFeed(mk(), '{"a":2}', false, 2000), null);
-  assert.equal(takeEarlyFeed(mk(), '{"a":1}', true, 2000), null);
-  assert.equal(takeEarlyFeed(mk(), '{"a":1}', false, 1000 + EARLY_FEED_MAX_AGE_MS + 1), null);
-  assert.equal(takeEarlyFeed({}, '{"a":1}', false), null);
-  assert.equal(takeEarlyFeed(undefined, '{"a":1}', false), null);
+test('early: n=2 serves two callers, then is gone', async () => {
+  const h = mk(2);
+  assert.deepEqual(await takeEarly(h, K, false, 2000), { ok: 1 });
+  assert.deepEqual(await takeEarly(h, K, false, 2000), { ok: 1 });
+  assert.equal(takeEarly(h, K, false, 2000), null);
+});
+test('early: other key keeps the entry; token or stale -> ignored', () => {
+  const h = mk();
+  assert.equal(takeEarly(h, 'k|{"a":2}', false, 2000), null);
+  assert.notEqual(takeEarly(h, K, false, 2000), null);
+  assert.equal(takeEarly(mk(), K, true, 2000), null);
+  assert.equal(takeEarly(mk(), K, false, 1000 + EARLY_FEED_MAX_AGE_MS + 1), null);
+  assert.equal(takeEarly({}, K, false), null);
+  assert.equal(takeEarly(undefined, K, false), null);
 });
