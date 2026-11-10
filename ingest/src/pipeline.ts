@@ -5,6 +5,7 @@
 // Inputs: Deps (fetcher, publisher, providers, usage counter, clock, log) and RunOptions (--only, --limit).
 // Outputs: RunStats counts; cards and items are written through deps.publisher.
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { config, fedRegisterUrls } from './config.ts';
 import { createGuard, normalizeUrl } from './dedupe.ts';
 import { buildPublishPayload, type Publisher } from './publish.ts';
@@ -83,16 +84,31 @@ interface RunCtx {
   guard: ReturnType<typeof createGuard>;
   chain: ChainState;
 }
-let topicFilterState: TopicFilterState = createTopicFilterState();
-/** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
-let runRecent: Array<{ id: string; headline: string; body: string | null }> | null = null;
+/**
+ * Mutable state of ONE runOnce call. It lives in an AsyncLocalStorage so two runs in the same process
+ * (a warm Edge Function isolate can serve two requests at once) never share it.
+ */
+interface RunState {
+  topic: TopicFilterState;
+  /** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
+  recent: Array<{ id: string; headline: string; body: string | null }> | null;
+  /** Set during a run with candidate selection on: processItems queues its job here instead of spending budget. */
+  collector: Job[] | null;
+}
+const runStore = new AsyncLocalStorage<RunState>();
+function runState(): RunState {
+  const s = runStore.getStore();
+  if (!s) throw new Error('pipeline state used outside runOnce');
+  return s;
+}
 async function recentCards(deps: Deps) {
-  if (!runRecent) {
+  const st = runState();
+  if (!st.recent) {
     const all = await Promise.resolve(deps.publisher.auditCards?.()).catch(() => undefined) ?? [];
     const cutoff = deps.now.getTime() - config.reportCard.recentCardDays * 86_400_000;
-    runRecent = all.filter((c) => Date.parse(c.as_of) >= cutoff).slice(0, config.reportCard.scoreMaxRecentCards).map((c) => ({ id: c.id, headline: c.headline, body: c.body }));
+    st.recent = all.filter((c) => Date.parse(c.as_of) >= cutoff).slice(0, config.reportCard.scoreMaxRecentCards).map((c) => ({ id: c.id, headline: c.headline, body: c.body }));
   }
-  return runRecent;
+  return st.recent;
 }
 
 /**
@@ -101,6 +117,13 @@ async function recentCards(deps: Deps) {
  * across all sources. A failing source is logged and the run continues with the next one.
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
+  const select = deps.selection?.enabled ?? config.selection.enabled;
+  // selection on: sources only collect; the budget is spent after all sources ran
+  const state: RunState = { topic: createTopicFilterState(), recent: null, collector: select ? [] : null };
+  return runStore.run(state, () => runOnceInState(deps, opts, state));
+}
+
+async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
   const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0, recall_material: 0, recall_not_material: 0 };
   const ctx: RunCtx = {
@@ -109,12 +132,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
     guard: createGuard(),
     chain: createChainState(),                       // provider cooldowns after a 429 last for this run
   };
-  topicFilterState = createTopicFilterState();
-  runRecent = null;
 
-  const select = deps.selection?.enabled ?? config.selection.enabled;
-  collector = select ? [] : null;                    // selection on: sources only collect; the budget is spent below
-  try {
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('treasury')) await runTreasury(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
@@ -127,8 +145,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
-  if (collector) await runSelected(collector, deps, ctx, opts.limit ?? 20);
-  } finally { collector = null; }
+  if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
@@ -313,10 +330,10 @@ async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof cre
       const d = guard.check(cand);
       if (!d.ok) { stats.skipped++; deps.log(`skip ${d.reason}: ${it.title}`); continue; }
       // narrow-source cap (config.reportCard.narrowSourceCaps.usgs_quake = 1 new card per run); the rest wait for the next run
-      if (narrowCapReached(it, topicFilterState)) { stats.skipped++; deps.log(`skip report_card_variety_cap: ${it.title}`); continue; }
+      if (narrowCapReached(it, runState().topic)) { stats.skipped++; deps.log(`skip report_card_variety_cap: ${it.title}`); continue; }
       const row = await deps.publisher.upsertItem(it);
       if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
-      recordTopic(it, topicFilterState);
+      recordTopic(it, runState().topic);
       try {
         const payload = buildPublishPayload(it, usgsDraft(it), { itemId: row.id, aiGenerated: false, model: null });
         const v = validatePublish(payload);
@@ -413,9 +430,6 @@ interface Job {
   perGroup: Map<string, number>;
 }
 
-/** Set during a run with candidate selection on: processItems queues its job here instead of spending budget. */
-let collector: Job[] | null = null;
-
 /**
  * Candidate selection. Step 1 (per job, no AI): dedupe/ticker guard, topic filter and the already-handled check
  * (upsert) drop what cannot become a card. Step 2: score what is left without AI (importance, freshness) and spend
@@ -432,7 +446,7 @@ async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: nu
       const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
       const d = ctx.guard.check(cand);
       if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); ctx.stats.skipped++; continue; }
-      const topicReject = filterTopic(it, topicFilterState);
+      const topicReject = filterTopic(it, runState().topic);
       if (topicReject) { ctx.stats.skipped++; deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`); continue; }
       const lg = job.limits.group;
       const group = lg?.of(it) ?? null;
@@ -507,6 +521,7 @@ async function processItems(
   limits: NewLimits = {},
 ): Promise<{ fresh: number; alreadyHandled: number }> {
   const job: Job = { items, deps, stats, budget, guard, chain, pageText, preCheck, limits, fresh: 0, alreadyHandled: 0, perGroup: new Map() };
+  const collector = runState().collector;
   if (collector) { collector.push(job); return { fresh: 0, alreadyHandled: 0 }; }   // candidate selection: spent later by runSelected
   for (const it of items) {
     if (budget.left <= 0) { deps.log('limit reached'); break; }
@@ -526,7 +541,7 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
   const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
   const d = guard.check(cand);
   if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); stats.skipped++; return; }
-  const topicReject = filterTopic(it, topicFilterState);
+  const topicReject = filterTopic(it, runState().topic);
   if (topicReject) {
     stats.skipped++;
     deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`);
@@ -542,7 +557,7 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
   const row = known ?? await deps.publisher.upsertItem(it);
   if (!known && !row.is_new && row.status !== 'new') { stats.skipped++; job.alreadyHandled++; return; }   // handled in an earlier run
   job.fresh++;
-  recordTopic(it, topicFilterState);
+  recordTopic(it, runState().topic);
   if (group !== null) perGroup.set(group, (perGroup.get(group) ?? 0) + 1);
 
   let text = it.summary_text;
@@ -650,7 +665,7 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       guard.record(cand);
       if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
         await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
-      if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
+      if (res.id) runState().recent?.push({ id: res.id, headline: payload.headline, body: payload.body });
       if (it.material && res.id) {
         // Recall gate (20261116000000_macro_focus.sql): no row = not material, so a failure here fails closed.
         stats[it.material.material ? 'recall_material' : 'recall_not_material']++;
