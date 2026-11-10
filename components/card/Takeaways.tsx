@@ -2,7 +2,7 @@
 // its 2-3 sentence summary when it has fewer than two key points (lib/shared/cardBody.ts
 // decides; nothing is written here). Shared by the feed card and the list tiles.
 
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import type { BlurbCard } from '../../contract/types.ts';
 import { cardTakeaways } from '../../lib/shared/cardBody';
 import { usePalette } from '../../lib/theme/useTheme';
@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
   list: {},
   item: { flexDirection: 'row', gap: 12 },
   dotBox: { justifyContent: 'center' },
-  text: { fontFamily: fonts.sans },
-  itemText: { flex: 1 },
+  // Very long words (tickers glued together, URLs) wrap instead of running off the card.
+  text: { fontFamily: fonts.sans, ...(Platform.OS === 'web' ? ({ overflowWrap: 'anywhere' } as object) : {}) },
+  itemText: { flex: 1, minWidth: 0 },
 });

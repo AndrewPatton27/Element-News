@@ -22,6 +22,7 @@ import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts, font, TOP_BAR_HEIGHT } from '../../lib/theme/theme';
 import type { Palette } from '../../lib/theme/theme';
 import { InfoIcon } from './Icons';
+import { tip } from '../../lib/theme/tooltip';
 import { NumbersTicker } from '../numbers/NumbersTicker';
 import { SampleBanner } from './SampleBanner';
 import { DelayedBanner } from './DelayedBanner';
@@ -146,9 +147,23 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
         ) : (
           <View style={styles.body}>
             {left ? (
-              <ScrollView style={styles.left} contentContainerStyle={styles.leftContent}>
-                {left}
-              </ScrollView>
+              <View style={styles.left}>
+                <ScrollView style={styles.fill} contentContainerStyle={styles.leftContent}>
+                  {left}
+                </ScrollView>
+                {/* With a left rail the About button sits under it, so it never covers a rail item. */}
+                {active !== 'about' ? (
+                  <Pressable
+                    onPress={() => go('/about')}
+                    accessibilityRole="link"
+                    accessibilityLabel="About Element"
+                    {...tip('About Element')}
+                    style={({ pressed }) => [styles.aboutInRail, { backgroundColor: p.surface, borderColor: p.borderStrong, opacity: pressed ? 0.8 : 1 }]}
+                  >
+                    <InfoIcon color={p.inkSoft} size={24} />
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
             <View style={styles.main}>
               {children}
@@ -161,7 +176,7 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
             ) : null}
           </View>
         )}
-        {active !== 'about' ? (
+        {active !== 'about' && !(left && !bare && !scroll) ? (
           <Pressable
             onPress={() => go('/about')}
             accessibilityRole="link"
@@ -196,10 +211,16 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
           onPress={() => go('/about')}
           accessibilityRole="link"
           accessibilityLabel="About Element"
-          hitSlop={4}
-          style={[active === 'feed' ? styles.aboutFabFeed : styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
+          style={active === 'feed' ? styles.aboutFabFeedHit : [styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
         >
-          <InfoIcon color={p.inkSoft} size={24} />
+          {/* The feed's button looks 36 px but its tap target is a real 44 px box (web ignores hitSlop). */}
+          {active === 'feed' ? (
+            <View style={[styles.aboutFabFeed, { backgroundColor: p.surface, borderColor: p.borderStrong }]}>
+              <InfoIcon color={p.inkSoft} size={22} />
+            </View>
+          ) : (
+            <InfoIcon color={p.inkSoft} size={24} />
+          )}
         </Pressable>
       ) : null}
     </SafeAreaView>
@@ -245,7 +266,8 @@ const styles = StyleSheet.create({
     gap: 36,
   },
   left: { flexGrow: 0, flexShrink: 0, flexBasis: 180, width: 180 },
-  leftContent: { paddingBottom: 90 },
+  leftContent: { paddingBottom: 16 },
+  aboutInRail: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   main: { flex: 1, minWidth: 0 },
   aside: { flexGrow: 0, flexShrink: 1, flexBasis: 340, maxWidth: 340, minWidth: 280 },
   asideContent: { paddingBottom: 90 },
@@ -268,17 +290,14 @@ const styles = StyleSheet.create({
   },
   // Feed (phones): floats at the bottom left in the strip between the card and the tab bar, so it
   // never covers the card footer or the AI label.
+  aboutFabFeedHit: { position: 'absolute', left: 6, bottom: 66, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 5 },
   aboutFabFeed: {
-    position: 'absolute',
-    left: 10,
-    bottom: 70,
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 5,
   },
   aboutFabNarrow: {
     position: 'absolute',

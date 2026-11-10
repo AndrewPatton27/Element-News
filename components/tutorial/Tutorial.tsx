@@ -233,7 +233,8 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
             updateFits();
           }}
         >
-          <StepTransition stepKey={step} dir={dir} reduced={reduced}>          <View style={styles.progressRow}>
+          <StepTransition stepKey={step} dir={dir} reduced={reduced}>
+          <View style={styles.progressRow}>
             <Text accessibilityLiveRegion="polite" style={[styles.progress, web && { fontSize: 14 }, { color: p.accentInk }]}>
               {progress}
             </Text>

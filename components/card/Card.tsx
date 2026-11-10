@@ -144,7 +144,7 @@ export function Card(props: Props) {
   const barSize: BarSize = wide ? 'wide' : compact || (box.w > 0 && box.w < 350) ? 'small' : 'phone';
   const type = bodyType(!!wide, !!compact, box.h, tablet);
   // How many bullets fit: data cards share the space with the numbers panel.
-  const maxPoints = wide ? (card.kind === 'data' ? (tight ? 1 : 3) : 4) : compact ? (card.kind === 'data' ? 1 : 2) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
+  const maxPoints = wide ? (card.kind === 'data' ? (tight ? 2 : 3) : 4) : compact ? (card.kind === 'data' ? 1 : 2) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
   // Bullets are whole or not shown: when the middle overflows (short screens, long
   // headlines), drop the last bullet until it fits instead of cutting one mid-line.
   const [fit, setFit] = useState({ key: '', points: maxPoints });
@@ -155,7 +155,13 @@ export function Card(props: Props) {
     const { h, content } = view.current;
     // 8 = middleContent paddingBottom
     if (h > 0 && content + 8 > h + 1 && points > 1) setFit({ key: fitKey, points: points - 1 });
+    // Still too tall with the fewest bullets (short phones, long headlines, many numbers):
+    // the middle scrolls and a soft fade at its foot says there is more below.
+    const over = h > 0 && content + 8 > h + 1 && points <= 1;
+    setOverflow((o) => (o === over ? o : over));
   };
+  const [overflow, setOverflow] = useState(false);
+  const [atEnd, setAtEnd] = useState(false);
   const takeaways = cardTakeaways(card, points);
   const showTakeaways = takeaways.kind !== 'none' && !(denseData && compact);
 
@@ -299,11 +305,18 @@ export function Card(props: Props) {
                 the free space, so tall phones and desktop windows show no empty gap. Tapping
                 it opens the detail sheet, but only when the card has detail. The hint is part
                 of the label because react-native-web drops accessibilityHint. */}
+            <View style={styles.middleScroll}>
             <ScrollView
-              style={styles.middleScroll}
+              style={styles.fill}
               contentContainerStyle={styles.middleContent}
-              scrollEnabled={!!compact}
+              scrollEnabled={!!compact || overflow}
               onLayout={(e) => { view.current.h = e.nativeEvent.layout.height; checkFit(); }}
+              onScroll={overflow ? (e) => {
+                const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+                const end = contentOffset.y + layoutMeasurement.height >= contentSize.height - 4;
+                setAtEnd((a) => (a === end ? a : end));
+              } : undefined}
+              scrollEventThrottle={64}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
@@ -352,6 +365,14 @@ export function Card(props: Props) {
                 ) : null}
               </View>
             </ScrollView>
+            {overflow && !atEnd ? (
+              <View pointerEvents="none" style={styles.fade}>
+                {FADE_STEPS.map((o) => (
+                  <View key={o} style={{ flex: 1, backgroundColor: p.surface, opacity: o }} />
+                ))}
+              </View>
+            ) : null}
+            </View>
             {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
           </>
         )}
@@ -398,6 +419,10 @@ function ReactButton({ kind, on, size = 22, onPress }: { kind: Feedback; on: boo
   );
 }
 
+// A soft fade at the foot of an overflowing middle: bands of the card colour, each more
+// opaque (no gradient library needed, same on web and native).
+const FADE_STEPS = [0.15, 0.35, 0.55, 0.75, 0.92];
+
 // Tap targets are real 44 px boxes: react-native-web's Pressable ignores hitSlop.
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
@@ -419,6 +444,8 @@ const styles = StyleSheet.create({
   // Takes the free space and centres the content in it, so no empty gap is left.
   middleScroll: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   middleContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: 8 },
+  fill: { flex: 1 },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 40 },
   group: { gap: 16 },
   middlePressable: { gap: 16 },
   spacer: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },

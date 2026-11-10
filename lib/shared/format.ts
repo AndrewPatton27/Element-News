@@ -108,7 +108,7 @@ export function categoryName(slug: string, categories: Category[] | null | undef
   if (hit) return hit.name;
   if (CATEGORY_FALLBACK_NAMES[slug]) return CATEGORY_FALLBACK_NAMES[slug];
   return slug
-    .split('-')
+    .split(/[-_]/)
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(' ');
 }

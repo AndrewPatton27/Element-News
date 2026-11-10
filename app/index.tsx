@@ -56,7 +56,10 @@ export default function FeedScreen() {
   const followsState = useFollows();
   const signedIn = acct.user !== null;
   const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string }>();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
+  // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
+  // nudge stays hidden there (the Me tab and the top bar still offer sign-in).
+  const shortPhone = !wide && windowHeight > 0 && windowHeight < 700;
   const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' ? 'for_you' : 'top');
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
@@ -340,7 +343,7 @@ export default function FeedScreen() {
   // Guests: one quiet line under the chips, dismissible. Never blocks the feed.
   const expired = acct.notice === SIGN_IN_AGAIN_MESSAGE; // not "Your account was deleted."
   const prompt =
-    !signedIn && (!promptHidden || expired) ? (
+    !signedIn && ((!promptHidden && !shortPhone) || expired) ? (
       <View style={[styles.prompt, !wide && styles.promptNarrow, wide && styles.promptWide, { backgroundColor: p.accentSoft }]}>
         <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" style={styles.promptMain}>
           <Text style={[styles.promptText, { color: p.accentInk }]}>

@@ -17,7 +17,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | `shared/` | Helpers used across folders: app data, card detail, formatting, labels, types, open-URL, card actions |
 | `sources/` | Source keys and source info |
 | `storage/` | Local preferences and storage wrapper |
-| `theme/` | Theme tokens, theme hook and tooltip helper |
+| `theme/` | Theme tokens, theme hook and tooltip helper (`webGlobalStyles.ts`: web-only global CSS for focus rings, long-word wrapping and reduced motion) |
 | `tutorial/` | Tutorial steps and logic |
 | `__tests__/` | Node test-runner tests (`npm run test:app`) |
 
@@ -147,7 +147,7 @@ The rules now:
 
 Tests: `__tests__/feedNav.test.ts` (422 cases: unit cases, 400 seeded fuzz sequences of key presses, auto-repeat, like/dislike/undo, swipes, user and stale scroll reports, refetch reshuffles, inserted cards, reranks and head swaps, plus Drew's case of a held ArrowRight during background refetches), and `e2e/feedNav.spec.ts`.
 
-`feed/toastPlacement.ts` holds the corner Undo toast's position and sizes. `CORNER_TOAST.bottom` (phone 64 px, wide 40 px from the bottom of the area the toast is drawn in) is the single value that sets how high it sits. The pill is 36 px tall and the Undo target is 44 px. `cornerToastText` gives the short visible word and the full spoken sentence. Tests: `__tests__/toastPlacement.test.ts`; the placement itself is checked in `e2e/feedNav.spec.ts`.
+`feed/toastPlacement.ts` holds the corner Undo toast's position and sizes (phones: bottom 28, over the left end of the card's bottom bar, since cards have no small print any more). `CORNER_TOAST.bottom` (phone 64 px, wide 40 px from the bottom of the area the toast is drawn in) is the single value that sets how high it sits. The pill is 36 px tall and the Undo target is 44 px. `cornerToastText` gives the short visible word and the full spoken sentence. Tests: `__tests__/toastPlacement.test.ts`; the placement itself is checked in `e2e/feedNav.spec.ts`.
 
 Note for code that filters the feed (for example seen-exclusion): removing a card that is already rendered drops it from the pager. If that card is the current one, the reader moves on. Filter new pages, not the cards already on screen.
 

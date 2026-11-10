@@ -5,12 +5,13 @@
 // toast on Following.
 //
 // CORNER_TOAST.bottom is the single knob for the vertical position: the distance from the bottom
-// of the screen area the toast is drawn in. It keeps the pill over the card's small print, clear of
-// the headline, summary, sources and buttons. Where a notice strip sits under the cards (D-80,
-// at most 40 px tall on phones), set it so the pill sits just above that strip.
+// of the screen area the toast is drawn in. Cards no longer carry small print (D-80 moved it to
+// the notice strip under the card area), so on phones the pill sits over the left end of the
+// card's bottom bar (the source name, for the few seconds it shows), clear of the headline,
+// takeaways, "More detail" and the like / dislike / follow / share buttons to its right.
 
 export const CORNER_TOAST = {
-  bottom: { phone: 64, wide: 40 },
+  bottom: { phone: 28, wide: 40 },
   left: { phone: 26, wide: 32 },
   pillHeight: 36, // what the eye sees
   hitMin: 44, // the Undo tap target (project rule: real 44 px boxes)

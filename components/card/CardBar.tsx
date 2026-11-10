@@ -30,7 +30,9 @@ export function BarSource({ card, onPress, timeLabel, size = 'phone', link }: So
   const m = cardBarMeta(card, { timeLabel });
   if (!m) return null;
   const wide = size === 'wide';
-  const name = wide && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? `${m.shortName} · ${m.docLabel}` : m.shortName;
+  // Wide web adds the document label; it truncates before the agency name does.
+  const doc = wide && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? m.docLabel : null;
+  const name = m.shortName;
   const time = wide ? m.time : m.timeShort;
   return (
     <Pressable
@@ -40,10 +42,18 @@ export function BarSource({ card, onPress, timeLabel, size = 'phone', link }: So
       {...tip(link ? 'Open the original' : m.count > 1 ? `${m.count} sources: open the list` : 'Open the source')}
       style={({ pressed }) => [styles.source, { opacity: pressed ? 0.7 : 1 }]}
     >
-      <LinkIcon color={p.accentInk} size={wide ? 18 : 16} />
-      <Text numberOfLines={1} style={[styles.name, wide && styles.nameWide, size === 'small' && styles.nameSmall, { color: p.ink }]}>
+      {/* the glyph never shrinks to a dot when a long name squeezes the row */}
+      <View style={styles.glyph}>
+        <LinkIcon color={p.accentInk} size={wide ? 18 : 16} />
+      </View>
+      <Text numberOfLines={1} style={[styles.name, wide && styles.nameWide, size === 'small' && styles.nameSmall, doc ? { flexShrink: 0 } : null, { color: p.ink }]}>
         {name}
       </Text>
+      {doc ? (
+        <Text numberOfLines={1} style={[styles.doc, styles.nameWide, { color: p.inkSoft }]}>
+          {`· ${doc}`}
+        </Text>
+      ) : null}
       {time ? (
         <Text numberOfLines={1} style={[styles.time, wide && styles.timeWide, size === 'small' && styles.nameSmall, { color: p.muted }]}>
           {`· ${time}`}
@@ -83,6 +93,8 @@ const styles = StyleSheet.create({
   barWide: { gap: 12, paddingTop: 8, marginBottom: -4 },
   sourceSlot: { flex: 1, minWidth: 0, flexDirection: 'row' },
   source: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, maxWidth: '100%', paddingRight: 6, flexShrink: 1 },
+  glyph: { flexShrink: 0 },
+  doc: { flexShrink: 1, minWidth: 0, fontFamily: fonts.sans },
   name: { flexShrink: 1, fontFamily: fonts.sansSemi, fontSize: 14 },
   nameWide: { fontSize: 15 },
   nameSmall: { fontSize: 13 },
