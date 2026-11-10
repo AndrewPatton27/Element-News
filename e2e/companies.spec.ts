@@ -25,9 +25,15 @@ test('Companies screen: sectors, counts, typo filter, company page, follow first
   await expect(page).toHaveURL(/\/company\/ADTB$/);
   await expect(page.getByRole('heading', { name: 'Adatum Bank' })).toBeVisible();
   await expect(page.getByText(/\[SAMPLE\] Adatum Bank/).first()).toBeVisible();
-  // the Companies screen stays mounted (hidden) under this one, so look at visible text only
-  await expect(page.getByText(/Informational only · Not investment advice/).filter({ visible: true }).first()).toBeVisible();
+  // the Companies screen stays mounted (hidden) under this one, so look at visible text only; \s also matches the
+  // no-break spaces the phone notice strip puts inside the disclaimer
+  await expect(page.getByText(/Informational\sonly\s·\sNot\sinvestment\sadvice/).filter({ visible: true }).first()).toBeVisible();
   expect(await page.locator('img').count()).toBe(0);
+  // rule 5 / D-80: the AI notice + disclaimer is the persistent strip under the card area, on screen
+  // without scrolling, not a footer after the list (P1-2)
+  const strip = page.locator('[role="note"]').filter({ hasText: 'AI-generated summaries may contain errors' }).filter({ visible: true });
+  await expect(strip).toHaveCount(1);
+  await expect(strip).toBeInViewport();
 
   // follow from the company page, then it is listed first on the Companies screen
   await page.getByRole('button', { name: 'Follow Adatum' }).filter({ visible: true }).first().click();

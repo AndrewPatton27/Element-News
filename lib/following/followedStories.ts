@@ -55,6 +55,65 @@ export function serializeFollowedStories(list: FollowedStory[]): string {
   return JSON.stringify(list);
 }
 
+// ---- Whose list it is ----
+//
+// The list lives under one device key, but signed-in For you sends its ids to the server (p_followed). So the
+// device remembers who the list belongs to ('' = a signed-out reader). On a switch the old owner's list is
+// put aside under its own key and the new owner's list comes back: the next person to sign in on this device
+// never sends (or sees) someone else's followed stories. A guest list is kept when the guest signs in (merged
+// into that account's list), like the other device choices (localPrefs.mergeIntoAccount).
+
+export const FOLLOWED_STORIES_OWNER_KEY = 'element.followedStories.owner';
+export const followedStoriesStashKey = (uid: string) => `element.followedStories.u.${uid}`;
+
+interface StoryStore {
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+  remove(key: string): void;
+}
+
+/** Who the device list belongs to: a user id, or '' for a signed-out reader (also when never set). */
+export function followedStoriesOwner(store: Pick<StoryStore, 'get'>): string {
+  return store.get(FOLLOWED_STORIES_OWNER_KEY) ?? '';
+}
+
+/**
+ * Makes the device list belong to `uid` (null = signed out). Call it whenever the signed-in user changes.
+ * Returns true when the list changed.
+ */
+export function switchFollowedStoriesOwner(store: StoryStore, uid: string | null): boolean {
+  const next = uid ?? '';
+  const owner = followedStoriesOwner(store);
+  if (owner === next) return false;
+  const current = parseFollowedStories(store.get(FOLLOWED_STORIES_KEY));
+  // Put the old owner's list aside (a guest's list is not kept apart: it joins the account below).
+  if (owner && current.length) store.set(followedStoriesStashKey(owner), serializeFollowedStories(current));
+  else if (owner) store.remove(followedStoriesStashKey(owner));
+  let restored: FollowedStory[] = [];
+  if (next) {
+    restored = parseFollowedStories(store.get(followedStoriesStashKey(next)));
+    store.remove(followedStoriesStashKey(next));
+    if (!owner) {
+      // guest -> signed in: keep what the guest followed, newest first, no duplicates
+      const ids = new Set(restored.map((s) => s.id));
+      restored = [...restored, ...current.filter((s) => !ids.has(s.id))].sort((a, b) => b.at - a.at).slice(0, MAX_FOLLOWED_STORIES);
+    }
+  }
+  if (restored.length) store.set(FOLLOWED_STORIES_KEY, serializeFollowedStories(restored));
+  else store.remove(FOLLOWED_STORIES_KEY);
+  store.set(FOLLOWED_STORIES_OWNER_KEY, next);
+  return true;
+}
+
+/**
+ * Followed-story ids to send for `uid`, newest first. [] when the device list belongs to someone else (the
+ * switch above has not run yet), so another reader's ids are never sent.
+ */
+export function followedStoryIdsFor(store: Pick<StoryStore, 'get'>, uid: string | null, max: number): string[] {
+  if (followedStoriesOwner(store) !== (uid ?? '')) return [];
+  return parseFollowedStories(store.get(FOLLOWED_STORIES_KEY)).map((s) => s.id).slice(0, Math.max(0, max));
+}
+
 export function isStoryFollowed(list: readonly FollowedStory[], id: string): boolean {
   return list.some((s) => s.id === id);
 }
