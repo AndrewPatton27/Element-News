@@ -241,7 +241,7 @@ export default function BriefScreen() {
 
   if (wide) {
     return (
-      <ScreenShell tab="brief" title={mode === 'weekly' ? 'Weekly brief' : 'Daily brief'} meta={briefDateLabel(mode, data)} notice>
+      <ScreenShell tab="brief" title="Brief" meta={briefDateLabel(mode, data)} notice>
         {switchTabs}
         {manageCard}
         {meta}

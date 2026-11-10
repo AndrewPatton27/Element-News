@@ -16,8 +16,9 @@ export function DetailActions({ card }: { card: BlurbCard }) {
   const button = (label: string, active: boolean, icon: ReactNode, onPress: () => void) => (
     <Pressable key={label} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} {...tip(label)}
       accessibilityState={{ selected: active }} aria-pressed={active}
-      style={({ pressed }) => [styles.button, { backgroundColor: active ? p.accentSoft : p.surfaceMuted, opacity: pressed ? 0.72 : 1 }]}>
-      {icon}<Text numberOfLines={1} style={[styles.label, { color: active ? p.accentInk : p.ink }]}>{label === 'Follow this story' && active ? 'Following' : label.replace(' this story', '')}</Text>
+      style={({ pressed }) => [styles.button, { backgroundColor: active ? p.accentSoft : p.surfaceMuted, opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+      {/* fixed icon box: the four icons have different drawn heights, the labels still line up */}
+      <View style={styles.icon}>{icon}</View><Text numberOfLines={1} style={[styles.label, { color: active ? p.accentInk : p.ink }]}>{label === 'Follow this story' && active ? 'Following' : label.replace(' this story', '')}</Text>
     </Pressable>
   );
   return <View style={[styles.dock, { backgroundColor: p.surface, borderTopColor: p.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -35,6 +36,7 @@ const styles = StyleSheet.create({
   dock: { borderTopWidth: 1, paddingTop: 10, paddingHorizontal: 12 },
   row: { flexDirection: 'row', gap: 6, justifyContent: 'space-between' },
   button: { flex: 1, minWidth: 44, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 2 },
-  label: { fontFamily: fonts.sansMedium, fontSize: 12 },
+  icon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  label: { fontFamily: fonts.sansMedium, fontSize: 12, lineHeight: 16 },
   toast: { position: 'absolute', alignSelf: 'center', bottom: 62, fontFamily: fonts.sansMedium, fontSize: 13, padding: 7, backgroundColor: '#E6E9E4', borderRadius: 10, overflow: 'hidden' },
 });

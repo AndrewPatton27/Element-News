@@ -81,27 +81,34 @@ export function TabBar({ active, signedIn }: { active: Tab; signedIn: boolean })
 // (AccountEntry in Shell.tsx); Numbers is the ticker strip. Underline on the current one.
 export const WEB_LINK_KEYS: MainTab[] = ['brief', 'search', 'following'];
 
+// About sits last in the same row (ui-polish-m8): a plain text link like its neighbours, so wide
+// screens need no floating About button over the content.
 export function TopNavLinks({ active, signedIn }: { active: Tab; signedIn: boolean }) {
   const p = usePalette();
   const current = mainTabFor(active);
+  const links: { key: string; label: string; href: Href; on: boolean; a11y?: string }[] = [
+    ...mainTabs(signedIn)
+      .filter((t) => WEB_LINK_KEYS.includes(t.key))
+      .map(({ key, label, href }) => ({ key, label, href, on: key === current })),
+    { key: 'about', label: 'About', href: '/about', on: active === 'about', a11y: 'About Element' },
+  ];
   return (
-    <View style={styles.links} aria-label="More">
-      {mainTabs(signedIn).filter((t) => WEB_LINK_KEYS.includes(t.key)).map(({ key, label, href }) => {
-        const on = key === current;
-        return (
-          <Pressable
-            key={key}
-            onPress={() => go(href)}
-            accessibilityRole="link"
-            accessibilityState={{ selected: on }}
-            style={[styles.link, { borderBottomColor: on ? p.accent : 'transparent' }]}
-          >
-            <Text style={{ color: on ? p.ink : p.muted, fontSize: font.nav, fontFamily: on ? fonts.sansSemi : fonts.sansMedium }}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View style={styles.links} role="navigation" aria-label="More">
+      {links.map(({ key, label, href, on, a11y }) => (
+        <Pressable
+          key={key}
+          onPress={() => go(href)}
+          accessibilityRole="link"
+          accessibilityLabel={a11y}
+          accessibilityState={{ selected: on }}
+          aria-current={on ? 'page' : undefined}
+          style={[styles.link, { borderBottomColor: on ? p.accent : 'transparent' }]}
+        >
+          <Text style={{ color: on ? p.ink : p.muted, fontSize: font.nav, fontFamily: on ? fonts.sansSemi : fonts.sansMedium }}>
+            {label}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

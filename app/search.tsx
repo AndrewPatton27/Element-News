@@ -205,7 +205,7 @@ function SearchScreenBody() {
         <View style={styles.headRow}>
           <View style={styles.headText}>
             {target.kind === 'category' ? (
-              <Text style={[styles.topicTitle, { color: p.ink }]} accessibilityRole="header">
+              <Text style={[styles.topicTitle, { color: p.ink }]} accessibilityRole="header" aria-level={2}>
                 {target.name}
               </Text>
             ) : null}
