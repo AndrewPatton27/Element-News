@@ -261,8 +261,12 @@ begin
 
   -- ---- 9. no more than 2 in a row from one topic while another topic is still available ---
   -- (13 of A's 16 cards are markets, so the tail is allowed to be markets only)
+  -- Only the unseen part is diversified: the seen tail (from seen_from, 20261113) is newest first by design, and
+  -- since 20261120000300 a viewed + liked card is seen too, so it sits in that tail.
+  page := api.feed_for_you(null, 30);
   select array_agg(x->>'category' order by o) into seen
-    from jsonb_array_elements(api.feed_for_you(null, 30)->'items') with ordinality as t(x, o);
+    from jsonb_array_elements(page->'items') with ordinality as t(x, o)
+   where page->>'seen_from' is null or o <= (page->>'seen_from')::int;
   for i in 3 .. coalesce(cardinality(seen), 0) loop
     if seen[i] = seen[i-1] and seen[i] = seen[i-2]
        and exists (select 1 from unnest(seen[i:]) c where c <> seen[i]) then

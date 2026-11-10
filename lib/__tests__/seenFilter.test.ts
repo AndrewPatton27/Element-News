@@ -30,10 +30,10 @@ test('a seen card is left out; unseen ones stay in order', () => {
   assert.deepEqual(seen.map((c) => c.id), ['c002', 'c004']);
 });
 
-test('a liked card, a followed story and an updated story may come back', () => {
+test('a followed story and an updated story may come back; a liked card stays seen', () => {
   const at = seenTimes(ctx(['c001', 'c002', 'c003', 'c004']).seen);
   const c = ctx(['c001', 'c002', 'c003', 'c004'], { liked: new Set(['c001']), followed: new Set(['c002']) });
-  assert.equal(isSeenCard(mk(1), c, at), false);
+  assert.equal(isSeenCard(mk(1), c, at), true); // liked: counts as seen (SEEN_LIKED_COMEBACK = false)
   assert.equal(isSeenCard(mk(2), c, at), false);
   assert.equal(isSeenCard(mk(3, { updated_at: new Date(NOW - 10 * 60_000).toISOString(), revision: 2 }), c, at), false); // updated after it was seen
   assert.equal(isSeenCard(mk(4, { updated_at: new Date(NOW - 5 * HOUR).toISOString(), revision: 2 }), c, at), true); // updated before it was seen
