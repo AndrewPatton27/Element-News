@@ -59,6 +59,7 @@ test('next card: keyboard moves to a different card', async ({ page }) => {
   const first = await currentHeadline(page);
   const second = await nextCard(page);
   expect(second).not.toBe(first);
+  await page.waitForTimeout(500); // past the 320 ms move lock (D-88), or the key is ignored on purpose
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => currentHeadline(page)).toBe(first);
 });

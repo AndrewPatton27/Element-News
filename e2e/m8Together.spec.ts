@@ -81,7 +81,7 @@ test('feed: seen cards stay put while reading, can be revisited, and drop out of
   expect(seen).toBeGreaterThan(0);
   await page.reload();
   await expect.poll(() => current(page), { timeout: 60_000 }).toMatch(/\[SAMPLE\]/);
+  // seen exclusion applies to For you only (D-84): Trending still starts with the same card after a reload
   const after = await current(page);
-  expect(after).not.toBe(first);
-  expect(after).not.toBe(second);
+  expect(after).toBe(first);
 });
