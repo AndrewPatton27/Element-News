@@ -85,6 +85,9 @@ export interface TrackResult {
 export interface FeedForYouParams {
   p_cursor?: string | null;             // next_cursor from the previous page
   p_limit?: number;                     // default 20, clamped to 10..30
+  /** Ids of the stories the reader follows (kept on the device): exempt from seen-card exclusion. Optional, at most
+   *  200 (extra ones are ignored). Sent only when there are some; needs migration 20261113000000. */
+  p_followed?: string[];
 }
 
 /** A card in the For you feed: a normal BlurbCard plus the user's reaction. */
