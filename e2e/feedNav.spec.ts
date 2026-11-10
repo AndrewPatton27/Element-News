@@ -170,10 +170,24 @@ async function checkCornerToast(page: Page, shot: string) {
       return r.width > 0 && r.top >= 0 && r.bottom <= window.innerHeight;
     });
     const out: { what: string; x: number; y: number; w: number; h: number }[] = [];
+    // The part of the element a reader can actually see and tap: clipped by every scrolling or
+    // overflow-hidden ancestor (a tall card scrolls inside its box, so "More detail" can sit half
+    // below the card's bottom edge, where the toast cannot cover it).
+    const visible = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      let l = r.left, t = r.top, rt = r.right, bt = r.bottom;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const o = getComputedStyle(p);
+        if (o.overflowX === 'visible' && o.overflowY === 'visible') continue;
+        const pr = p.getBoundingClientRect();
+        l = Math.max(l, pr.left); t = Math.max(t, pr.top); rt = Math.min(rt, pr.right); bt = Math.min(bt, pr.bottom);
+      }
+      return { left: l, top: t, width: Math.max(0, rt - l), height: Math.max(0, bt - t) };
+    };
     const add = (what: string, el: Element | null | undefined) => {
       if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) out.push({ what, x: r.left, y: r.top, w: r.width, h: r.height });
+      const r = visible(el);
+      if (r.width > 0 && r.height > 0 && r.top + r.height > 0 && r.top < window.innerHeight) out.push({ what, x: r.left, y: r.top, w: r.width, h: r.height });
     };
     add('headline', cur);
     document
