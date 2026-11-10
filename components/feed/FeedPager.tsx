@@ -1,6 +1,13 @@
 // Vertical one-card-per-screen pager. FlatList with paging and snap. On web the
-// the arrow keys (and only those): up and down move between cards, right likes and left dislikes like a swipe; wide web also shows a
+// arrow keys (and only those): up and down move between cards, right likes and left dislikes like a swipe; wide web also shows a
 // "Next: press ↓ or scroll" button in the card footer.
+//
+// Navigation is deterministic (lib/feed/feedNav.ts): the card on screen is tracked by id, the
+// order of cards already rendered is frozen (refetches, reranks after a like, new pages and the
+// tab-head swap can only change cards not rendered yet, and new cards only join after them),
+// every user action moves at most one card with a short lock, held-key auto-repeat is ignored,
+// and where the list comes to rest only moves the reader when it is not a leftover of our own
+// animated scroll.
 //
 // Swipe to react (touch, phone layouts, signed in): drag right = like, left =
 // dislike, the same onReact signal as the thumb buttons. The gesture locks to an
@@ -9,11 +16,19 @@
 // width or a fast fling the card flies off, the reaction is saved, an Undo toast
 // shows and the feed moves on; otherwise it springs back. Reduced motion: no tilt
 // or fly-off, just the reaction. Pure rules: lib/swipeLogic.ts.
+//
+// Motion (ui-polish-m8): while the finger is down the card is the finger (1:1, from wherever
+// the card was when it was caught, so a card grabbed mid spring-back does not jump). On release
+// the fly-off continues at the finger's speed (lib/theme/motion.ts flingDuration, strong
+// ease-out) and the spring-back is a damping-0.8 spring seeded with the release velocity.
+// Keyboard moves (arrow keys) are instant: no smooth scroll on a key press. Buttons and swipes
+// still glide to the next card.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Easing,
   FlatList,
   PanResponder,
   Platform,
@@ -21,15 +36,31 @@ import {
   Text,
   StyleSheet,
   View,
-  type FlatListProps,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewStyle,
   useWindowDimensions,
 } from 'react-native';
 import type { AppConfig, BlurbCard, Category } from '../../contract/types.ts';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts, radius } from '../../lib/theme/theme';
-import { nextRevealCount, scrollToIndexFallbackOffset, shouldHandleFeedKey } from '../../lib/feed/pagerLogic';
+import { shouldHandleFeedKey } from '../../lib/feed/pagerLogic';
+import {
+  canReactNow,
+  currentIndex,
+  initNav,
+  isKeyRepeat,
+  reactNav,
+  renderedIds,
+  restingIndex,
+  settleNav,
+  stepNav,
+  syncNav,
+  undoNav,
+  type NavResult,
+  type NavState,
+} from '../../lib/feed/feedNav';
 import {
   MAX_TILT_DEG,
   SWIPE_COACH_KEY,
@@ -52,7 +83,9 @@ import { CardErrorBoundary } from '../shell/ErrorBoundary';
 import type { Feedback } from '../../lib/account/accountLogic';
 import { ThumbDownIcon, ThumbUpIcon } from '../shell/Icons';
 import { UndoToast } from './UndoToast';
+import { cornerToastText } from '../../lib/feed/toastPlacement';
 import { shouldUseCompactCard } from '../../lib/feed/cardFit';
+import { flingDuration, motion as m } from '../../lib/theme/motion';
 
 interface Props {
   items: BlurbCard[];
@@ -61,6 +94,8 @@ interface Props {
   categories: Category[];
   loadingMore: boolean;
   done: boolean;
+  /** Cards shown again because the reader had already seen them (the feed ran out of new ones). */
+  reshownIds?: ReadonlySet<string>;
   onEndReached: () => void;
   onShowSources: (card: BlurbCard) => void;
   onOpenDetail?: (card: BlurbCard) => void;
@@ -77,6 +112,7 @@ interface Props {
 
 // Below this page height the card switches to smaller type so it fits.
 const MOUSE_SWIPE = false; // desktop mouse drag-to-react: off by default
+const REST_IDLE_MS = 120; // no scroll event for this long = the list came to rest
 const coachStore = defaultStore();
 
 function detectTouch(): boolean {
@@ -128,12 +164,14 @@ function SwipeCard({
   const p = usePalette();
   const drag = useRef(new Animated.Value(0)).current;
   const axis = useRef<Axis | null>(null);
+  const grabbed = useRef(0); // where the card was when the finger landed
   const live = useRef({ enabled, reduced, width, onSwipe });
   live.current = { enabled, reduced, width, onSwipe };
   const nativeDriver = Platform.OS !== 'web';
 
   const responder = useMemo(() => {
-    const springBack = () => Animated.spring(drag, { toValue: 0, useNativeDriver: nativeDriver, friction: 7 }).start();
+    // px/ms from the responder -> px/s for the spring
+    const springBack = (vx = 0) => Animated.spring(drag, { toValue: 0, velocity: vx * 1000, ...m.springSnap, useNativeDriver: nativeDriver }).start();
     return PanResponder.create({
       // Every touch starts undecided; the axis is picked once, after a few px.
       onStartShouldSetPanResponderCapture: () => {
@@ -146,22 +184,37 @@ function SwipeCard({
         return axis.current === 'x';
       },
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => drag.stopAnimation(),
-      onPanResponderMove: (_, g) => drag.setValue(g.dx),
+      onPanResponderGrant: () => {
+        grabbed.current = 0;
+        drag.stopAnimation((v) => {
+          grabbed.current = v;
+        });
+      },
+      onPanResponderMove: (_, g) => drag.setValue(grabbed.current + g.dx),
       onPanResponderRelease: (_, g) => {
         axis.current = null;
         const { width: w, reduced: still, onSwipe: done } = live.current;
-        const decision = swipeDecision(g.dx, g.vx, w);
-        if (!decision) return springBack();
+        const dx = grabbed.current + g.dx;
+        const decision = swipeDecision(dx, g.vx, w);
+        if (!decision) return springBack(g.vx);
         if (still) {
           drag.setValue(0);
           done(decision);
           return;
         }
-        Animated.timing(drag, { toValue: (decision === 'like' ? 1 : -1) * w * 1.3, duration: 200, useNativeDriver: nativeDriver }).start(() => {
-          // Moved on: put the card back while it is off screen. Last card: spring back.
-          if (done(decision)) setTimeout(() => drag.setValue(0), 450);
-          else springBack();
+        // Decide (react + move on) at release, so the move is locked in before the fly-off
+        // animation; a second swipe during it is dropped by the navigation lock.
+        const moved = done(decision);
+        if (!moved) return springBack(g.vx);
+        const target = (decision === 'like' ? 1 : -1) * w * 1.3;
+        Animated.timing(drag, {
+          toValue: target,
+          duration: flingDuration(Math.abs(target - dx), g.vx, 140, 260),
+          easing: Easing.bezier(...m.easeOut),
+          useNativeDriver: nativeDriver,
+        }).start(() => {
+          // Moved on: put the card back while it is off screen.
+          setTimeout(() => drag.setValue(0), 450);
         });
       },
       onPanResponderTerminate: () => {
@@ -197,12 +250,22 @@ function SwipeCard({
   );
 }
 
+interface UndoInfo {
+  card: BlurbCard;
+  previous: Feedback | undefined;
+  sent: Feedback;
+  message: string;
+  label: string;
+  seq: number;
+}
+
 export function FeedPager({
   items,
   config,
   categories,
   loadingMore: _loadingMore,
   done,
+  reshownIds,
   onEndReached,
   onShowSources,
   onOpenDetail,
@@ -222,20 +285,93 @@ export function FeedPager({
   const list = useRef<FlatList<BlurbCard>>(null);
   const [height, setHeight] = useState(0);
   const [width, setWidth] = useState(0);
-  const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState(5);
-  const totalRef = useRef(items.length);
-  totalRef.current = items.length;
-  const indexRef = useRef(0);
-  indexRef.current = index;
+  const heightRef = useRef(0);
+  heightRef.current = height;
 
   const onLayout = (e: LayoutChangeEvent) => {
     setHeight(Math.round(e.nativeEvent.layout.height));
     setWidth(Math.round(e.nativeEvent.layout.width));
   };
 
-  const [touch] = useState(detectTouch);
+  // ---- Navigation state: one source of truth (React state for rendering, mirrored in a ref so
+  // key and gesture handlers always act on the latest copy, never a stale closure) ----
+  const byId = useMemo(() => new Map(items.map((c) => [c.id, c])), [items]);
+  const incoming = useMemo(() => items.map((c) => c.id), [items]);
+  const [navState, setNavState] = useState<NavState>(() => initNav(incoming));
+  // Merge what the feed wants to show now (a pure derivation): cards already rendered keep their
+  // place, new ones only join after them.
+  const s = useMemo(() => syncNav(navState, incoming).state, [navState, incoming]);
+  const nav = useRef<NavState>(s);
+  useLayoutEffect(() => {
+    nav.current = s;
+    if (s !== navState) setNavState(s);
+  }, [s, navState]);
+  const index = Math.max(0, currentIndex(s));
+  const rows = useMemo(() => renderedIds(s).map((id) => byId.get(id)).filter((c): c is BlurbCard => !!c), [s, byId]);
+  const rerender = useCallback(() => setNavState(nav.current), []);
+  // The row the list is at or heading to. When the current card's index changes without our
+  // own animated move (a card behind the reader was hidden), the list jumps there instantly.
+  const listAt = useRef(index);
   const reduced = useReducedMotion();
+  const reducedRef = useRef(reduced);
+  reducedRef.current = reduced;
+
+  const scrollToRow = useCallback((i: number, animated: boolean) => {
+    listAt.current = i;
+    list.current?.scrollToOffset({ offset: heightRef.current * i, animated });
+  }, []);
+
+  const apply = useCallback(
+    (r: NavResult, viaKey = false) => {
+      if (!r.accepted) return false;
+      nav.current = r.state;
+      const i = currentIndex(r.state);
+      // Arrow keys move instantly (no animation on a keyboard action); buttons and swipes glide.
+      if (r.cause === 'step' || r.cause === 'undo') scrollToRow(i, !reducedRef.current && !viaKey);
+      else if (r.cause === 'settle') listAt.current = i;
+      rerender();
+      return true;
+    },
+    [scrollToRow, rerender],
+  );
+
+  useLayoutEffect(() => {
+    if (height > 0 && listAt.current !== index) scrollToRow(index, false);
+  });
+
+  // Page height changed (window resized, phone rotated): the old scroll offset no
+  // longer lines up with a card, so jump straight back to the current one.
+  useEffect(() => {
+    if (height > 0) scrollToRow(Math.max(0, currentIndex(nav.current!)), false);
+  }, [height, scrollToRow]);
+
+  // Where the list came to rest (user scroll, our own animation landing). A report that is a
+  // leftover of our own move is ignored; if our move never lands, the report wins after a grace.
+  const lastY = useRef(0);
+  const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onRest = useCallback(() => {
+    restTimer.current = null;
+    const st = nav.current!;
+    const r = settleNav(st, restingIndex(lastY.current, heightRef.current), Date.now());
+    if (r.accepted) apply(r);
+    else if (st.pending && r.state === st) {
+      restTimer.current = setTimeout(onRest, Math.max(20, st.pending.until - Date.now() + 20));
+    }
+  }, [apply]);
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      lastY.current = e.nativeEvent.contentOffset.y;
+      if (restTimer.current) clearTimeout(restTimer.current);
+      restTimer.current = setTimeout(onRest, REST_IDLE_MS);
+    },
+    [onRest],
+  );
+  useEffect(() => () => { if (restTimer.current) clearTimeout(restTimer.current); }, []);
+
+  const step = useCallback((dir: 1 | -1, viaKey = false) => apply(stepNav(nav.current!, dir, Date.now()), viaKey), [apply]);
+  const next = useCallback(() => void step(1), [step]);
+
+  const [touch] = useState(detectTouch);
   const canReact = typeof onReact === 'function';
   const swipeOn = swipeEnabled({ wide: !!wide, canReact, touch, mouseSwipe: MOUSE_SWIPE });
   const [coachSeen, setCoachSeen] = useState(() => coachStore.get(SWIPE_COACH_KEY));
@@ -249,10 +385,11 @@ export function FeedPager({
     const timer = setTimeout(dismissCoach, COACH_AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
   }, [coach, dismissCoach]);
-  const [undo, setUndo] = useState<{ card: BlurbCard; previous: Feedback | undefined; sent: Feedback; message: string } | null>(null);
+  const [undo, setUndo] = useState<UndoInfo | null>(null);
+  const undoSeq = useRef(0);
   const reactionsRef = useRef(reactions);
   reactionsRef.current = reactions;
-  // Thumb buttons: same signal as before, and using them counts as having seen the hint.
+  // Thumb buttons: same signal as before (a toggle, no move), and using them counts as having seen the hint.
   const react = useMemo(
     () =>
       onReact
@@ -264,118 +401,83 @@ export function FeedPager({
     [onReact, dismissCoach],
   );
 
-  const onViewable = useRef<NonNullable<FlatListProps<BlurbCard>['onViewableItemsChanged']>>(({ viewableItems }) => {
-    const first = viewableItems.find((v) => v.isViewable && typeof v.index === 'number');
-    if (first && typeof first.index === 'number') {
-      setIndex(first.index);
-      onQueuePosition?.(first.index);
-      setRevealed((n) => nextRevealCount(first.index!, n, totalRef.current));
-    }
-  }).current;
-
-  const goTo = useCallback(
-    (i: number) => {
-      if (items.length === 0) return;
-      const target = Math.max(0, Math.min(items.length - 1, i));
-      list.current?.scrollToIndex({ index: target, animated: true });
-      setIndex(target);
-      if (target >= items.length - 2) onEndReached();
-    },
-    [items.length, onEndReached],
-  );
-  const next = useCallback(() => goTo(indexRef.current + 1), [goTo]);
-
-  // A completed swipe: set the reaction (never toggle it off), offer Undo, move on.
+  // A completed swipe or a like / dislike arrow key: only for the card on screen and outside the
+  // navigation lock. Sets the reaction (never toggles it off), offers Undo, moves on exactly one.
   const swiped = useCallback(
-    (card: BlurbCard, r: Feedback): boolean => {
+    (card: BlurbCard, r: Feedback, viaKey = false): boolean => {
       dismissCoach();
       if (!onReact) return false;
+      const now = Date.now();
+      if (!canReactNow(nav.current!, card.id, now)) return false;
       const previous = reactionsRef.current?.[card.id];
       const sent = reactionToSend(previous, r);
       if (sent) {
         onReact(card, sent);
         markCardSwiped(card.id);
-        setUndo({ card, previous, sent, message: sent === 'like' ? 'Liked. More like this.' : 'Disliked. Less like this.' });
+        const t = cornerToastText(sent === 'like' ? 'like' : 'dislike');
+        setUndo({ card, previous, sent, message: t.text, label: t.label, seq: ++undoSeq.current });
       }
-      const i = items.findIndex((c) => c.id === card.id);
-      if (i < 0 || i >= items.length - 1) return false;
-      goTo(i + 1);
-      return true;
+      const res = reactNav(nav.current!, card.id, now);
+      apply(res, viaKey);
+      return res.accepted && res.cause === 'step';
     },
-    [onReact, items, goTo, dismissCoach],
+    [onReact, dismissCoach, apply],
   );
   const undoSwipe = useCallback(() => {
     if (!undo || !onReact) return setUndo(null);
     const press = undoPress(undo.previous, undo.sent);
     if (press) onReact(undo.card, press);
+    apply(undoNav(nav.current!, undo.card.id, Date.now()));
     setUndo(null);
-  }, [undo, onReact]);
+  }, [undo, onReact, apply]);
   const clearUndo = useCallback(() => setUndo(null), []);
 
-  // Fast key-nav can target a row that isn't laid out yet, which makes scrollToIndex
-  // throw "out of range". Wait one frame and retry; if it still can't, scroll to the
-  // computed offset (index * itemHeight) so navigation never throws or no-ops.
-  const onScrollToIndexFailed = useCallback(
-    (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
-      const offset = scrollToIndexFallbackOffset(info, height);
-      requestAnimationFrame(() => {
-        try {
-          list.current?.scrollToIndex({ index: info.index, animated: true });
-        } catch {
-          list.current?.scrollToOffset({ offset, animated: true });
-        }
-      });
-    },
-    [height],
-  );
-
-  // Page height changed (window resized, phone rotated): the old scroll offset no
-  // longer lines up with a card, so jump straight back to the current one.
-  useEffect(() => {
-    if (height > 0 && indexRef.current > 0) list.current?.scrollToOffset({ offset: height * indexRef.current, animated: false });
-  }, [height]);
-
-  const current = items[index];
+  const current = s.currentId ? byId.get(s.currentId) : undefined;
   useEffect(() => {
     if (current && onActiveCard) onActiveCard(current);
   }, [current, onActiveCard]);
-
-  // New filter -> new list: jump back to the first card.
-  const firstId = items[0]?.id;
   useEffect(() => {
-    setIndex(0);
-    setRevealed(Math.min(5, items.length));
-    list.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [firstId]);
+    onQueuePosition?.(index);
+  }, [index, onQueuePosition]);
+  // Near the end of what is loaded: ask for more.
+  const nearEnd = index >= s.order.length - 3;
+  useEffect(() => {
+    if (nearEnd) onEndReached();
+  }, [nearEnd, s.order.length, onEndReached]);
 
+  // Keys go through refs, so the listener is added once and always sees the current card.
+  const keyActions = useRef({ step, swiped, byId });
+  keyActions.current = { step, swiped, byId };
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined' || active === false) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || target?.closest?.('[contenteditable], [role="dialog"], [aria-modal="true"]') || !shouldHandleFeedKey({ active: true, key: e.key, tagName: target?.tagName, contentEditable: target?.isContentEditable })) return;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        goTo(indexRef.current + 1);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        goTo(indexRef.current - 1);
-      } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && canReact) {
+      const isReact = e.key === 'ArrowRight' || e.key === 'ArrowLeft';
+      if (isReact && !canReact) return;
+      e.preventDefault();
+      // Holding a key fires auto-repeat keydowns: one press, one card.
+      if (isKeyRepeat(e)) return;
+      const a = keyActions.current;
+      if (e.key === 'ArrowDown') a.step(1, true);
+      else if (e.key === 'ArrowUp') a.step(-1, true);
+      else {
         // Drew: the right arrow is a right swipe (like) and the left arrow a left swipe (dislike).
-        const card = items[indexRef.current];
-        if (card) {
-          e.preventDefault();
-          swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike');
-        }
+        const id = nav.current?.currentId;
+        const card = id ? a.byId.get(id) : undefined;
+        if (card) a.swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike', true);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goTo, active, canReact, items, swiped]);
+  }, [active, canReact]);
 
   const compact = !wide && shouldUseCompactCard(windowHeight, height);
+  const lastIndex = rows.length - 1;
+  const atEnd = done && rows.length === s.order.length;
   const renderItem = useCallback(
     ({ item, index: i }: { item: BlurbCard; index: number }) => {
-      const last = i === items.length - 1 && done;
+      const last = i === lastIndex && atEnd;
       return (
         <View style={[styles.page, wide && styles.pageWide, { height }]}>
           <View style={coachLane(coach, height) ? { height: height - coachLane(coach, height) } : styles.cardArea}>
@@ -404,7 +506,7 @@ export function FeedPager({
         </View>
       );
     },
-    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, items.length, done, reactions, react, swipeOn, reduced, swiped, timeLabel, coach],
+    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, lastIndex, atEnd, reactions, react, swipeOn, reduced, swiped, timeLabel, coach],
   );
 
   return (
@@ -412,10 +514,7 @@ export function FeedPager({
       {height > 0 ? (
         <FlatList
           ref={list}
-          // Smooth, eased paging between cards on the web (arrow keys, buttons and swipes).
-          style={Platform.OS === 'web' ? ({ scrollBehavior: 'smooth' } as object) : undefined}
-          data={items.slice(0, revealed)}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          data={rows}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
           pagingEnabled
@@ -424,17 +523,14 @@ export function FeedPager({
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
-          onEndReached={onEndReached}
-          onEndReachedThreshold={2}
-          onScrollToIndexFailed={onScrollToIndexFailed}
-          onViewableItemsChanged={onViewable}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           windowSize={5}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           removeClippedSubviews={Platform.OS !== 'web'}
           ListFooterComponent={
-            done && items.length > 0 ? (
+            atEnd && rows.length > 0 ? (
               <View style={styles.end}>
                 <Text style={[styles.endText, { color: p.muted }]}>You’re all caught up. Switch to Latest or another topic.</Text>
               </View>
@@ -456,7 +552,21 @@ export function FeedPager({
           </Pressable>
         </View>
       ) : null}
-      <UndoToast message={undo?.message ?? null} onUndo={undoSwipe} onDone={clearUndo} />
+      {/* By card id: `index` is the position in the nav order, which can differ from `items`. */}
+      {reshownIds && current && reshownIds.has(current.id) ? (
+        <View style={styles.caughtUpDock} pointerEvents="none" accessibilityLiveRegion="polite">
+          <Text style={[styles.caughtUp, { backgroundColor: p.ink, color: p.bg }]}>You’re all caught up. These are stories you’ve already seen.</Text>
+        </View>
+      ) : null}
+      <UndoToast
+        message={undo?.message ?? null}
+        label={undo?.label}
+        token={undo?.seq}
+        placement="corner"
+        wide={wide}
+        onUndo={undoSwipe}
+        onDone={clearUndo}
+      />
     </View>
   );
 }
@@ -465,6 +575,8 @@ const styles = StyleSheet.create({
   end: { height: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   endText: { fontFamily: fonts.sansMedium, fontSize: 14, textAlign: 'center' },
   fill: { flex: 1 },
+  caughtUpDock: { position: 'absolute', top: 8, left: 0, right: 0, alignItems: 'center', paddingHorizontal: 24 },
+  caughtUp: { fontFamily: fonts.sansMedium, fontSize: 13, textAlign: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, overflow: 'hidden' },
   cardArea: { flex: 1 },
   // Phones: the card, the next card's edge and the disclaimer line all sit inside the page.
   page: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },

@@ -120,3 +120,7 @@ Next step: tune `step_extra` around 2 on the tuning seeds, then re-run once on s
 ## Limits
 
 These are simulated readers graded by the same simulator family, so nothing here is a gain for real readers. The gains in stress and wild are small (+0.017). The tags only separate subtopics because the synthetic headlines contain the `core.tag_rules` keywords; real headlines will match less often. SQL parity is not written yet, so v3 is untested in Postgres.
+
+## Decision: extra topic step for cold readers (2026-11-09)
+
+Drew chose `v3_step_extra_cold` = 1 (migration `supabase/migrations/20261117000000_v3_extra_cold.sql`). Reason: faster personalisation for cold readers; the tuned configuration with this setting is the one that passes the recovery gate. Effect: a reader with no evidence in mode 3 gets v5's score plus the 2.5 h extra same-topic step, so cold readers no longer get exactly the v5 order. The SQL now matches the Python `V3Config` default (`step_extra_cold` 1). v3 itself stays OFF (`foryou_ml_mode` 0); setting it back to 0 restores the exact v5 order for cold readers. Checks: `supabase/tests/ranking_v3_check.sql` section 3 and the PGlite parity variants `cold` (switch off: v5 exactly) and `cold_step` (shipped value).

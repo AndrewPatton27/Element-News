@@ -25,10 +25,15 @@ test('cardTime: older cards fall back to a short date', () => {
   assert.equal(cardTime(card({ as_of: '2026-10-03T18:00:00Z' }), NOW), 'Oct 3');
 });
 
-test('the feed card and the detail sheet both use the shared cardTime helper', () => {
-  for (const file of ['../../components/card/Card.tsx', '../../components/card/DetailSheet.tsx']) {
-    const src = readFileSync(new URL(file, import.meta.url), 'utf8');
-    assert.match(src, /cardTime\(card\)/, `${file} should call cardTime(card)`);
-    assert.doesNotMatch(src, /relativeTime/, `${file} should not format times itself`);
+test('the feed card and the detail sheet both show time through the shared bar (cardBarMeta -> cardTime)', () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
+  assert.match(read('../shared/cardBody.ts'), /cardTime\(card, opts\.now\)/);
+  assert.match(read('../../components/card/CardBar.tsx'), /cardBarMeta\(card/);
+  assert.match(read('../../components/card/Card.tsx'), /<CardBar\b/);
+  // the detail sheet's body lives in DetailBody.tsx (shared with the /b/<id> share page)
+  assert.match(read('../../components/card/DetailSheet.tsx'), /<DetailBody\b/);
+  assert.match(read('../../components/card/DetailBody.tsx'), /<BarSource\b/);
+  for (const file of ['../../components/card/Card.tsx', '../../components/card/DetailSheet.tsx', '../../components/card/DetailBody.tsx', '../../components/card/CardBar.tsx']) {
+    assert.doesNotMatch(read(file), /relativeTime/, `${file} should not format times itself`);
   }
 });

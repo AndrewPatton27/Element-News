@@ -25,6 +25,8 @@ export interface RawItem {
   items?: { number: string; title: string }[];   // SEC 8-K items
   summary_text: string;              // short licensed text from the feed itself
   attribution?: string;              // credit line shown on the card (BEA: "Source: U.S. Bureau of Economic Analysis")
+  /** CPSC only: deterministic "material" verdict, stored after publish (api.set_card_material). Not shown on the card. */
+  material?: { material: boolean; reasons: string[]; tickers: string[] };
 }
 
 export interface TickerRef {
@@ -50,6 +52,7 @@ export interface SummarizeInput {
   item: RawItem;
   text: string;                      // licensed source text (feed text + page text)
   retryErrors?: string[];            // validator errors from the previous attempt
+  onExtraCall?: () => void;          // called before each EXTRA HTTP request for this draft (model fallback, format retry), so caps count it
 }
 
 export interface Summarizer {
@@ -64,8 +67,10 @@ export interface Summarizer {
   dailyCap?: number;
   /** min gap between two calls to this provider, in ms (its requests-per-minute limit) */
   minIntervalMs?: number;
-  /** Optional compact JSON scoring call for editorial report-card providers. */
-  generate?(prompt: string, opts?: { maxTokens?: number }): Promise<string>;
+  /** true only for a PAID AI key (CLAUDE.md rule 3: Guardian text may only reach a paid key). Default false. */
+  paidKey?: boolean;
+  /** Optional compact JSON scoring call for editorial report-card providers (onExtraCall: as in SummarizeInput). */
+  generate?(prompt: string, opts?: { maxTokens?: number; onExtraCall?: () => void }): Promise<string>;
   summarize(input: SummarizeInput): Promise<SummaryDraft>;
 }
 

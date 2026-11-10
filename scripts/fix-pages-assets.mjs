@@ -8,13 +8,13 @@
 // so a post-build injection is the only place the tag can go for every deploy.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildHeadersFile } from './security-headers.mjs';
 
 const dist = process.argv[2] ?? 'dist';
 
 injectCloudflareBeacon(dist);
 injectSplash(dist);
 injectEarlyLoad(dist);
-writeHeaders(dist);
 
 const assets = join(dist, 'assets');
 const vendor = join(assets, 'vendor');
@@ -49,6 +49,7 @@ const walk = (dir) => {
 };
 walk(dist);
 injectFontPreloads(dist);
+writeHeaders(dist);   // last: the CSP hashes the final inline scripts in index.html
 console.log(`fix-pages-assets: moved ${nodeModules.length} node_modules asset folder(s) -> assets/vendor, rewrote ${files} file(s)`);
 
 function injectSplash(outDir) {
@@ -63,13 +64,15 @@ function injectSplash(outDir) {
 }
 
 function writeHeaders(outDir) {
-  const headers = `/_expo/static/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: public, max-age=0, must-revalidate\n\n/index.html\n  Cache-Control: public, max-age=0, must-revalidate\n`;
-  writeFileSync(join(outDir, '_headers'), headers);
+  const htmlPath = join(outDir, 'index.html');
+  const html = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : '';
+  const supabaseUrl = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
+  writeFileSync(join(outDir, '_headers'), buildHeadersFile({ html, supabaseUrl }));
 }
 
 function injectFontPreloads(outDir) {
   const htmlPath = join(outDir, 'index.html');
-  const fontsRoot = join(outDir, 'assets', 'vendor', '@expo-google-fonts');
+  const fontsRoot = join(outDir, 'assets'); // Expo names the folder ___node_modules (older builds: node_modules -> vendor), so scan all of assets
   if (!existsSync(htmlPath) || !existsSync(fontsRoot)) return;
   const found = [];
   const walk = (dir) => {
@@ -130,6 +133,13 @@ function readEnvValue(name) {
   } catch { return ''; }
 }
 
+function tourPreloadScript(href) {
+  // Function-scoped: the script body above runs before module-level consts would be initialised.
+  const TOUR_SEEN_KEY = 'element.tutorial-seen.v1';
+  const TOUR_NO_AUTO_SHOW = ['/tutorial', '/reset-password'];
+  return `<script>(function(){try{var p=location.pathname,s=null;try{s=localStorage.getItem(${JSON.stringify(TOUR_SEEN_KEY)})}catch(x){return}if(s!==null)return;if(${JSON.stringify(TOUR_NO_AUTO_SHOW)}.some(function(n){return p===n||p.indexOf(n+'/')===0}))return;var l=document.createElement('link');l.rel='preload';l.as='script';l.href=${JSON.stringify(href)};document.head.appendChild(l)}catch(x){}})()</script>`;
+}
+
 function injectEarlyLoad(outDir) {
   const htmlPath = join(outDir, 'index.html');
   if (!existsSync(htmlPath)) return;
@@ -142,16 +152,32 @@ function injectEarlyLoad(outDir) {
       const f = readdirSync(jsDir).find((n) => n.startsWith(prefix) && n.endsWith('.js'));
       if (f) tags += `<link rel="preload" as="script" href="/_expo/static/js/web/${f}" />`;
     }
+    // The first-run tour chunk is otherwise requested only after the main bundle has run, so it
+    // showed up a round trip after the first card. Preload it only for readers who have not seen
+    // the tour (same key and skipped paths as lib/tutorial/tutorialLogic.ts; app/_layout.tsx does
+    // not load the chunk at all for readers who have seen it).
+    const tour = readdirSync(jsDir).find((n) => n.startsWith('Tutorial-') && n.endsWith('.js'));
+    if (tour) tags += tourPreloadScript(`/_expo/static/js/web/${tour}`);
   }
   const url = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
   const key = readEnvValue('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
   const live = readEnvValue('EXPO_PUBLIC_API_MODE').toLowerCase() === 'supabase' && /^https:\/\/[\w.-]+$/.test(url) && /^[\w.-]+$/.test(key);
   if (live) {
-    // The body must equal what planRequest builds for the first Trending page (key order matters).
-    const body = JSON.stringify({ p_mode: 'top', p_cursor: null, p_limit: 10, p_category: null });
-    const headers = { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+    // Each request must equal what planRequest (lib/api/api.supabase.ts) builds: same path, same body
+    // (key order matters). [path, body | null, takes, needsNoSession]. The key the app looks up is path|body.
+    const feed = (mode) => JSON.stringify({ p_mode: mode, p_cursor: null, p_limit: 10, p_category: null });
+    const reqs = [
+      ['/rest/v1/rpc/feed', feed('top'), 2, true],   // Trending head: the feed and the tab heads both read it
+      ['/rest/v1/rpc/feed', feed('latest'), 1, true],
+      ['/rest/v1/app_config?select=*&limit=1', null, 1, false],
+      ['/rest/v1/categories?select=*&order=sort_order', null, 1, false],
+      ['/rest/v1/numbers_to_know?select=*&order=sort_order', null, 1, false],
+      ['/rest/v1/rpc/feed_status', '{}', 1, false],
+    ];
+    const base = { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api' };
+    const post = { ...base, 'Content-Type': 'application/json', 'Content-Profile': 'api' };
     tags += `<link rel="preconnect" href="${url}" crossorigin />`;
-    tags += `<script>(function(){try{if(localStorage.getItem('element.session.v1'))return;var b=${JSON.stringify(body)};window.__elementEarly={body:b,t:Date.now(),p:fetch(${JSON.stringify(`${url}/rest/v1/rpc/feed`)},{method:'POST',headers:${JSON.stringify(headers)},body:b}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})}}catch(e){}})()</script>`;
+    tags += `<script>(function(){try{var u=${JSON.stringify(url)},R=${JSON.stringify(reqs)},H=${JSON.stringify(base)},P=${JSON.stringify(post)},s=0,e={};try{s=localStorage.getItem('element.session.v1')}catch(x){}R.forEach(function(r){if(r[3]&&s)return;var o={method:r[1]===null?'GET':'POST',headers:r[1]===null?H:P};if(r[1]!==null)o.body=r[1];e[r[0]+'|'+(r[1]||'')]={t:Date.now(),n:r[2],p:fetch(u+r[0],o).then(function(x){return x.ok?x.json():null}).catch(function(){return null})}});window.__elementEarly=e}catch(x){}})()</script>`;
   }
   if (!tags) return;
   // Right after <head> so these start first.

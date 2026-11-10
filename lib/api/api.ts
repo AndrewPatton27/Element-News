@@ -7,6 +7,7 @@ import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
 import { createMockAccount, createSupabaseAccount, type AccountApi } from '../account/account.ts';
 import { createSupabaseApi } from './api.supabase.ts';
+import type { CompanyApi } from '../companies/companyApi.ts';
 
 export interface FeedRequest {
   mode: FeedMode;
@@ -30,6 +31,9 @@ export interface Api {
   numberTrends(): Promise<NumberTrend[]>;
   search(q: string, cursor?: string | null, limit?: number): Promise<FeedPage>;
   relatedCards(cardId: string, limit?: number): Promise<BlurbCard[]>;
+  /** One published card by id (the /b/<id> share page). null when unknown, not published, or the server
+   *  has no api.card_by_id yet; throws on a network or server error (the page shows Try again). */
+  card(cardId: string): Promise<BlurbCard | null>;
   followingFeed(f: { topics: string[]; sources: string[]; tickers: string[]; cursor?: string | null; limit?: number }): Promise<FeedPage>;
   dailyBrief(): Promise<Brief>;
   weeklyBrief(): Promise<Brief & { movers: NumberTrend[] }>;
@@ -43,6 +47,8 @@ export interface Api {
   unsubscribeMine(kind: 'daily' | 'weekly'): Promise<MyBriefChangeResult>;
   /** status 'unavailable' when the RPC does not exist yet. */
   updateMyTime(kind: 'daily' | 'weekly', hour: number, tz: string): Promise<MyBriefChangeResult>;
+  /** Company directory, company search, a company's cards and card -> company tags (lib/companies/companyApi.ts). */
+  companies: CompanyApi;
 }
 
 export type ApiResult = { ok: true; api: Api; account: AccountApi } | { ok: false; error: string };

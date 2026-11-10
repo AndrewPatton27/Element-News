@@ -4,7 +4,7 @@
 // top stories and trends on the right (Shell lays out the frame). Guests see a gentle
 // sign-in prompt; the feed never needs an account.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { DwellTimer } from '../lib/feed/dwell';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -40,7 +40,8 @@ import { SourcesSheet } from '../components/card/SourcesSheet';
 import { DetailSheet } from '../components/card/DetailSheet';
 import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
-import { EmptyState, ErrorState, LoadingState } from '../components/shell/States';
+import { cornerToastText } from '../lib/feed/toastPlacement';
+import { CardSkeleton, EmptyState, ErrorState } from '../components/shell/States';
 
 // Below this window width the right column is dropped.
 const ASIDE_MIN_WIDTH = 1180;
@@ -55,18 +56,27 @@ export default function FeedScreen() {
   const followsState = useFollows();
   const signedIn = acct.user !== null;
   const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string }>();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
+  // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
+  // nudge stays hidden there (the Me tab and the top bar still offer sign-in).
+  const shortPhone = !wide && windowHeight > 0 && windowHeight < 700;
+  // Landscape phones and 200% zoom (under 520 px tall): the category chips step aside too, so the
+  // card keeps enough height to read; categories stay reachable by widening or rotating.
+  const tinyHeight = !wide && windowHeight > 0 && windowHeight < 520;
   const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' ? 'for_you' : 'top');
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
   const [menuCard, setMenuCard] = useState<BlurbCard | null>(null);
-  const [undo, setUndo] = useState<
-    | { message: string; kind: 'topic'; previous: { followed: string[]; hidden: string[] } }
-    | { message: string; kind: 'source'; previous: string[] }
-    | { message: string; kind: 'follow'; slug: string }
-    | null
-  >(null);
+  // The corner toast shows a short word (message) and reads the full sentence (label); seq
+  // restarts its 5 s timer when the same message shows twice.
+  type FeedUndo =
+    | { message: string; label: string; kind: 'topic'; previous: { followed: string[]; hidden: string[] } }
+    | { message: string; label: string; kind: 'source'; previous: string[] }
+    | { message: string; label: string; kind: 'follow'; slug: string };
+  const [undo, setUndoState] = useState<(FeedUndo & { seq: number }) | null>(null);
+  const toastSeq = useRef(0);
+  const setUndo = useCallback((u: FeedUndo | null) => setUndoState(u ? { ...u, seq: ++toastSeq.current } : null), []);
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   // The feed stays mounted under Numbers / About / Account; only drive it (keys,
   // view tracking) while it's the screen on top (B2).
@@ -153,7 +163,8 @@ export default function FeedScreen() {
   const queuePositions = useRef<Record<string, number>>({});
   const headId = mode === 'latest' ? null : heads?.[mode];
   const position = queuePositions.current[pagerKey] ?? 0;
-  const pagerItems = mode === 'latest' ? latestOrder(items, position) : position === 0 ? promoteHead(items, headId) : items;
+  const reshown = useMemo(() => new Set(state.seenIds), [state.seenIds]);
+  const pagerItems = mode === 'latest' ? latestOrder(items, position, reshown) : position === 0 ? promoteHead(items, headId) : items;
   shownRef.current = pagerItems;
   surfaceRef.current = surfaceForTab(locked ? 'top' : mode);
   const followed = acct.viewPrefs?.followed ?? [];
@@ -182,27 +193,34 @@ export default function FeedScreen() {
       const topic = categoryName(c.category, categories);
       acct
         .hideTopic(c.category)
-        .then((previous) => setUndo({ message: `${topic} topics hidden.`, kind: 'topic', previous }))
+        .then((previous) => {
+          const t = cornerToastText('hideTopic', topic);
+          setUndo({ message: t.text, label: t.label, kind: 'topic', previous });
+        })
         .catch(() => setUndo(null));
     },
-    [acct, categories],
+    [acct, categories, setUndo],
   );
   const toggleCardFollow = useCallback((card: BlurbCard) => {
     const isFollowed = followedTopics.includes(card.category);
     setFollowOverrides((current) => ({ ...current, [card.category]: !isFollowed }));
     followsState.toggleTopic(card.category);
     const topic = categoryName(card.category, categories);
-    setUndo({ message: `${isFollowed ? 'Unfollowed' : 'Following'} ${topic}`, kind: 'follow', slug: card.category });
-  }, [followedTopics, followsState, categories]);
+    const t = cornerToastText(isFollowed ? 'unfollow' : 'follow', topic);
+    setUndo({ message: t.text, label: t.label, kind: 'follow', slug: card.category });
+  }, [followedTopics, followsState, categories, setUndo]);
   const hideSource = useCallback(
     (_c: BlurbCard, key: string) => {
       setMenuCard(null);
       acct
         .hideSource(key)
-        .then((previous) => setUndo({ message: `Cards from ${sourceName(key)} hidden.`, kind: 'source', previous }))
+        .then((previous) => {
+          const t = cornerToastText('hideSource', sourceName(key));
+          setUndo({ message: t.text, label: t.label, kind: 'source', previous });
+        })
         .catch(() => setUndo(null));
     },
-    [acct],
+    [acct, setUndo],
   );
   const undoHide = useCallback(() => {
     if (undo?.kind === 'topic') void acct.restoreTopics(undo.previous).catch(() => undefined);
@@ -213,8 +231,8 @@ export default function FeedScreen() {
       followsState.toggleTopic(undo.slug);
     }
     setUndo(null);
-  }, [acct, undo, followedTopics, followsState]);
-  const clearUndo = useCallback(() => setUndo(null), []);
+  }, [acct, undo, followedTopics, followsState, setUndo]);
+  const clearUndo = useCallback(() => setUndo(null), [setUndo]);
 
   const { noteCards, trackView, react, trackDwell, trackDwellOnExit, trackOpenDetail } = acct;
 
@@ -281,11 +299,12 @@ export default function FeedScreen() {
   let body;
   if (locked) body = <ForYouWarmup progress={gate} onBack={() => setMode('top')} />;
   else if (first && state.error) body = <ErrorState message={state.error} onRetry={retry} />;
-  else if (first && (state.loading || !state.done)) body = <LoadingState label="Loading the feed…" />;
+  else if (first && (state.loading || !state.done)) body = <CardSkeleton wide={wide} />;
   else if (first) {
     body = (
       <EmptyState
-        message={forYou ? 'Nothing new in your topics yet.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
+        title={forYou ? 'Your topics are quiet' : category ? 'Nothing here yet' : 'No stories yet'}
+        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
         actionLabel={forYou ? 'Show Trending' : category ? 'Show all categories' : undefined}
         onAction={forYou ? () => setMode('top') : category ? () => setCategory(null) : undefined}
       />
@@ -293,12 +312,15 @@ export default function FeedScreen() {
   } else {
     body = (
       <FeedPager
+        // A new tab or topic is a new list: start it fresh (the pager freezes the order it shows).
+        key={pagerKey}
         items={pagerItems}
         timeLabel={mode === 'latest' ? 'added' : undefined}
         config={config}
         categories={categories}
         loadingMore={state.loading}
         done={state.done}
+        reshownIds={reshown}
         onEndReached={loadMore}
         onShowSources={showSources}
         onOpenDetail={openDetail}
@@ -325,7 +347,7 @@ export default function FeedScreen() {
   // Guests: one quiet line under the chips, dismissible. Never blocks the feed.
   const expired = acct.notice === SIGN_IN_AGAIN_MESSAGE; // not "Your account was deleted."
   const prompt =
-    !signedIn && (!promptHidden || expired) ? (
+    !signedIn && ((!promptHidden && !shortPhone) || expired) ? (
       <View style={[styles.prompt, !wide && styles.promptNarrow, wide && styles.promptWide, { backgroundColor: p.accentSoft }]}>
         <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" style={styles.promptMain}>
           <Text style={[styles.promptText, { color: p.accentInk }]}>
@@ -395,6 +417,7 @@ export default function FeedScreen() {
   return (
     <Shell
       active="feed"
+      notice
       feedTab={{ mode, onChange: setMode }}
       left={
         wide ? (
@@ -428,13 +451,19 @@ export default function FeedScreen() {
               <SortToggle mode={mode} onChange={setMode} forYou />
             </View>
           </View>
-          <View style={[styles.ticker, { borderBottomColor: p.border }]}>
-            <NumbersTicker api={api} config={config} />
-          </View>
-          {chips}
+          {/* Short phones (under 700 px tall): the ticker steps aside so a data card's change and
+              agency citation fit on screen; Numbers stays reachable from Brief ("See all numbers"). */}
+          {shortPhone ? null : (
+            <View style={[styles.ticker, { borderBottomColor: p.border }]}>
+              <NumbersTicker api={api} config={config} />
+            </View>
+          )}
+          {tinyHeight ? null : chips}
           {prompt}
         </>
       )}
+      {/* One page heading for screen readers; each card headline is a level-2 heading under it. */}
+      <Text role="heading" aria-level={1} style={styles.srOnly}>{`Element: ${mode === 'latest' ? 'Latest' : forYou ? 'For you' : 'Trending'} stories`}</Text>
       {inlineError}
       <View style={styles.fill}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
@@ -446,24 +475,33 @@ export default function FeedScreen() {
         onHideSource={sourcesSupported ? hideSource : undefined}
         onClose={() => setMenuCard(null)}
       />
-      <UndoToast message={undo?.message ?? null} onUndo={undoHide} onDone={clearUndo} />
+      <UndoToast
+        message={undo?.message ?? null}
+        label={undo?.label}
+        token={undo?.seq}
+        placement="corner"
+        wide={wide}
+        onUndo={undoHide}
+        onDone={clearUndo}
+      />
     </Shell>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'flex-end', height: MOBILE_HEADER_HEIGHT, paddingLeft: 16, paddingRight: 12, borderBottomWidth: 1 },
   brand: { height: MOBILE_HEADER_HEIGHT - 1, justifyContent: 'center', marginRight: 6 },
   tabs: { flexShrink: 1, marginBottom: -1 }, // the active underline sits on the header's bottom rule
   ticker: { height: 44, borderBottomWidth: 1, justifyContent: 'center', overflow: 'hidden' },
   inlineError: { alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, marginTop: 6 },
-  prompt: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingLeft: 14, paddingRight: 8, minHeight: 40 },
+  prompt: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingLeft: 14, paddingRight: 0, minHeight: 44 },
   promptWide: { marginTop: 16, paddingLeft: 12, minHeight: 0 },
   promptNarrow: { marginHorizontal: 16, marginTop: 8 },
   promptMain: { flex: 1, minHeight: 44, justifyContent: 'center' },
   promptText: { fontFamily: fonts.sansSemi, fontSize: 14 },
-  promptClose: { padding: 6 },
+  promptClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   forYouLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
   forYouWide: { flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12 },
   forYouText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },

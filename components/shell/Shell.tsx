@@ -1,12 +1,12 @@
 // Page frame shared by every screen. Phones: content, then the 5-tab bottom bar
-// (Feed / Brief / Search / Following / Me; components/TabBar.tsx) and a round
-// "About Element" info button floating above it. Numbers is reached from the ticker.
+// (Feed / Brief / Search / Following / Me; components/TabBar.tsx). On screens with the notice
+// strip (D-80) a round "About Element" button sits at the strip's left end; elsewhere About is
+// reached from Me. Numbers is reached from the ticker.
 // Wide web: a 64 px top bar (wordmark, Trending / Latest / For you, Brief / Search /
-// Following links, then the account entry: the Sign in pill when signed out, or in the
+// Following / About links, then the account entry: the Sign in pill when signed out, or in the
 // same slot a pill with the reader's initial and short email that opens /account when
-// signed in; no Me icon or Me/Numbers text links), a scrolling Numbers strip (tap =
-// Numbers to know), then left categories, the main column and a right aside, with the
-// round About button at the bottom left (design: docs/design/web/Web-Final.dc.html).
+// signed in), a scrolling Numbers strip (tap = Numbers to know), then left categories, the main
+// column and a right aside. Nothing floats over the content (ui-polish-m8).
 // The SAMPLE DATA banner sits on top in mock mode.
 
 import type { ReactNode } from 'react';
@@ -28,6 +28,7 @@ import { DelayedBanner } from './DelayedBanner';
 import { useFeedStatus } from '../../lib/status/useFeedStatus';
 import { SortToggle } from '../feed/SortToggle';
 import { go, TabBar, TopNavLinks, type Tab } from './TabBar';
+import { FeedNotice } from './FeedNotice';
 
 export type { Tab } from './TabBar';
 
@@ -41,7 +42,7 @@ export function Wordmark({ size = 24, text = APP_NAME }: { size?: number; text?:
   // The Element name in the top left of every page takes you back to the feed.
   if (text !== APP_NAME) return label;
   return (
-    <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, back to the feed`} hitSlop={{ top: 11, bottom: 11, left: 8, right: 8 }}>
+    <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, back to the feed`} style={styles.logoHit}>
       {label}
     </Pressable>
   );
@@ -92,8 +93,8 @@ function TopBar({ active, p, email, signedIn, feedTab }: { active: Tab; p: Palet
   // Laptops (about 1280 px): tighter gaps so the bar stays on one row, also with "Account".
   const narrow = useWindowDimensions().width < 1340;
   return (
-    <View style={[styles.topBar, narrow && styles.topBarTight, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
-      <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, home`}>
+    <View role="banner" style={[styles.topBar, narrow && styles.topBarTight, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
+      <Pressable onPress={() => go('/')} accessibilityRole="link" accessibilityLabel={`${APP_NAME}, home`} style={styles.logoHit}>
         <Text style={[styles.wordmark, { color: p.accent }]}>{APP_NAME}</Text>
       </Pressable>
       <SortToggle mode={feedTab ? feedTab.mode : null} onChange={onChange} wide forYou={signedIn} />
@@ -113,9 +114,10 @@ interface ShellProps {
   noFab?: boolean; // phones: leave out the floating About button (sign-in pages)
   bare?: boolean; // children fill the area under the bars as-is (ScreenShell does its own layout)
   feedTab?: { mode: FeedTab; onChange: (m: FeedTab) => void }; // wide only: top bar tabs (feed screen)
+  notice?: boolean; // D-80: the persistent AI notice + disclaimer line under the card area (feed-style screens)
 }
 
-export function Shell({ active, children, left, aside, scroll, bare, noFab, feedTab }: ShellProps) {
+export function Shell({ active, children, left, aside, scroll, bare, noFab, feedTab, notice }: ShellProps) {
   const p = usePalette();
   const wide = useWide();
   const { api, config } = useAppData();
@@ -133,76 +135,74 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
           <NumbersTicker api={api} config={config} />
         </View>
         {bare ? (
-          <View style={styles.fill}>{children}</View>
+          <View style={styles.fill} role="main">
+            {children}
+            {notice ? <FeedNotice wide /> : null}
+          </View>
         ) : scroll ? (
-          <ScrollView style={styles.fill} contentContainerStyle={styles.scrollWide}>
+          <ScrollView style={styles.fill} contentContainerStyle={styles.scrollWide} role="main">
             {children}
           </ScrollView>
         ) : (
           <View style={styles.body}>
             {left ? (
-              <ScrollView style={styles.left} contentContainerStyle={styles.leftContent}>
-                {left}
-              </ScrollView>
+              <View style={styles.left}>
+                <ScrollView style={styles.fill} contentContainerStyle={styles.leftContent}>
+                  {left}
+                </ScrollView>
+              </View>
             ) : null}
-            <View style={styles.main}>{children}</View>
+            <View style={styles.main} role="main">
+              {children}
+              {notice ? <FeedNotice wide /> : null}
+            </View>
             {aside ? (
-              <ScrollView style={styles.aside} contentContainerStyle={styles.asideContent}>
+              <ScrollView style={styles.aside} contentContainerStyle={styles.asideContent} role="complementary" aria-label="Top stories">
                 {aside}
               </ScrollView>
             ) : null}
           </View>
         )}
-        {active !== 'about' ? (
-          <Pressable
-            onPress={() => go('/about')}
-            accessibilityRole="link"
-            accessibilityLabel="About Element"
-            style={[styles.aboutFabWide, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
-          >
-            <InfoIcon color={p.inkSoft} size={24} />
-          </Pressable>
-        ) : null}
+        {/* Wide screens: About is a text link in the top bar (TopNavLinks), never a floating button. */}
       </SafeAreaView>
     );
   }
 
   const content =
     scroll && !bare ? (
-      <ScrollView style={styles.fill} contentContainerStyle={styles.scrollNarrow}>
+      <ScrollView style={styles.fill} contentContainerStyle={styles.scrollNarrow} role="main">
         {children}
       </ScrollView>
     ) : (
-      <View style={styles.fill}>{children}</View>
+      <View style={styles.fill} role="main">{children}</View>
     );
+  // Phones: the About button lives at the left end of the notice strip, in the space between the
+  // content and the tab bar, so it never floats over text. Screens without the strip reach About
+  // from the Me tab ("About Element" row).
+  const about = notice && active !== 'about' && !noFab;
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: p.bg }]} edges={['top', 'bottom']}>
       {api.sample ? <SampleBanner /> : null}
       <DelayedBanner status={feedStatus} />
       {content}
+      {notice ? <FeedNotice wide={false} insetLeft={about ? 52 : 0} /> : null}
       <TabBar active={active} signedIn={signedIn} />
-      {active !== 'about' && !noFab ? (
+      {about ? (
         <Pressable
           onPress={() => go('/about')}
           accessibilityRole="link"
           accessibilityLabel="About Element"
-          hitSlop={4}
-          style={[active === 'feed' ? styles.aboutFabFeed : styles.aboutFabNarrow, { backgroundColor: p.surface, borderColor: p.borderStrong }]}
+          style={({ pressed }) => [styles.aboutFabFeedHit, pressed && styles.pressed]}
         >
-          <InfoIcon color={p.inkSoft} size={24} />
+          {/* Looks 36 px; the tap target is a real 44 px box (web ignores hitSlop). */}
+          <View style={[styles.aboutFabFeed, { backgroundColor: p.surface, borderColor: p.borderStrong }]}>
+            <InfoIcon color={p.inkSoft} size={22} />
+          </View>
         </Pressable>
       ) : null}
     </SafeAreaView>
   );
 }
-
-const fabShadow = {
-  shadowColor: '#14211C',
-  shadowOpacity: 0.14,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 2 },
-  elevation: 3,
-};
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
   topBarTight: { columnGap: 16, paddingHorizontal: 24 },
   wordmark: { fontFamily: fonts.serif, fontSize: 26, letterSpacing: -0.26 },
   spacer: { flex: 1 },
+  logoHit: { minHeight: 44, justifyContent: 'center' }, // a real 44 px target (web ignores hitSlop)
   pill: { minHeight: 44, paddingHorizontal: 18, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   accountPill: { flexDirection: 'row', gap: 8, borderWidth: 1, paddingLeft: 8, paddingRight: 16 },
   initial: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -235,52 +236,22 @@ const styles = StyleSheet.create({
     gap: 36,
   },
   left: { flexGrow: 0, flexShrink: 0, flexBasis: 180, width: 180 },
-  leftContent: { paddingBottom: 90 },
+  leftContent: { paddingBottom: 16 },
   main: { flex: 1, minWidth: 0 },
   aside: { flexGrow: 0, flexShrink: 1, flexBasis: 340, maxWidth: 340, minWidth: 280 },
   asideContent: { paddingBottom: 90 },
   scrollWide: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 32, paddingTop: 28, paddingBottom: 100, gap: 16 },
   scrollNarrow: { padding: 20, paddingTop: 24, gap: 16 },
-  // The floating About button: a round icon button (Web: 48 px, left 32 / bottom 28;
-  // phones: 44 px, left 16, 51 px above the tab bar).
-  aboutFabWide: {
-    position: 'absolute',
-    left: 32,
-    bottom: 28,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-    ...fabShadow,
-  },
-  // Feed (phones): floats at the bottom left in the strip between the card and the tab bar, so it
+  // Phones: floats at the bottom left in the strip between the card and the tab bar, so it
   // never covers the card footer or the AI label.
+  aboutFabFeedHit: { position: 'absolute', left: 6, bottom: 66, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 5 },
   aboutFabFeed: {
-    position: 'absolute',
-    left: 10,
-    bottom: 70,
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 5,
   },
-  aboutFabNarrow: {
-    position: 'absolute',
-    left: 16,
-    bottom: 116,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-    ...fabShadow,
-  },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.96 }] },
 });

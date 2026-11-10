@@ -2,7 +2,9 @@
 // card's topic or source. A small sheet
 // with large tap targets; Escape / back / tapping outside closes it.
 
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { SheetModal } from '../shell/SheetModal';
 import type { BlurbCard, Category } from '../../contract/types.ts';
 import { categoryName } from '../../lib/shared/format';
 import { cardSourceKey, sourceName } from '../../lib/sources/sourceKeys';
@@ -18,15 +20,24 @@ interface Props {
   onClose: () => void;
 }
 
-export function CardMenu({ card, categories, onHideTopic, onClose, onHideSource }: Props) {
+export function CardMenu({ card: openCard, categories, onHideTopic, onClose, onHideSource }: Props) {
   const p = usePalette();
+  // Keep the last card while the panel fades out, so it doesn't empty out first.
+  const last = useRef(openCard);
+  if (openCard) last.current = openCard;
+  const card = openCard ?? last.current;
   const topic = card ? categoryName(card.category, categories) : '';
   const sourceKey = card && onHideSource ? cardSourceKey(card) : null;
   return (
-    <Modal visible={card !== null} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: p.overlay }]} onPress={onClose} accessibilityLabel="Close options" />
-      <View style={styles.center} pointerEvents="box-none">
-        <View style={[styles.menu, { backgroundColor: p.surface, borderColor: p.border }]} accessibilityViewIsModal accessibilityLabel="Card options">
+    <SheetModal
+      open={openCard !== null}
+      onClose={onClose}
+      variant="panel"
+      label="Card options"
+      backdropLabel="Close options"
+      dockStyle={styles.center}
+      surfaceStyle={[styles.menu, { borderColor: p.border }]}
+    >
           <Pressable
             onPress={() => card && onHideTopic(card)}
             accessibilityRole="button"
@@ -52,14 +63,11 @@ export function CardMenu({ card, categories, onHideTopic, onClose, onHideSource 
           >
             <Text style={[styles.cancelText, { color: p.accentInk }]}>Cancel</Text>
           </Pressable>
-        </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1 },
   center: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24 },
   menu: { width: '100%', maxWidth: 360, borderRadius: radius.tile, borderWidth: 1, overflow: 'hidden' },
   item: { minHeight: 52, paddingVertical: 14, paddingHorizontal: 20, gap: 4, justifyContent: 'center' },

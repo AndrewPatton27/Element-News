@@ -45,7 +45,7 @@ export default function NumbersScreen() {
 }
 
 const styles = StyleSheet.create({
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 4, marginLeft: -6 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', minHeight: 44, minWidth: 44, paddingRight: 8, marginLeft: -6 },
   backText: { fontFamily: fonts.sans, fontSize: 15 },
   header: { gap: 4, paddingBottom: 4 },
   title: { fontFamily: fonts.serif, fontSize: 34, lineHeight: 37, letterSpacing: -0.5 },

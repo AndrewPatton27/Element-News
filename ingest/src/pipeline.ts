@@ -5,7 +5,8 @@
 // Inputs: Deps (fetcher, publisher, providers, usage counter, clock, log) and RunOptions (--only, --limit).
 // Outputs: RunStats counts; cards and items are written through deps.publisher.
 
-import { config, fedRegisterUrls } from './config.ts';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { config, fedRegisterUrls, groqDailyCap } from './config.ts';
 import { createGuard, normalizeUrl } from './dedupe.ts';
 import { buildPublishPayload, type Publisher } from './publish.ts';
 import { beaItemToItem } from './sources/bea.ts';
@@ -15,10 +16,9 @@ import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
-import { buildDataCard, buildObservation, differenceSeries, fredUrl, parseFredObservations, type Point } from './sources/macro.ts';
 import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
-import { avgRatesUrl, debtUrl, parseAvgRates, parseDebt } from './sources/fiscaldata.ts';
+import { runMacro, runTreasury } from './macroRun.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -27,7 +27,7 @@ import { secFilingPageText } from './sec-text.ts';
 import { createChainState, summarizeWithChain, type ChainState, type UsageCounter } from './summarizer/chain.ts';
 import type { RawItem, Summarizer } from './types.ts';
 import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
-import { createTopicFilterState, filterTopic, recordTopic, type TopicFilterState } from './topicFilter.ts';
+import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, type TopicFilterState } from './topicFilter.ts';
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
@@ -72,6 +72,8 @@ export interface RunStats {
   report_unscored: number;
   report_scored: number;
   report_provider_groq: number;
+  recall_material: number;        // CPSC cards published as material (shown in the feeds)
+  recall_not_material: number;    // CPSC cards published as not material (Recalls & Safety topic only)
 }
 
 /** Per-run state passed to each source's runner (shared budget, dedupe guard and provider cooldowns). */
@@ -81,16 +83,31 @@ interface RunCtx {
   guard: ReturnType<typeof createGuard>;
   chain: ChainState;
 }
-let topicFilterState: TopicFilterState = createTopicFilterState();
-/** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
-let runRecent: Array<{ id: string; headline: string; body: string | null }> | null = null;
+/**
+ * Mutable state of ONE runOnce call. It lives in an AsyncLocalStorage so two runs in the same process
+ * (a warm Edge Function isolate can serve two requests at once) never share it.
+ */
+interface RunState {
+  topic: TopicFilterState;
+  /** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
+  recent: Array<{ id: string; headline: string; body: string | null }> | null;
+  /** Set during a run with candidate selection on: processItems queues its job here instead of spending budget. */
+  collector: Job[] | null;
+}
+const runStore = new AsyncLocalStorage<RunState>();
+function runState(): RunState {
+  const s = runStore.getStore();
+  if (!s) throw new Error('pipeline state used outside runOnce');
+  return s;
+}
 async function recentCards(deps: Deps) {
-  if (!runRecent) {
+  const st = runState();
+  if (!st.recent) {
     const all = await Promise.resolve(deps.publisher.auditCards?.()).catch(() => undefined) ?? [];
     const cutoff = deps.now.getTime() - config.reportCard.recentCardDays * 86_400_000;
-    runRecent = all.filter((c) => Date.parse(c.as_of) >= cutoff).slice(0, config.reportCard.scoreMaxRecentCards).map((c) => ({ id: c.id, headline: c.headline, body: c.body }));
+    st.recent = all.filter((c) => Date.parse(c.as_of) >= cutoff).slice(0, config.reportCard.scoreMaxRecentCards).map((c) => ({ id: c.id, headline: c.headline, body: c.body }));
   }
-  return runRecent;
+  return st.recent;
 }
 
 /**
@@ -99,20 +116,22 @@ async function recentCards(deps: Deps) {
  * across all sources. A failing source is logged and the run continues with the next one.
  */
 export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunStats> {
+  const select = deps.selection?.enabled ?? config.selection.enabled;
+  // selection on: sources only collect; the budget is spent after all sources ran
+  const state: RunState = { topic: createTopicFilterState(), recent: null, collector: select ? [] : null };
+  return runStore.run(state, () => runOnceInState(deps, opts, state));
+}
+
+async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Promise<RunStats> {
   const only = new Set<SourceName>(opts.only?.length ? opts.only : SOURCE_NAMES);
-  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0 };
+  const stats: RunStats = { published: 0, duplicate: 0, ticker_cap: 0, skipped: 0, failed: 0, ai: 0, template: 0, macro: 0, data_cards: 0, report_pass: 0, report_revise: 0, report_abandon: 0, report_duplicate: 0, report_provider_gemini: 0, report_unscored: 0, report_scored: 0, report_provider_groq: 0, recall_material: 0, recall_not_material: 0 };
   const ctx: RunCtx = {
     stats,
     budget: { left: opts.limit ?? 20 },
     guard: createGuard(),
     chain: createChainState(),                       // provider cooldowns after a 429 last for this run
   };
-  topicFilterState = createTopicFilterState();
-  runRecent = null;
 
-  const select = deps.selection?.enabled ?? config.selection.enabled;
-  collector = select ? [] : null;                    // selection on: sources only collect; the budget is spent below
-  try {
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('treasury')) await runTreasury(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
@@ -125,8 +144,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
-  if (collector) await runSelected(collector, deps, ctx, opts.limit ?? 20);
-  } finally { collector = null; }
+  if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
 }
@@ -260,7 +278,8 @@ async function runCpsc(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
     }
     await processItems(items, deps, stats, budget, guard, chain, async () => '', undefined, {
       total: config.cpsc.maxPerRun,
-      onDone: (p) => deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates, `
+      onDone: (p) => deps.log(`cpsc: ${all.length} recalls in the last ${config.cpsc.lookbackDays} days, ${items.length} candidates `
+        + `(${items.filter((i) => i.material?.material).length} material), `
         + `${p.alreadyHandled} already handled, ${p.fresh} new processed (max ${config.cpsc.maxPerRun} new per run)`),
     });
   } catch (e) {
@@ -309,8 +328,18 @@ async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof cre
       const cand = { url: it.url, tickers: [], sortAt: new Date(it.published_at) };
       const d = guard.check(cand);
       if (!d.ok) { stats.skipped++; deps.log(`skip ${d.reason}: ${it.title}`); continue; }
-      const row = await deps.publisher.upsertItem(it);
+      // narrow-source cap (config.reportCard.narrowSourceCaps.usgs_quake = 1 new card per run); the rest wait for the next run
+      if (narrowCapReached(it, runState().topic)) { stats.skipped++; deps.log(`skip report_card_variety_cap: ${it.title}`); continue; }
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {                                  // one bad row must not end the USGS run
+        stats.failed++;
+        deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+        continue;
+      }
       if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
+      recordTopic(it, runState().topic);
       try {
         const payload = buildPublishPayload(it, usgsDraft(it), { itemId: row.id, aiGenerated: false, model: null });
         const v = validatePublish(payload);
@@ -407,9 +436,6 @@ interface Job {
   perGroup: Map<string, number>;
 }
 
-/** Set during a run with candidate selection on: processItems queues its job here instead of spending budget. */
-let collector: Job[] | null = null;
-
 /**
  * Candidate selection. Step 1 (per job, no AI): dedupe/ticker guard, topic filter and the already-handled check
  * (upsert) drop what cannot become a card. Step 2: score what is left without AI (importance, freshness) and spend
@@ -426,7 +452,7 @@ async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: nu
       const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
       const d = ctx.guard.check(cand);
       if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); ctx.stats.skipped++; continue; }
-      const topicReject = filterTopic(it, topicFilterState);
+      const topicReject = filterTopic(it, runState().topic);
       if (topicReject) { ctx.stats.skipped++; deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`); continue; }
       const lg = job.limits.group;
       const group = lg?.of(it) ?? null;
@@ -435,7 +461,14 @@ async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: nu
         deps.log(`skip ${lg.skip} (max ${lg.max} ${lg.label} per run): ${it.title.slice(0, 80)}`);
         continue;
       }
-      const row = await deps.publisher.upsertItem(it);
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {                                  // one bad row must not end this source's run
+        ctx.stats.failed++;
+        deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+        continue;
+      }
       if (!row.is_new && row.status !== 'new') { ctx.stats.skipped++; job.alreadyHandled++; continue; }   // handled in an earlier run
       if (group !== null) groupNew.set(group, (groupNew.get(group) ?? 0) + 1);
       newHere++;
@@ -501,6 +534,7 @@ async function processItems(
   limits: NewLimits = {},
 ): Promise<{ fresh: number; alreadyHandled: number }> {
   const job: Job = { items, deps, stats, budget, guard, chain, pageText, preCheck, limits, fresh: 0, alreadyHandled: 0, perGroup: new Map() };
+  const collector = runState().collector;
   if (collector) { collector.push(job); return { fresh: 0, alreadyHandled: 0 }; }   // candidate selection: spent later by runSelected
   for (const it of items) {
     if (budget.left <= 0) { deps.log('limit reached'); break; }
@@ -520,7 +554,7 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
   const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
   const d = guard.check(cand);
   if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); stats.skipped++; return; }
-  const topicReject = filterTopic(it, topicFilterState);
+  const topicReject = filterTopic(it, runState().topic);
   if (topicReject) {
     stats.skipped++;
     deps.log(`skip ${topicReject}: ${it.title.slice(0, 100)}`);
@@ -533,10 +567,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     return;
   }
 
-  const row = known ?? await deps.publisher.upsertItem(it);
+  let row: ItemRow;
+  try {
+    row = known ?? await deps.publisher.upsertItem(it);
+  } catch (e) {                                      // one bad row must not end this source's run
+    stats.failed++;
+    deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+    return;
+  }
   if (!known && !row.is_new && row.status !== 'new') { stats.skipped++; job.alreadyHandled++; return; }   // handled in an earlier run
   job.fresh++;
-  recordTopic(it, topicFilterState);
+  recordTopic(it, runState().topic);
   if (group !== null) perGroup.set(group, (perGroup.get(group) ?? 0) + 1);
 
   let text = it.summary_text;
@@ -596,7 +637,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       if (g && stop !== undefined && deps.counter.used('groq') >= stop) return null;   // Groq calls are reserved for writing and the Brief
       const perRun = deps.reportCard?.scorerMaxPerRun;
       if (g && perRun !== undefined && stats.report_scored >= perRun) return null;           // per-run cap: the rest publish unscored
-      return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
+      if (!g) return null;
+      const cap = g.dailyCap ?? groqDailyCap();
+      if (deps.counter.used('groq') >= cap) return null;                                     // Groq's daily cap: publish unscored
+      // Every scorer request counts against Groq's daily cap like a writing call (laptop: state/ai-usage.json).
+      return {
+        generate: (prompt: string) => {
+          if (deps.counter.used('groq') >= cap) return Promise.reject(new Error(`groq: daily cap ${cap} reached`));
+          deps.counter.add('groq');
+          return g.generate!(prompt, { onExtraCall: () => deps.counter.add('groq') });
+        },
+      };
     })();
     if (protocolOn && r.ai_generated && scorer) {
       stats.report_scored++;
@@ -605,10 +656,19 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
       const rv = await reviewCard({
         client: scorer, card: candidate, payload, recent,
+        // The rewrite goes through the chain with only the writer and one attempt, so it is counted against the
+        // writer's daily cap and runs every draft check of the first draft (shape, relevance score, advice words,
+        // numbers and tickers in the source, product codes, copy limits, repetition, length trim, detail checks).
+        // A rewrite that fails them (or no AI draft at all) throws: reviewCard gives 'revise_failed', not published.
         rewrite: async (recs) => {
           if (!writer) throw new Error('writer unavailable');
-          const d2 = await writer.summarize({ item: it, text, retryErrors: recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'] });
-          const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
+          const retryErrors = recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'];
+          const r2 = await summarizeWithChain({ item: it, text, retryErrors }, [writer], deps.counter, {
+            state: chain, requireRelevance: true, maxAttempts: 1,
+          });
+          if (!r2.ai_generated) throw new Error(`rewrite rejected: ${r2.log.join(' | ')}`);
+          const d2 = r2.draft;
+          const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: r2.model ?? writer.model ?? null });
           const v2 = validatePublish(p2);
           if (!v2.ok) throw new Error(v2.errors.join('; '));
           if (requiresFigures(it) && !hasFigures(p2.body)) throw new Error('no_figures');
@@ -644,7 +704,14 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       guard.record(cand);
       if (cardScore?.related_id && ['UPDATE','ANGLE','RELATED'].includes(cardScore.relation) && res.id)
         await Promise.resolve(deps.publisher.setStoryLink?.(res.id, cardScore.related_id, cardScore.relation.toLowerCase())).catch(() => {});   // tolerate failure
-      if (res.id) runRecent?.push({ id: res.id, headline: payload.headline, body: payload.body });
+      if (res.id) runState().recent?.push({ id: res.id, headline: payload.headline, body: payload.body });
+      if (it.material && res.id) {
+        // Recall gate (20261116000000_macro_focus.sql): no row = not material, so a failure here fails closed.
+        stats[it.material.material ? 'recall_material' : 'recall_not_material']++;
+        deps.log(`recall ${it.material.material ? 'material' : 'not material (Safety topic only)'}: ${it.material.reasons.join(', ')}: ${it.title.slice(0, 80)}`);
+        await Promise.resolve(deps.publisher.setCardMaterial?.(res.id, it.material))
+          .catch((e) => deps.log(`set_card_material failed (card stays out of the feeds): ${(e as Error).message}`));
+      }
     }
     const notes = r.log.length > 1 ? [...r.log] : [];
     if (r.relevance !== null) notes.push(`relevance ${r.relevance}`);
@@ -671,70 +738,4 @@ export function templateAllowed(it: RawItem): boolean {
     return !!main && (config.templateSecItems as readonly string[]).includes(main);
   }
   return false;
-}
-
-/** FRED series -> Numbers panel rows (api.upsert_macro) and, for big enough moves, data cards. Skipped without FRED_API_KEY. */
-async function runMacro(deps: Deps, stats: RunStats): Promise<void> {
-  if (!deps.fredApiKey) { deps.log('macro: FRED_API_KEY not set, skipping'); return; }
-  const start = new Date(deps.now.getTime() - config.fredLookbackDays * 86_400_000).toISOString().slice(0, 10);
-  const fetched = new Map<string, Point[]>();
-  for (const id of config.macroSeries) {
-    if ((config.forbiddenSeries as readonly string[]).includes(id)) { deps.log(`macro: ${id}: forbidden series, skipped`); continue; }
-    try {
-      const url = new URL(fredUrl(id, start));
-      url.searchParams.set('api_key', deps.fredApiKey);          // never logged: errors print the host only
-      const points = parseFredObservations(await deps.fetchText(url.toString(), 'api', 60));
-      fetched.set(id, points);
-      await publishSeries(deps, stats, 'macro', id, points, true);
-    } catch (e) {
-      deps.log(`macro: ${id}: ${(e as Error).message}`);
-    }
-  }
-  // Derived series (e.g. the 10Y-2Y spread) are computed here, never fetched from FRED.
-  for (const [id, [a, b]] of Object.entries(config.derivedSeries)) {
-    const pa = fetched.get(a), pb = fetched.get(b);
-    if (!pa || !pb) { deps.log(`macro: ${id}: inputs ${a}/${b} not fetched, skipped`); continue; }
-    try {
-      await publishSeries(deps, stats, 'macro', id, differenceSeries(pa, pb), true);
-    } catch (e) {
-      deps.log(`macro: ${id}: ${(e as Error).message}`);
-    }
-  }
-}
-
-/** One series' points -> Numbers panel row and, if `cardAllowed` and the move is big enough, a data card. */
-async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean): Promise<void> {
-  const obs = buildObservation(id, points);
-  if (!obs) { deps.log(`${tag}: ${id}: not enough data`); return; }
-  await deps.publisher.upsertMacro(obs);
-  stats.macro++;
-  const card = cardAllowed ? buildDataCard(obs) : null;
-  if (card) {
-    const res = await deps.publisher.publishBlurb(card);
-    if (res.status === 'published') stats.data_cards++;
-    deps.log(`${tag}: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> data card ${res.status}`);
-  } else {
-    deps.log(`${tag}: ${id} ${obs.display_value} (${obs.change_text ?? 'no change'}) -> numbers panel only`);
-  }
-}
-
-/**
- * Treasury FiscalData: average interest rates (Bills, Notes, Bonds) and the national debt, from the JSON API
- * (API host list, no key). Same Numbers/data-card path as FRED series; only config.fiscalData.cardSeries may
- * become data cards. One failing dataset is logged and the other still runs.
- */
-async function runTreasury(deps: Deps, stats: RunStats): Promise<void> {
-  try {
-    const rates = parseAvgRates(await deps.fetchText(avgRatesUrl(), 'api', 0));
-    for (const id of Object.keys(rates)) {
-      await publishSeries(deps, stats, 'treasury', id, rates[id], config.fiscalData.cardSeries.includes(id));
-    }
-  } catch (e) {
-    deps.log(`treasury: average rates failed: ${(e as Error).message}`);
-  }
-  try {
-    await publishSeries(deps, stats, 'treasury', 'TREAS_DEBT', parseDebt(await deps.fetchText(debtUrl(), 'api', 0)), config.fiscalData.cardSeries.includes('TREAS_DEBT'));
-  } catch (e) {
-    deps.log(`treasury: debt failed: ${(e as Error).message}`);
-  }
 }

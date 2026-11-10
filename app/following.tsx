@@ -24,11 +24,11 @@ import { FollowingManager } from '../components/following/FollowingManager';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { clearStoryUpdates, FollowedStories, useStoryRows } from '../components/following/FollowedStories';
 import { UndoToast } from '../components/feed/UndoToast';
+import { cornerToastText } from '../lib/feed/toastPlacement';
 import { storiesHeader } from '../lib/following/followedStories';
 import { useFollowedStories } from '../lib/following/useFollowedStories';
 import { FollowingFeed } from '../components/following/FollowingFeed';
 import { SourcesSheet } from '../components/card/SourcesSheet';
-import { aiNoticeText, disclaimerText } from '../lib/shared/labels';
 import { rerankFollowing } from '../lib/following/followingRerank';
 
 export default function FollowingScreen() {
@@ -46,7 +46,9 @@ export default function FollowingScreen() {
 
   const followedStories = useFollowedStories();
   const { rows, loading: storiesLoading } = useStoryRows(api, followedStories.stories);
-  const [undo, setUndo] = useState<BlurbCard | null>(null);
+  const [undo, setUndoCard] = useState<{ card: BlurbCard; seq: number } | null>(null);
+  const undoSeq = useRef(0);
+  const setUndo = (c: BlurbCard | null) => setUndoCard(c ? { card: c, seq: ++undoSeq.current } : null);
   const hdr = storiesHeader(rows.filter((r) => r.updates.length > 0).length, rows.length);
   const countLine = rows.length ? [hdr.left, hdr.right].filter(Boolean).join(' · ') : undefined;
 
@@ -120,7 +122,7 @@ export default function FollowingScreen() {
   );
 
   return (
-    <ScreenShell tab="following" title="Following" meta={wide ? countLine : undefined}>
+    <ScreenShell tab="following" title="Following" meta={wide ? countLine : undefined} notice>
       {!wide && rows.length ? (
         <View style={styles.countRow}>
           <Text style={[styles.countLeft, { color: p.ink }]}>{hdr.left}</Text>
@@ -148,7 +150,7 @@ export default function FollowingScreen() {
         </View>
       )}
 
-      <Text accessibilityRole="header" style={[styles.section, { color: p.muted }]}>More stories you may like</Text>
+      <Text accessibilityRole="header" aria-level={2} style={[styles.section, { color: p.muted }]}>More stories you may like</Text>
 
       <FollowingManager
         categories={suggestedTopics(categories, hidden)}
@@ -181,12 +183,14 @@ export default function FollowingScreen() {
         empty={empty}
       />
 
-      <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} · {disclaimerText(config)}</Text>
-
       <UndoToast
-        message={undo ? 'Stopped following this story' : null}
+        message={undo ? cornerToastText('unfollowStory').text : null}
+        label={cornerToastText('unfollowStory').label}
+        token={undo?.seq}
+        placement="corner"
+        wide={wide}
         onUndo={() => {
-          if (undo) followedStories.toggle(undo.id, undo);
+          if (undo) followedStories.toggle(undo.card.id, undo.card);
           setUndo(null);
         }}
         onDone={() => setUndo(null)}
@@ -198,7 +202,6 @@ export default function FollowingScreen() {
 }
 
 const styles = StyleSheet.create({
-  footer: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingTop: 4 },
   intro: { fontFamily: fonts.sans, fontSize: font.chip, lineHeight: 20, paddingHorizontal: 4 },
   introWide: { fontSize: font.body, lineHeight: 24, maxWidth: 640, paddingHorizontal: 0 },
   section: { fontFamily: fonts.sansSemi, fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', paddingHorizontal: 4 },

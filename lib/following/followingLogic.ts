@@ -36,7 +36,7 @@ export function parseFollows(raw: string | null): Follows {
   try {
     const x = JSON.parse(raw) as Partial<Record<keyof Follows, unknown>> | null;
     if (!x || typeof x !== 'object') return EMPTY_FOLLOWS;
-    return { topics: strings(x.topics), sources: strings(x.sources), tickers: strings(x.tickers).map((t) => t.toUpperCase()) };
+    return { topics: strings(x.topics), sources: strings(x.sources), tickers: strings(x.tickers).map((t) => t.toUpperCase().replace('.', '-')) };
   } catch {
     return EMPTY_FOLLOWS;
   }
@@ -66,10 +66,12 @@ export function toggleTopicFollow(topics: readonly string[], slug: string): stri
   return topics.includes(slug) ? topics.filter((topic) => topic !== slug) : [...topics, slug];
 }
 
-// "aapl" / " BA " -> "AAPL"; null when the text can't be a ticker (1 to 5 letters, optional .X class).
+// "aapl" / " BA " -> "AAPL"; null when the text can't be a ticker (1 to 5 letters, optional class).
+// A share class is written the SEC way, with a hyphen ("brk.b" -> "BRK-B"), because cards and the company
+// directory carry SEC tickers and api.following_feed matches them exactly.
 export function normalizeTicker(raw: string): string | null {
-  const t = raw.trim().toUpperCase();
-  return /^[A-Z]{1,5}(\.[A-Z])?$/.test(t) ? t : null;
+  const t = raw.trim().toUpperCase().replace('.', '-');
+  return /^[A-Z]{1,5}(-[A-Z])?$/.test(t) ? t : null;
 }
 
 // The lists api.followingFeed gets: signed in, topics come from the account.

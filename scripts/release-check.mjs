@@ -1,5 +1,7 @@
 // One command before a release: type checks, every test suite, SQL checks, Python tests, secret scan.
 // Usage: npm run release:check            (add -- --e2e to also run the Playwright suite)
+//        npm run release:check -- --prod  production release: also runs the security gate on the built
+//                                         dist-pages/ (scripts/security-gate.mjs --require-build); build first with npm run export:web
 // Prints a PASS / FAIL / SKIP table and exits 1 if any step failed. Only step names and the tail of a
 // failing step's own output are printed; the secret scan prints file and line, never values, and
 // environment variables are never echoed. SKIP is for steps that cannot run here (no Python, no SQL runner).
@@ -12,7 +14,7 @@ const npx = win ? 'npx.cmd' : 'npx';
 const npm = win ? 'npm.cmd' : 'npm';
 
 /** The ordered step list. A step is { name, cmd, args, cwd?, skip?: () => string | null }. */
-export function buildSteps({ e2e = false, exists = existsSync, pythonCmd = null, env = process.env } = {}) {
+export function buildSteps({ e2e = false, prod = false, exists = existsSync, pythonCmd = null, env = process.env } = {}) {
   const sqlRunner = env.RELEASE_SQL_RUNNER || 'supabase/tests/run-pglite.mjs';
   const steps = [
     { name: 'no private files tracked', cmd: process.execPath, args: ['scripts/private-files-check.mjs'] },
@@ -43,6 +45,8 @@ export function buildSteps({ e2e = false, exists = existsSync, pythonCmd = null,
     { name: 'secret scan', cmd: process.execPath, args: ['scripts/secret-scan.mjs'] },
   ];
   if (e2e) steps.push({ name: 'test:e2e', cmd: npm, args: ['run', 'test:e2e'] });
+  // Production releases only: headers, bundle secrets and private files on the build about to be uploaded.
+  if (prod) steps.push({ name: 'security gate (prod)', cmd: process.execPath, args: ['scripts/security-gate.mjs', '--require-build'] });
   return steps;
 }
 
@@ -83,7 +87,7 @@ function findPython() {
 }
 
 function main() {
-  const steps = buildSteps({ e2e: process.argv.includes('--e2e'), pythonCmd: findPython() });
+  const steps = buildSteps({ e2e: process.argv.includes('--e2e'), prod: process.argv.includes('--prod'), pythonCmd: findPython() });
   const run = (s) => {
     console.log(`> ${s.name}`);
     const r = spawnSync(s.cmd, s.args, { cwd: s.cwd, encoding: 'utf8', shell: win && s.cmd.endsWith('.cmd'), maxBuffer: 64 * 1024 * 1024 });

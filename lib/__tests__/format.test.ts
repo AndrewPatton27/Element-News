@@ -41,6 +41,7 @@ test('category and event labels', () => {
   assert.equal(categoryName('markets', null), 'Business');
   assert.equal(categoryName('science', null), 'Science & Space');
   assert.equal(categoryName('brand-new', null), 'Brand New');
+  assert.equal(categoryName('zzz_unknown', []), 'Zzz Unknown');
   assert.equal(categoryName('markets', [{ slug: 'markets', name: 'Markets (API)', sort_order: 1 }]), 'Markets (API)');
   assert.equal(eventLabel('world_event'), 'World');
   assert.equal(eventLabel('recall'), 'Recall');

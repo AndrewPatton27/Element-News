@@ -171,6 +171,7 @@ export default function AboutScreen() {
               'Trending: the most important cards first, balanced with freshness and how much readers engage with them.',
               'Latest: newest first.',
               'For you (with an account): learns from your favorite and hidden topics, the sources you switch off, the cards you like or dislike, and how long you spend on each card. Only taps and time on cards are stored, never anything you type: which cards you liked, viewed or opened, and the seconds spent on each.',
+              'To ensure the quality of recommended posts, we keep a short record of which cards were shown to you in each batch, for 21 days, linked only to your account. Deleting your data removes it.',
             ]}
           />
         </Section>
@@ -180,6 +181,7 @@ export default function AboutScreen() {
             items={[
               'Reading never needs an account.',
               'With an account we store your email, the topics and sources you pick, your reactions and taps, and how long you look at each card, only to tailor your feed.',
+              'To ensure the quality of recommended posts, we keep a short record of which cards were shown to you in each batch, for 21 days, linked only to your account. Deleting your data removes it.',
               'Your password is handled by our sign-in service (Supabase Auth), which keeps only a one-way hash of it. We never see or store the password itself.',
               'On the Account screen you can delete your data or your whole account at any time.',
               'Cloudflare Web Analytics counts page views for the whole site without cookies and without identifying you.',
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
   switch: { minHeight: 44 },
   sourceName: { fontFamily: fonts.sansSemi, fontSize: font.nav },
   links: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, paddingTop: 2 },
-  link: { fontFamily: fonts.sansSemi, fontSize: font.meta, textDecorationLine: 'underline', paddingVertical: 10 },
+  link: { fontFamily: fonts.sansSemi, fontSize: font.meta, lineHeight: 18, textDecorationLine: 'underline', paddingVertical: 13 }, // 44 px tall target
   tint: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14 },
   tintWide: { paddingVertical: 18, paddingHorizontal: 22, borderRadius: 16 },
 });

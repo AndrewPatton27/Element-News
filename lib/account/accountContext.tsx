@@ -11,6 +11,7 @@ import type { AuthUser, RecoveryLink } from './session.ts';
 import { setOpenSourceListener } from '../shared/openUrl.ts';
 import { defaultStore, onStoreChange } from '../storage/storage.ts';
 import { FOLLOWS_KEY } from '../following/followingLogic.ts';
+import { switchFollowedStoriesOwner } from '../following/followedStories.ts';
 import {
   LOCAL_PREFS_KEY,
   asUserPrefs,
@@ -100,6 +101,12 @@ export function AccountProvider({ account, children }: { account: AccountApi; ch
   }, []);
   const guestPrefs = useMemo(() => asUserPrefs(local), [local]);
   const guestReactions = useMemo(() => reactionMap(local), [local]);
+
+  // Followed stories are one device list whose ids For you sends to the server: give the list to whoever
+  // is signed in now (the previous owner's list is put aside, lib/following/followedStories.ts).
+  useEffect(() => {
+    switchFollowedStoriesOwner(store, uid);
+  }, [uid]);
 
   // Signing in: merge this device's choices into the account once per user (best effort;
   // the merge is a union, so running it twice changes nothing).

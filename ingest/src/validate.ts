@@ -36,6 +36,27 @@ export function assertSummarizable(licenseClass: string): void {
   }
 }
 
+/** Thrown by assertPaidKeyFor when Guardian-licensed text would reach an AI key that is not paid (rule 3). */
+export class PaidKeyRequiredError extends Error {
+  constructor(provider: string) {
+    super(`${provider}: Guardian text may only be sent to a paid AI key`);
+    this.name = 'PaidKeyRequiredError';
+  }
+}
+
+/** True if the item's text is Guardian-licensed (by license class or source name). */
+export function isGuardianText(item: { source?: string; license_class?: string }): boolean {
+  return /guardian/i.test(String(item.license_class ?? '')) || /guardian/i.test(String(item.source ?? ''));
+}
+
+/**
+ * CLAUDE.md rule 3: Guardian text only goes to the PAID Gemini key. Every AI summarize() calls this before
+ * any request. (The license gate above already keeps Guardian out of this build; this is the second lock.)
+ */
+export function assertPaidKeyFor(item: { source?: string; license_class?: string }, provider: { name: string; paidKey?: boolean }): void {
+  if (isGuardianText(item) && provider.paidKey !== true) throw new PaidKeyRequiredError(provider.name);
+}
+
 export interface Draft {
   headline: string;
   body: string | null;

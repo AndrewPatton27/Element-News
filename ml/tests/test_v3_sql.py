@@ -36,14 +36,16 @@ SOURCE_NAMES = {"sec": "SEC", "fed": "Federal Reserve Board", "wikipedia": "Wiki
 def test_sql_defaults_match_python_and_the_tuned_config():
     sql = MIGRATION.read_text(encoding="utf-8")
     rows = dict(re.findall(r"\('(v3_[a-z0-9_]+)',\s*([0-9.]+)\)", sql))
-    assert {k: float(v) for k, v in rows.items()} == R.SQL_DEFAULTS
+    later = (REPO / "supabase" / "migrations" / "20261117000000_v3_extra_cold.sql").read_text(encoding="utf-8")
+    assert "('v3_step_extra_cold', 1)" in later and "foryou_ml_mode" not in later.split("\n-- Re-runnable")[1]
+    assert {k: float(v) for k, v in rows.items()} | R.LATER_MIGRATION_VALUES == R.SQL_DEFAULTS
     cfg = R.sql_config(R.sql_params())
     tuned = parse(FINAL)
     assert tuned.step_extra == 2.5
     for f in ("hours_per_reward", "cap_hours", "lam", "k0", "g_c", "g_t", "g_s", "g_g", "neg_mult", "step_extra",
               "window_days", "half_life_days", "explore", "solver", "base"):
         assert getattr(cfg, f) == getattr(tuned, f), f
-    assert cfg.step_extra_cold == 0 and V3Config().step_extra_cold == 1      # SQL: cold readers get exactly v5
+    assert cfg.step_extra_cold == 1 and V3Config().step_extra_cold == 1      # SQL = Python: extra step for cold readers too
     assert "'foryou_ml_mode'" not in sql.split("-- B. SETTINGS")[1].split("-- D.")[0]   # ships off: mode not touched
 
 
@@ -120,8 +122,9 @@ def test_pglite_parity_v3(variant, tmp_path):
     fx = _fixture(rng, now)
     if variant in ("cold", "cold_step"):
         fx["events"], fx["prefs"]["followed"] = [], []
-    if variant == "cold_step":                                          # the Python behaviour: extra step when cold too
-        fx["params"] = {"v3_step_extra_cold": 1}
+    if variant == "cold":                                               # the switch off: a cold reader gets exactly v5
+        fx["params"] = {"v3_step_extra_cold": 0}
+    # cold_step: the shipped value (v3_step_extra_cold = 1, the Python behaviour): extra step when cold too
     if variant == "few":
         fx["prefs"]["followed"] = []
         first = list(dict.fromkeys(e["blurb_id"] for e in fx["events"] if e["kind"] == "view"))[:3]

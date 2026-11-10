@@ -8,12 +8,16 @@
 //   + 8   per like in the same topic (max 3), + 4 per like from the same source (max 3)
 //   - 8   per dislike in the same topic (max 3), - 4 per dislike from the same source (max 3)
 // Cards the reader disliked and hidden topics/sources drop out. Then a diversity pass
-// picks greedily, costing each card 6 hours for every card of its topic among the last 3 picked.
+// picks greedily, costing each card 6 hours for every card of its topic among the last 3 picked. Last, the macro/
+// finance page cap (microFocus.microCapOrder: at most 1 recall or science card in any 10, soft), the same rule the
+// server applies to every For you page; a liked or followed science topic could otherwise stack micro cards on
+// top. Following passes { microCap: false } (no cap there, like the server).
 
 import type { BlurbCard } from '../../contract/types.ts';
 import { mockRankScore } from './feedLogic.ts';
 import type { LocalPrefs } from '../storage/localPrefs.ts';
 import { cardSourceKey } from '../sources/sourceKeys.ts';
+import { microCapOrder } from './microFocus.ts';
 
 export const RANK = { favorite: 24, likeTopic: 8, likeSource: 4, dislikeTopic: 8, dislikeSource: 4, maxCount: 3, repeat: 6, window: 3 } as const;
 
@@ -38,7 +42,7 @@ export function localScore(card: BlurbCard, prefs: Prefs): number {
   return s;
 }
 
-export function rankLocal(cards: BlurbCard[], prefs: Prefs): BlurbCard[] {
+export function rankLocal(cards: BlurbCard[], prefs: Prefs, opts: { microCap?: boolean } = {}): BlurbCard[] {
   const kept = cards.filter((c) => {
     if (prefs.reactions[c.id]?.r === 'dislike') return false;
     if (prefs.hiddenTopics.includes(c.category)) return false;
@@ -62,5 +66,5 @@ export function rankLocal(cards: BlurbCard[], prefs: Prefs): BlurbCard[] {
     });
     out.push(pool.splice(best, 1)[0].c);
   }
-  return out;
+  return opts.microCap === false ? out : microCapOrder(out);
 }

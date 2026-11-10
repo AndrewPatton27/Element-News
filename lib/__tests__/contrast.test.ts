@@ -16,7 +16,9 @@ export function ratio(a: string, b: string): number {
 const PAIRS: Array<[keyof Palette, keyof Palette]> = [
   ['ink', 'bg'], ['inkBody', 'surface'], ['inkSoft', 'surface'], ['inkPlain', 'surface'],
   ['muted', 'bg'], ['muted', 'surface'], ['muted', 'surfaceMuted'],
-  ['accent', 'surface'], ['accent', 'bg'], ['accentInk', 'accentSoft'], ['onAccent', 'accent'],
+  // accentInk on surface: the card topic line and the bar's link glyph / "+N" count;
+  // muted on bg: the persistent feed notice strip (D-80) under the card area.
+  ['accent', 'surface'], ['accent', 'bg'], ['accentInk', 'accentSoft'], ['accentInk', 'surface'], ['onAccent', 'accent'],
   ['dataInk', 'dataSoft'], ['dataInk', 'dataPanel'],
   ['warn', 'surfaceMuted'], ['warn', 'bg'], ['up', 'surface'], ['down', 'surface'], ['flat', 'surface'],
   ['good', 'surface'], ['bad', 'surface'], ['good', 'bg'], ['bad', 'bg'],

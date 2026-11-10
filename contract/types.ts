@@ -149,6 +149,8 @@ export interface BlurbCard {
   detail?: CardDetail | null;           // in-depth summary; null or missing = none (older servers omit it)
   story_link?: StoryLink;
   follow_reason?: string;               // present on cards returned by api.following_feed
+  follow_match?: 'topic' | 'source' | 'ticker' | 'company'; // following_feed direct matches: why it matched
+  follow_ticker?: string;               // the followed ticker for 'ticker' / 'company' matches
 }
 
 /** Response of `api.feed`. `next_cursor` null = end of feed. Treat the cursor as opaque. */
@@ -158,6 +160,9 @@ export interface FeedPage {
   /** Signed-in Trending / For you pages only, while ML shadow logging is on (migration
    *  20261019010000). Send it back with the 'view' event (api.track p_page). Absent otherwise. */
   page_id?: string;
+  /** Signed-in pages near the end of the unseen cards (migration 20261113000000): the index in `items` where
+   *  cards the reader has already seen start (0 = the whole page). Absent otherwise. Older apps ignore it. */
+  seen_from?: number;
 }
 
 /**

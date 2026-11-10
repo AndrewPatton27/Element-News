@@ -10,6 +10,8 @@ import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
 import { mockFeedStatus } from './mockStatus.ts';
+import { wantsWorstCase, worstCaseCards } from '../shared/mockWorst.ts';
+import { createMockCompanyApi } from '../companies/companyApi.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 
 import page1 from '../../contract/fixtures/feed.page1.json';
@@ -37,9 +39,11 @@ export function allCards(): BlurbCard[] {
 }
 
 export function createMockApi(): Api {
-  const cards = allCards();
+  // ?mock_data=worst: stress-test cards for the layout (lib/shared/mockWorst.ts)
+  const cards = wantsWorstCase() ? worstCaseCards(allCards()) : allCards();
   const trends = SAMPLE_NUMBER_TRENDS.map((t) => ({ ...t, points: [...t.points] }));
   const features = createMockFeatureApi(cards, parseMacroFacts(numbers), trends);
+  const companies = createMockCompanyApi(cards);
   return {
     sample: true,
     feed: (req) =>
@@ -59,6 +63,7 @@ export function createMockApi(): Api {
     numberTrends: () => wait(trends.map((t) => ({ ...t, points: [...t.points] }))),
     search: (q, cursor, limit) => wait(features.search(q, cursor, limit)),
     relatedCards: (id, limit) => wait(features.relatedCards(id, limit)),
+    card: (id) => wait(cards.find((c) => c.id.toLowerCase() === String(id).toLowerCase()) ?? null),
     followingFeed: (f) => wait(features.followingFeed(f)),
     dailyBrief: () => wait(features.dailyBrief()),
     weeklyBrief: () => wait(features.weeklyBrief()),
@@ -69,5 +74,11 @@ export function createMockApi(): Api {
     mySubscriptions: () => wait(features.mySubscriptions()),
     unsubscribeMine: (k) => wait(features.unsubscribeMine(k)),
     updateMyTime: (k, h, tz) => wait(features.updateMyTime(k, h, tz)),
+    companies: {
+      search: (q, limit) => companies.search(q, limit).then(wait),
+      cards: (t, cursor, limit) => companies.cards(t, cursor, limit).then(wait),
+      directory: () => companies.directory().then(wait),
+      tags: (ids) => wait(companies.tagsNow(ids)),
+    },
   };
 }

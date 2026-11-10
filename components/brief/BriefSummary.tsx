@@ -25,7 +25,7 @@ export function BriefSummary({ summary, mode, config, wide }: { summary: BriefSu
     <View accessibilityLabel={title} style={[styles.box, wide && styles.boxWide, { backgroundColor: p.surface, borderColor: p.border }]}>
       <View style={[styles.badge, { backgroundColor: p.accentSoft }]}>
         <SparkIcon color={p.accentInk} />
-        <Text accessibilityRole="header" style={[styles.badgeText, { color: p.accentInk }]}>
+        <Text accessibilityRole="header" aria-level={2} style={[styles.badgeText, { color: p.accentInk }]}>
           {title}
         </Text>
       </View>
@@ -34,7 +34,7 @@ export function BriefSummary({ summary, mode, config, wide }: { summary: BriefSu
           {para.trim()}
         </Text>
       ))}
-      <Text style={[styles.label, { color: p.muted }]}>{summaryFooter(config)}</Text>
+      <Text style={[styles.label, { color: p.muted }]}>{summaryFooter()}</Text>
     </View>
   );
 }

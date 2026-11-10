@@ -13,10 +13,8 @@ import { useAppData } from '../lib/shared/appData';
 import { useAccount } from '../lib/account/accountContext';
 import { withoutHidden } from '../lib/account/accountLogic';
 import {
-  briefCards,
   briefDate,
   briefDateLabel,
-  briefFooter,
   briefIsEmpty,
   briefView,
   dayLabelShort,
@@ -240,18 +238,15 @@ export default function BriefScreen() {
       </Text>
     ) : null;
   const meta = data ? <BriefMeta line={generatedLine(data)} refreshing={refreshing} onRefresh={refresh} /> : null;
-  const footerText = briefFooter(view ? briefCards(view) : [], config);
-  const footer = footerText ? <Text style={[styles.footer, { color: p.muted }]}>{footerText}</Text> : null;
 
   if (wide) {
     return (
-      <ScreenShell tab="brief" title={mode === 'weekly' ? 'Weekly brief' : 'Daily brief'} meta={briefDateLabel(mode, data)}>
+      <ScreenShell tab="brief" title="Brief" meta={briefDateLabel(mode, data)} notice>
         {switchTabs}
         {manageCard}
         {meta}
         {inlineError}
         {body}
-        {footer}
         <DetailSheet card={detailCard} config={config} categories={categories} onClose={() => setDetailCard(null)} />
       </ScreenShell>
     );
@@ -259,7 +254,7 @@ export default function BriefScreen() {
 
   // Phones: the header carries the wordmark and the Daily / Weekly tabs (Mobile-Brief).
   return (
-    <Shell active="brief" bare>
+    <Shell active="brief" bare notice>
       <View style={[styles.header, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
         <View style={styles.brand}>
           <Wordmark size={22} />
@@ -280,7 +275,6 @@ export default function BriefScreen() {
         {meta}
         {inlineError}
         {body}
-        {footer}
       </ScrollView>
       <DetailSheet card={detailCard} config={config} categories={categories} onClose={() => setDetailCard(null)} />
     </Shell>
@@ -298,5 +292,4 @@ const styles = StyleSheet.create({
   main: { flex: 1, minWidth: 0 },
   aside: { width: 320, gap: 16 },
   inlineError: { alignSelf: 'flex-start', overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, fontFamily: fonts.sansSemi, fontSize: 14 },
-  footer: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingTop: 4 },
 });

@@ -278,6 +278,9 @@ export default function SignInScreen() {
           store your email, the topics you pick and what you like, view or open, only to tailor your feed. You can delete that data, or your whole
           account, on the Account screen.
         </Text>
+        <Text style={[styles.fine, { color: p.muted }]}>
+          To ensure the quality of recommended posts, we keep a short record of which cards were shown to you in each batch, for 21 days, linked only to your account. Deleting your data removes it.
+        </Text>
         <Text style={[styles.fine, { color: p.muted }]}>{disclaimerText(config)}</Text>
       </View>
     </ScreenShell>

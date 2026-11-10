@@ -77,7 +77,9 @@ export const config = {
     scoreMinIntervalMs: 24_000,
     scoreMax429Retries: 8,
     narrowSourceMaxPerRun: 2,
-    narrowSources: ['faa_airworthiness_directive'] as readonly string[],
+    narrowSources: ['faa_airworthiness_directive', 'usgs_quake', 'nasa_release'] as readonly string[],
+    // Per-type caps (override narrowSourceMaxPerRun): USGS and NASA at most 1 new card per run (R-218 macro focus).
+    narrowSourceCaps: { usgs_quake: 1, nasa_release: 1 } as Readonly<Record<string, number>>,
     denyTitlePatterns: [
       /\bform\s*144\b/i,
       /\b(form|schedule)\s+(?:8-k|10-q|10-k)\b.*\b(amendment|exhibit|supplement)\b/i,
@@ -384,12 +386,41 @@ export const config = {
   // the CPSC policy page could not be read). AI text = Title + Description + Hazards + Remedies.
   cpsc: {
     url: 'https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallDateStart={start}',
-    lookbackDays: 180,
+    // 14 days (was 180): the 180-day backfill made 59% of the 14-day catalog recalls (R-218, macro focus).
+    lookbackDays: 14,
     rewriteLookbackDays: 120,                   // --rewrite looks this far back to find an old recall again
     // Recalls can flood the feed (PM review 2): at most this many NEW recalls are processed per run.
     // Recalls an earlier run already handled do not count, so each run moves on to the next
     // unprocessed recall inside the lookback window (newest first).
-    maxPerRun: 100,
+    maxPerRun: 5,                                // was 100 (R-218 macro focus)
+    // "Material" recall (20261116000000_macro_focus.sql): only these are shown in Trending, Latest and For you;
+    // every recall stays in the Recalls & Safety topic, the company page and search. Material when ANY holds:
+    // units >= materialMinUnits; units x highest listed price >= materialMinValueUsd; reported deaths or serious
+    // injuries (Injuries text, not the hazard wording: almost every title says "risk of serious injury or death");
+    // a stop-sale; or the recalling firm (title before "Recalls", manufacturers, importers, distributors; NOT
+    // retailers, since most small recalls are sold on Amazon) is a watch-list company (watchNames).
+    materialMinUnits: 100_000,
+    materialMinValueUsd: 10_000_000,
+    // true (Drew, 2026-11-09): a watch-list company's recall is material even when small. false = the company link is
+    // still stored (tickers) but only the other rules decide. SQL backfill twin: rank_params micro_watch_material.
+    watchCompanyMaterial: true as boolean,
+    // recalling-firm name pattern -> watch-list ticker (config.watchCompanies).
+    // Each pattern is matched as whole words, case-insensitive (cpsc.ts wraps it in \b(?:...)\b).
+    watchNames: [
+      ['3M', 'MMM'], ['wal-?mart', 'WMT'], ['target corp(oration)?', 'TGT'], ['costco', 'COST'],
+      ['home depot', 'HD'], ["lowe'?s", 'LOW'], ['best buy', 'BBY'], ['amazon([.]com)?', 'AMZN'],
+      ['apple inc', 'AAPL'], ['microsoft', 'MSFT'], ['dell', 'DELL'], ['nike', 'NKE'],
+      ['lululemon', 'LULU'], ['gap inc|old navy|banana republic', 'GAP'], ['abercrombie', 'ANF'],
+      ['american eagle', 'AEO'], ['urban outfitters', 'URBN'], ['peloton', 'PTON'], ['tesla', 'TSLA'],
+      ['ford motor', 'F'], ['general motors', 'GM'], ['procter (&|and) gamble', 'PG'], ['hershey', 'HSY'],
+      ['pepsico', 'PEP'], ['coca-cola', 'KO'], ['(walt )?disney', 'DIS'], ['dollar general', 'DG'],
+      ['dollar tree|family dollar', 'DLTR'], ['tjx|t[.]?j[.]? maxx|marshalls|homegoods', 'TJX'],
+      ['ross stores', 'ROST'], ['ulta beauty', 'ULTA'], ['five below', 'FIVE'], ['crocs', 'CROX'],
+      ['deckers|ugg|hoka', 'DECK'], ['under armour', 'UAA'], ['e[.]l[.]f[.]? cosmetics', 'ELF'],
+      ['chewy', 'CHWY'], ['wayfair', 'W'], ['honeywell', 'HON'], ['caterpillar', 'CAT'],
+      ['deere', 'DE'], ['kroger', 'KR'], ['tractor supply', 'TSCO'], ['starbucks', 'SBUX'],
+      ["mcdonald'?s", 'MCD'], ['etsy', 'ETSY'], ['ebay', 'EBAY'], ["macy'?s", 'M'], ['nordstrom', 'JWN'],
+    ] as ReadonlyArray<readonly [string, string]>,
     category: 'safety',
     eventType: 'recall',
     sourceName: 'U.S. Consumer Product Safety Commission',

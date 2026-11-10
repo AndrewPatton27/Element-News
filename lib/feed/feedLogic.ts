@@ -2,8 +2,9 @@
 
 import type { BlurbCard, CategorySlug, FeedMode, FeedPage } from '../../contract/types.ts';
 import { isBlurbCard } from '../shared/types.ts';
-import { diversifyFeed } from './diversify.ts';
+import { diversifyAppend } from './diversify.ts';
 import { pulledAt } from './feedOrder.ts';
+import { applyMicroFocus } from './microFocus.ts';
 
 // The feed tabs. 'for_you' is the signed-in personal feed (api.feed_for_you).
 export type FeedTab = FeedMode | 'for_you';
@@ -21,6 +22,7 @@ export interface FeedState {
   done: boolean; // server said there is nothing more
   loading: boolean;
   error: string | null;
+  seenIds: string[]; // cards re-shown at the end because the reader had already seen them ("all caught up")
 }
 
 export type FeedAction =
@@ -35,7 +37,7 @@ export function feedKey(q: FeedQuery): string {
 }
 
 export function initialFeedState(key: string): FeedState {
-  return { key, items: [], cursor: null, done: false, loading: false, error: null };
+  return { key, items: [], cursor: null, done: false, loading: false, error: null, seenIds: [] };
 }
 
 // Appends a page: drops cards already shown (by id) and cards that fail the guard.
@@ -61,10 +63,12 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
     case 'page':
       return {
         ...state,
-        items: state.key.startsWith('top|') ? diversifyFeed(appendPage(state.items, action.page)) : appendPage(state.items, action.page),
+        // Trending: only the new page and a bounded tail are re-mixed (diversifyAppend), not the whole list.
+        items: state.key.startsWith('top|') ? diversifyAppend(state.items, appendPage(state.items, action.page)) : appendPage(state.items, action.page),
         cursor: action.page.next_cursor,
         done: action.page.next_cursor === null,
         loading: false,
+        seenIds: typeof action.page.seen_from === 'number' ? [...state.seenIds, ...action.page.items.slice(action.page.seen_from).map((c) => c.id)] : state.seenIds,
       };
     case 'rerank':
       return { ...state, items: action.items };
@@ -185,9 +189,10 @@ function byDescThenId(score: (c: BlurbCard) => number) {
 export function mockFeedPage(all: BlurbCard[], p: MockFeedParams): FeedPage {
   const limit = clampLimit(p.limit);
   const filtered = all.filter((c) => p.category === null || c.category === p.category);
-  const sorted = filtered.slice().sort(p.mode === 'latest'
+  // same rules as the server (20261116000000_macro_focus.sql): recalls gated, micro cards capped, chips unchanged
+  const sorted = applyMicroFocus(filtered.slice().sort(p.mode === 'latest'
     ? (a, b) => pulledAt(b) - pulledAt(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
-    : byDescThenId(mockRankScore));
+    : byDescThenId(mockRankScore)), p.category);
   const offset = p.cursor ? Math.max(0, parseInt(p.cursor, 10) || 0) : 0;
   const items = sorted.slice(offset, offset + limit);
   const end = offset + items.length;

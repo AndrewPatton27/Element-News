@@ -30,9 +30,9 @@ async function onScreenIndex(page: Page, selector: string): Promise<number> {
 }
 
 async function currentHeadline(page: Page): Promise<string> {
-  const idx = await onScreenIndex(page, '[role="heading"][aria-level="1"], h1');
+  const idx = await onScreenIndex(page, '[data-testid="card-headline"]');
   expect(idx, 'a card headline is on screen').toBeGreaterThanOrEqual(0);
-  return page.locator('[role="heading"][aria-level="1"], h1').nth(idx).innerText();
+  return page.locator('[data-testid="card-headline"]').nth(idx).innerText();
 }
 
 async function nextCard(page: Page) {
@@ -59,6 +59,7 @@ test('next card: keyboard moves to a different card', async ({ page }) => {
   const first = await currentHeadline(page);
   const second = await nextCard(page);
   expect(second).not.toBe(first);
+  await page.waitForTimeout(500); // past the 320 ms move lock (D-88), or the key is ignored on purpose
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => currentHeadline(page)).toBe(first);
 });
@@ -120,10 +121,29 @@ test('share copies the card /b/<id> page link', async ({ page }) => {
   await expect(page.getByText('Link copied')).toBeVisible();
   const link = await page.evaluate(() => navigator.clipboard.readText());
   expect(link).toMatch(/^https:\/\/[^/]+\/b\/[0-9a-f-]{36}$/);
-  // The same path opens in the app without a crash (the real /b/<id> share page is served by the host in production).
+  // The same path opens the shared-card page (app/b/[id].tsx; in production the Pages Function adds the
+  // link-preview tags to the same shell).
   const res = await page.goto(new URL(link).pathname, { waitUntil: 'domcontentloaded' });
   expect(res!.status()).toBeLessThan(400);
-  await expect(page.locator('body')).not.toBeEmpty();
+  await expect(page.getByRole('heading', { level: 2, name: /\[SAMPLE\]/ }).filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+  // standalone view: BOTH notices inside the view (rule 5, D-80), a source link, like and dislike (D-63), Open Element
+  await expect(page.getByText(/Not investment advice/).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText(/may contain errors/i).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sources' }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Like this story', exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dislike this story', exact: true }).filter({ visible: true })).toBeVisible();
+  expect(await page.locator('img').count()).toBe(0);
+  await page.getByRole('link', { name: 'Open Element' }).filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('share page: an unknown or malformed card id shows a friendly page with a way into the app', async ({ page }) => {
+  for (const path of ['/b/00000000-0000-4000-8000-000000000000', '/b/not-a-card']) {
+    await page.goto(path);
+    await expect(page.getByText('This story is not available').filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Not investment advice/).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Element' }).filter({ visible: true })).toBeVisible();
+  }
 });
 
 test('Updates delayed banner shows only when the status says so', async ({ page }) => {
@@ -132,4 +152,27 @@ test('Updates delayed banner shows only when the status says so', async ({ page 
   await expect(page.getByText(/Updates delayed/)).toHaveCount(0);
   await page.goto('/?mock_delayed=1');
   await expect(page.getByText(/^Updates delayed · last updated .+ ago$/)).toBeVisible();
+});
+
+test('search: empty box suggests up to 5 stories above the topics, a suggestion opens its detail', async ({ page }) => {
+  await page.goto('/search');
+  const box = page.getByTestId('search-suggestions');
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await expect(box.getByText('Suggested for you')).toBeVisible();
+  const rows = box.locator('[aria-label$="Opens more detail"]');
+  const n = await rows.count();
+  expect(n).toBeGreaterThan(0);
+  expect(n).toBeLessThanOrEqual(5);
+  // the existing chips stay below the suggestions
+  const chips = page.getByText('Try a company');
+  await expect(chips).toBeVisible();
+  const boxY = (await box.boundingBox())!.y;
+  expect((await chips.boundingBox())!.y).toBeGreaterThan(boxY);
+  await rows.first().click();
+  await expect(page.locator('[aria-label^="More detail: "]').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).first().click();
+  // typing a query replaces the suggestions with results, without the error screen
+  await page.getByLabel('Search stories, companies and topics').fill('sample');
+  await expect(box).toBeHidden();
+  await expect(page.getByText('Something went wrong')).toHaveCount(0);
 });

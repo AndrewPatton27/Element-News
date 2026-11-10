@@ -105,6 +105,11 @@ begin
     raise exception 'FAIL: anon lost access to api.feed';
   end if;
 
+  -- This check predates seen-card exclusion (a viewed card stays in For you with a penalty): switch it off
+  -- here (rolled back); seen_exclusion_check.sql covers the new behaviour.
+  perform set_config('role', 'none', true);
+  update core.rank_params set value = 0 where key = 'seen_exclude_mode';
+
   -- ---- 2. authenticated without a user id is refused ------------------------
   perform set_config('role', 'authenticated', true);
   perform set_config('request.jwt.claims', '{"role":"authenticated"}', true);

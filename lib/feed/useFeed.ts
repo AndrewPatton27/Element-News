@@ -12,6 +12,10 @@ import type { LocalPrefs } from '../storage/localPrefs.ts';
 import { readLocal } from '../storage/localPrefs.ts';
 import { defaultStore } from '../storage/storage.ts';
 import { readSeen } from './forYouGate.ts';
+import { FOLLOWED_STORIES_KEY, followedStoryIdsFor, parseFollowedStories } from '../following/followedStories.ts';
+import { reorderUnseen, splitSeen, withDeviceSeen, type SeenContext } from './seenFilter.ts';
+import type { BlurbCard } from '../../contract/types.ts';
+import { FOLLOWED_IDS_MAX } from '../account/account.ts';
 import { finishForYou, mergePool, rankForYou } from './forYouRank.ts';
 import { assignFirstCards, dedupeCards, sortLatest, trendingOrder } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from '../api/errors.ts';
@@ -25,6 +29,7 @@ import {
   type CardFilter,
   type FeedQuery,
   type FeedState,
+  type LoadPagesOptions,
 } from './feedLogic.ts';
 
 export interface UseFeed {
@@ -35,6 +40,24 @@ export interface UseFeed {
 }
 
 const SHOW_ALL: CardFilter = (cards) => cards;
+
+/** Ids of the stories this reader follows (device-side), newest first, for the server's seen-card exemption.
+ *  Only when the device list belongs to `userId` (lib/following/followedStories.ts switchFollowedStoriesOwner). */
+export function followedStoryIds(userId: string | null): string[] {
+  return followedStoryIdsFor(defaultStore(), userId, FOLLOWED_IDS_MAX);
+}
+
+/** What this device knows about seen cards, likes and followed stories (lib/feed/seenFilter.ts). */
+export function deviceSeenContext(): SeenContext {
+  const store = defaultStore();
+  const local = readLocal(store);
+  return {
+    seen: readSeen(store),
+    liked: new Set(Object.entries(local.reactions).filter(([, v]) => v.r === 'like').map(([id]) => id)),
+    followed: new Set(parseFollowedStories(store.get(FOLLOWED_STORIES_KEY)).map((s) => s.id)),
+    now: Date.now(),
+  };
+}
 
 /** First-page heads that keep the three tabs distinct. `refresh` changes on every tab switch,
  *  so the heads are pulled again each time; the last heads stay in use while the new ones load. */
@@ -50,10 +73,16 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
       api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
-      userId && account ? account.feedForYou(null, 10) : Promise.resolve(null),
-    ]).then(([top, latest, personal]) => {
+      userId && account ? account.feedForYou(null, 10, followedStoryIds(userId)) : Promise.resolve(null),
+    ]).then(([topRaw, latestRaw, personalRaw]) => {
       const store = defaultStore();
-      let fy = personal?.items ?? rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id)));
+      // Trending and Latest list everything. Only the For you head skips cards this device has seen (signed in on
+      // the real back end the server already did).
+      const unseen = (xs: BlurbCard[]) => (userId && !api.sample ? xs : splitSeen(xs, deviceSeenContext()).fresh);
+      const top = topRaw;
+      const latest = latestRaw;
+      const personal = personalRaw ? { ...personalRaw, items: unseen(personalRaw.items) } : null;
+      let fy = personal?.items ?? unseen(rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id))));
       if (category) fy = fy.filter((c) => c.category === category);
       const orders = assignFirstCards(filter(sortLatest(latest.items)), filter(trendingOrder(top.items)), filter(fy));
       setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
@@ -81,6 +110,10 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
   const restart = useRef(false);
   const failures = useRef(0);
   const retryAt = useRef(0);
+  // Seen-card exclusion is For you only. Signed in on the real back end the server does it (migration 20261113000000). Guests, and
+  // sample mode (no server), do it on this device: seen cards are held in `stash` and appended last when the feed ends.
+  const clientSeen = query.mode === 'for_you' && (!query.user || api.sample);
+  const stash = useRef(new Map<string, BlurbCard>());
 
   const load = useCallback(
     async (k: string, cursor: string | null): Promise<void> => {
@@ -89,7 +122,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
       busy.current = { id, key: k };
       restart.current = false;
       try {
-        await loadFeedPages({
+        const options: LoadPagesOptions = {
           cursor,
           // From the first page nothing is known yet (the reducer resets in the same tick).
           known: cursor === null ? [] : stateRef.current.items,
@@ -98,10 +131,10 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
             if (query.mode === 'for_you' && query.user && account) {
               // Server order stays; each page gets the shared post-step (spread from Trending's top stories,
               // diversify last). Trending's top ids are only needed on page 1.
-              const [page, top] = await Promise.all([account.feedForYou(c, 10), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
+              const [page, top] = await Promise.all([account.feedForYou(c, 10, followedStoryIds(query.user ?? null)), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
               const topItems = trendingOrder(top?.items ?? []);
               pageIds.note('for_you', page);
-              return { ...page, items: finishForYou(page.items, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null) };
+              return reorderUnseen(page, (xs) => finishForYou(xs, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null));
             }
             if (query.mode === 'for_you') {
               // Signed out: candidates are Trending (20: its page 1 plus the next 10) plus the Latest page, ranked on this
@@ -120,13 +153,13 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
             pageIds.note(surfaceForTab(query.mode), page);
             // Re-order only this fetched page (the server's cursor does not depend on item order); pages
             // already shown are never touched. Latest = published_at desc; Trending = lib/feedOrder.ts trendingOrder.
-            const items = query.mode === 'latest' ? sortLatest(dedupeCards(page.items)) : query.mode === 'top' ? trendingOrder(dedupeCards(page.items)) : page.items;
-            return { ...page, items };
+            return { ...page, items: query.mode === 'latest' ? sortLatest(dedupeCards(page.items)) : query.mode === 'top' ? trendingOrder(dedupeCards(page.items)) : page.items };
           },
           onRequest: () => dispatch({ type: 'request', key: k }),
           onPage: (page) => dispatch({ type: 'page', key: k, page }),
           alive: () => busy.current?.id === id,
-        });
+        };
+        await loadFeedPages(clientSeen ? withDeviceSeen(options, stash.current, deviceSeenContext) : options);
         failures.current = 0;
         retryAt.current = 0;
       } catch (err) {
@@ -146,7 +179,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
         if (busy.current?.id === id) busy.current = null;
       }
     },
-    [api, account, query.mode, query.category, query.user],
+    [api, account, query.mode, query.category, query.user, clientSeen],
   );
 
   useEffect(() => {
@@ -183,7 +216,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
 
   const rerank = useCallback((signals: LocalPrefs, seenCount: number, signedIn = false) => {
     if (query.mode === 'latest') return;
-    dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn) });
+    dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn, new Set(stateRef.current.seenIds)) });
   }, [key, query.mode]);
 
   // Keep the unseen queue filled while there is still a cursor. One chain at a time;

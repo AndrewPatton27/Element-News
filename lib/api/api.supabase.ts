@@ -6,7 +6,8 @@ import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
-import { takeEarlyFeed, type EarlyFeed } from '../feed/earlyFeed.ts';
+import { takeEarly, type EarlyHolder } from '../feed/earlyFeed.ts';
+import { createSupabaseCompanyApi } from '../companies/companyApi.ts';
 import { isBlurbCard, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
 export interface SupabaseOptions {
@@ -87,6 +88,15 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
   const doFetch = opts.fetchFn ?? ((input, init) => fetch(input, init));
 
   async function call(plan: PlannedRequest): Promise<unknown> {
+    // A request the inline script in index.html already has in flight (lib/feed/earlyFeed.ts): same
+    // path and body, anonymous. Falls back to a normal request when it failed or does not match.
+    if (!opts.fetchFn && plan.url.startsWith(opts.url)) {
+      const early = takeEarly(globalThis as EarlyHolder, `${plan.url.slice(opts.url.length)}|${plan.init.body ?? ''}`, !!plan.init.headers.Authorization);
+      if (early) {
+        const json = await early;
+        if (json != null) return json;
+      }
+    }
     let res: Response;
     try {
       res = await doFetch(plan.url, plan.init);
@@ -141,6 +151,20 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       return e instanceof ApiError && e.status === 404 ? { missing: true } : { error: true };
     }
   }
+  // Company RPCs (migration 20261115000000_companies.sql): the reader's token when signed in (my_reaction on cards).
+  async function companyRpc(name: string, body: Record<string, unknown>): Promise<unknown> {
+    const token = opts.getToken ? await opts.getToken() : null;
+    const headers: Record<string, string> = { apikey: opts.key, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const plan = (h: Record<string, string>): PlannedRequest => ({ url: `${opts.url}/rest/v1/rpc/${name}`, init: { method: 'POST', headers: h, body: JSON.stringify(body) } });
+    try {
+      return await call(plan(headers));
+    } catch (e) {
+      // a rejected token: read as a guest, like api.feed
+      if (e instanceof ApiError && e.status === 401 && token) { const { Authorization: _a, ...guest } = headers; return call(plan(guest)); }
+      throw e;
+    }
+  }
   const mineFail = (r: { missing: true } | { error: true }) => ({ ok: false, changed: false, ...('missing' in r ? { status: 'unavailable' as const } : {}) });
   const unavailable = { ok: false, status: 'unavailable' as const };
   const tokenCall = async (name: string, token: string, extra: Record<string, unknown> = {}) => {
@@ -158,14 +182,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const token = opts.getToken ? await opts.getToken() : null;
       try {
         const plan = planRequest(opts.url, opts.key, 'feed', req, token);
-        // First page: the inline script in index.html may already have it in flight (lib/earlyFeed.ts).
-        const early = opts.fetchFn ? null : takeEarlyFeed(globalThis as { __elementEarly?: EarlyFeed }, plan.init.body, !!token);
-        if (early) {
-          const json = await early;
-          if (json) {
-            try { return parseFeedPage(json); } catch { /* fall through to a normal request */ }
-          }
-        }
+        // First pages may already be in flight from index.html: `call` picks them up (lib/feed/earlyFeed.ts).
         return parseFeedPage(await call(plan));
       } catch (e) {
         // api.feed is the same for everyone: if the user's token is rejected, read it as a guest.
@@ -205,6 +222,18 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const x = await optional('related_cards', { mode: 'top', limit, cardId });
       return Array.isArray(x) ? x.filter(isBlurbCard).slice(0, limit) : [];
     },
+    async card(cardId) {
+      if (!UUID.test(String(cardId))) return null;
+      const headers = { apikey: opts.key, Accept: 'application/json', 'Accept-Profile': 'api', 'Content-Type': 'application/json', 'Content-Profile': 'api' };
+      try {
+        // anonymous on purpose: the same answer for everyone, like the Pages Function's preview
+        const x = await call({ url: `${opts.url}/rest/v1/rpc/card_by_id`, init: { method: 'POST', headers, body: JSON.stringify({ p_id: cardId }) } });
+        return isBlurbCard(x) && x.id.toLowerCase() === String(cardId).toLowerCase() ? x : null;
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 400)) return null; // RPC not applied yet / bad id
+        throw e;
+      }
+    },
     async followingFeed(f) {
       const x = await optional('following_feed', { mode: 'top', ...f });
       try { return x === null ? { items: [], next_cursor: null } : parseFeedPage(x); } catch { return { items: [], next_cursor: null }; }
@@ -240,6 +269,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const r = await authedRpc('update_my_brief_time', { p_kind: kind, p_send_hour: hour, p_timezone: tz });
       return 'data' in r ? parseMyBriefChange(r.data) : mineFail(r);
     },
+    companies: createSupabaseCompanyApi(companyRpc),
   };
 }
 

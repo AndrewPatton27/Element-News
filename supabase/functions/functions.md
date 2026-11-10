@@ -40,6 +40,9 @@ lines; never keys or source text).
   `config.groq.alternativeModel` and sets `stats.model_missing` in the run summary (the watchdog opens `wd:model`).
   At the cap, or if the counter cannot be read, no AI call is made. The Groq report-card scorer counts
   against Groq too. Gemini pacing (5 s) and Groq pacing (30 s) apply within a call.
+  The report-card REVISE rewrite now goes through the shared chain (one attempt, every draft check), so it takes a
+  database unit like any writing call. Extra requests inside one call (the retired-model repeat, Groq's
+  json_schema -> json_object retry) are counted only in the run's local view, not with a second database take.
 - **Caller check:** the `Authorization: Bearer` token must equal the project's service-role key
   (`SUPABASE_SERVICE_ROLE_KEY`) or the function secret `CRON_SECRET` (24+ characters; the watchdog Worker uses it, so the
   Worker never holds the service-role key); anything else gets HTTP 401. Because a `CRON_SECRET` bearer is not a JWT,
@@ -122,3 +125,10 @@ secrets described at the top of `20261019050000_cron_schedule.sql` (`element_fun
 Deno itself, the deploy bundler (relative imports outside `supabase/functions`), the real CPU and wall time
 per call (the SEC source parses about 170 company filing lists and is the most likely to approach 2 s CPU),
 pg_cron, pg_net and Vault on Supabase.
+
+## Scaling notes
+
+- One source per call and 5 new items per call keep each call far under 150 s wall / 2 s CPU. For 100x more sources add a source name to `SOURCE_NAMES` and one cron row; do not raise `work_cap` above 20.
+- Gemini and Groq daily caps are enforced in the database (`api.ai_usage_take`), so any number of calls and isolates share them.
+- Pipeline state is per run (`AsyncLocalStorage`), so concurrent requests in one isolate are safe.
+- A failed source fetch is not retried inside the call; the next scheduled call retries it (items are deduped by URL, so re-runs are safe).

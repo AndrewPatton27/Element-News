@@ -41,7 +41,14 @@ export function checkFeedStatus(x) {
   return (row.delayed ?? row.is_delayed) === true ? 'feed_status says updates are delayed' : null;
 }
 
-/** Contract rules: app_config.disclaimer set; each card has >= 1 http(s) source link; AI cards carry the AI label. */
+/** D-80: the feed shows the AI notice and the disclaimer once, in a persistent strip under the
+ *  card area (components/shell/FeedNotice.tsx). The strip's text ships in the JS bundle. */
+export const FEED_NOTICE_MARKER = 'AI-generated summaries may contain errors';
+export function checkNotice(bundle) {
+  return typeof bundle === 'string' && bundle.includes(FEED_NOTICE_MARKER) ? null : 'the feed notice strip text is missing from the bundle';
+}
+
+/** Contract rules: app_config.disclaimer set; each card has >= 1 http(s) source link; AI cards carry the AI label (data contract). */
 export function checkCards(cards, config) {
   const problems = [];
   if (!config || typeof config.disclaimer !== 'string' || !config.disclaimer.trim()) problems.push('app_config.disclaimer is empty');
@@ -77,6 +84,7 @@ export async function runSmoke({ site = DEFAULT_SITE, supabaseUrl, key, now = ne
   const base = supabaseUrl.replace(/\/+$/, '');
   const siteUrl = site.replace(/\/+$/, '') + '/';
   let html = '';
+  let bundle = '';
   let cards = [];
   const limit = maxAgeHours(now, maxAge);
 
@@ -91,7 +99,15 @@ export async function runSmoke({ site = DEFAULT_SITE, supabaseUrl, key, now = ne
     if (!url) return 'no script bundle found in the page';
     const res = await fetchFn(url);
     if (res.status !== 200) return `bundle returned HTTP ${res.status}`;
-    return (await res.text()).length > 1000 ? null : 'bundle is suspiciously small';
+    bundle = await res.text();
+    // the shared strings (feed notice) live in split chunks: read every JS chunk the page names
+    const chunks = [...new Set([...html.matchAll(/\/_expo\/static\/js\/web\/[\w.-]+\.js/g)].map((m) => m[0]))];
+    for (const c of chunks) {
+      const full = new URL(c, siteUrl).toString();
+      if (full === url) continue;
+      try { const r = await fetchFn(full); if (r.status === 200) bundle += ' ' + (await r.text()); } catch { /* best effort */ }
+    }
+    return bundle.length > 1000 ? null : 'bundle is suspiciously small';
   });
   await step('feed returns cards', async () => {
     const res = await rpc(fetchFn, base, key, 'feed', { p_mode: 'latest', p_cursor: null, p_limit: 20, p_category: null });
@@ -107,7 +123,9 @@ export async function runSmoke({ site = DEFAULT_SITE, supabaseUrl, key, now = ne
     if (!res.ok) return `feed_status returned HTTP ${res.status}`;
     return checkFeedStatus(await res.json());
   });
-  await step('cards: source link, disclaimer, AI label', async () => {
+  await step('persistent notice present on the feed page and every card has a source link', async () => {
+    const notice = checkNotice(bundle);
+    if (notice) return notice;
     const res = await fetchFn(`${base}/rest/v1/app_config?select=*&limit=1`, { headers: { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api' } });
     if (!res.ok) return `app_config returned HTTP ${res.status}`;
     const rows = await res.json();

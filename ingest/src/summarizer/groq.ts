@@ -7,7 +7,7 @@
 
 import { config, groqDailyCap, groqMinIntervalMs } from '../config.ts';
 import { fetchAllowed, type FetchLike } from '../allowlist.ts';
-import { AI_CATEGORY_SLUGS } from '../validate.ts';
+import { AI_CATEGORY_SLUGS, assertPaidKeyFor } from '../validate.ts';
 import { buildPrompt, isDailyQuota, modelFallback, ProviderError, RateLimitedError, RELEVANCE_RUBRIC } from './gemini.ts';
 import type { Summarizer, SummaryDraft } from '../types.ts';
 
@@ -120,15 +120,16 @@ export function createGroqSummarizer(opts: {
     get modelMissing() { return mf.missing; },
     dailyCap: opts.dailyCap ?? groqDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? groqMinIntervalMs(),
-    async generate(prompt: string, gopts?: { maxTokens?: number }): Promise<string> {
+    async generate(prompt: string, gopts?: { maxTokens?: number; onExtraCall?: () => void }): Promise<string> {
       for (let attempt = 0; ; attempt++) {
+        if (attempt > 0) gopts?.onExtraCall?.();                // a 429 retry is one more request against the cap
         const wait = lastScoreCall + config.reportCard.scoreMinIntervalMs - Date.now();
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
         lastScoreCall = Date.now();
         const res = await mf.call((model) => fetchAllowed(config.groq.endpoint, { kind: 'api', method: 'POST', fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.apiKey}` },
           body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1,
-            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, reasoning_effort: 'low', response_format: { type: 'json_object' } }) }));
+            max_completion_tokens: gopts?.maxTokens ?? config.reportCard.scoreMaxTokens, reasoning_effort: 'low', response_format: { type: 'json_object' } }) }), gopts?.onExtraCall);
         // A daily-quota 429 will not clear by waiting: stop at once instead of retrying for minutes.
         if (res.status === 429 && !isDailyQuota(res.text) && attempt < config.reportCard.scoreMax429Retries) {
           await new Promise(r => setTimeout(r, retryWaitMs(res)));
@@ -141,14 +142,16 @@ export function createGroqSummarizer(opts: {
       }
     },
     async summarize(input): Promise<SummaryDraft> {
+      assertPaidKeyFor(input.item, { name: 'groq', paidKey: false });   // rule 3: the Groq key is never the paid key
       // Tokens per minute are Groq's binding limit: send a shorter slice of the (already licensed) text.
       const prompt = buildPrompt({ ...input, text: input.text.slice(0, config.groq.sourceTextMaxChars) });
       let format: ResponseFormat = config.groq.responseFormat;
-      let res = await mf.call((m) => call(prompt, format, m));
+      let res = await mf.call((m) => call(prompt, format, m), input.onExtraCall);
       // Structured output not accepted for this model/request: retry once in plain JSON mode.
       if (res.status === 400 && format === 'json_schema' && /response_format|json_schema|schema/i.test(res.text)) {
         format = 'json_object';
-        res = await mf.call((m) => call(prompt, format, m));
+        input.onExtraCall?.();                                  // the retry is one more request against the cap
+        res = await mf.call((m) => call(prompt, format, m), input.onExtraCall);
       }
       if (res.status === 429) throw new RateLimitedError('groq', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) {

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   briefCards,
   briefDateLabel,
-  briefFooter,
   briefIsEmpty,
   briefRowLabels,
   briefView,
@@ -116,31 +115,24 @@ test('teaser: first sentence, capped, empty for no body', () => {
   assert.equal(teaser('Costs rose 3.1% last month. More.'), 'Costs rose 3.1% last month.');
 });
 
-test('briefFooter: only when no row carries labels (numbers-only brief), and it is the disclaimer', () => {
-  assert.equal(briefFooter([card()], config()), null);
-  assert.equal(briefFooter([], config()), 'Informational only · Not investment advice');
-  assert.equal(briefFooter([], null), 'Informational only · Not investment advice');
-});
-
-test('briefRowLabels: AI card gets a source link, the AI label and the disclaimer once', () => {
+test('briefRowLabels: AI card gets a source link and no per-row AI label or disclaimer (D-80: the screen strip has them)', () => {
   const r = briefRowLabels(card(), config());
   assert.deepEqual(r.source, { label: 'SEC · Form 8-K', url: 'https://www.sec.gov/Archives/edgar/data/1/0001.htm', count: 1 });
-  assert.equal(r.line, 'AI-generated summary · may contain errors · Informational only · Not investment advice');
-  assert.equal(r.line.split('Informational only').length - 1, 1);
+  assert.equal(r.line, '');
   assert.equal(r.credit, null);
 });
 
-test('briefRowLabels: template and data cards carry no AI label; data cards from FRED add the notice', () => {
+test('briefRowLabels: data cards from FRED still carry the FRED notice on the row (rule 8)', () => {
   const tpl = briefRowLabels(card({ ai: { generated: false, label: null } }), config());
-  assert.equal(tpl.line, 'Informational only · Not investment advice');
+  assert.equal(tpl.line, '');
   const d = briefRowLabels(dataCard({ sources: [{ ...card().sources[0], name: 'FRED', doc_label: null }] }), config());
-  assert.equal(d.line, 'Informational only · Not investment advice · FRED notice text');
+  assert.equal(d.line, 'FRED notice text');
   assert.equal(d.source?.label, 'FRED');
 });
 
-test('briefRowLabels: falls back to built-in wording without config; counts extra sources', () => {
+test('briefRowLabels: works without config; counts extra sources', () => {
   const r = briefRowLabels(card({ source_count: 3 }), null);
-  assert.equal(r.line, 'AI-generated summary · may contain errors · Informational only · Not investment advice');
+  assert.equal(r.line, '');
   assert.equal(r.source?.count, 3);
 });
 
