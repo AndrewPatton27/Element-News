@@ -88,11 +88,7 @@ begin
      and (select prosrc from pg_proc where oid = 'core.seen_tail(uuid,text,text,integer,boolean)'::regprocedure) not like '%macro_focus_wrapper%' then
     raise exception 'FAIL: core.seen_tail not wrapped';
   end if;
-  -- the seen filter of the installed base is still there (seen-exclusion migration applied before this one)
-  if to_regprocedure('core.seen_ids(uuid,timestamptz)') is not null
-     and (select prosrc from pg_proc where oid = 'core.feed_top_base(text,text,integer,text)'::regprocedure) not like '%v_sx%' then
-    raise exception 'FAIL: the wrapped feed_top lost the seen filter';
-  end if;
+  -- (seen exclusion now applies to For you only, D-84; Trending and Latest are no longer filtered)
 
   -- ---- 2. importance after publish; fresh macro beats a recall --------------------------------------------------
   r := api.publish_blurb(jsonb_build_object('dedupe_key', 'mf-recall', 'kind', 'summary', 'headline', 'MF recall', 'category', 'safety',
@@ -257,9 +253,15 @@ begin
       perform set_config('role', 'none', true);
       if seen && gated then raise exception 'FAIL: % (signed in, seen on) showed a non-material recall', rl; end if;
       if (select count(distinct x) from unnest(seen) x) <> cardinality(seen) then raise exception 'FAIL: % repeated a card', rl; end if;
-      if seen[1:28] && viewed then raise exception 'FAIL: % showed a seen card before the unseen ones ran out', rl; end if;
-      if not (array(select x from unnest(seen[1:28]) x) <@ seen) or cardinality(seen) < 28 then
-        raise exception 'FAIL: % showed % cards, want the 28 unseen ones first', rl, cardinality(seen);
+      -- seen exclusion applies to For you only (D-84): Trending and Latest still list viewed cards, with no seen_from
+      if rl = 'foryou' then
+        if seen[1:28] && viewed then raise exception 'FAIL: % showed a seen card before the unseen ones ran out', rl; end if;
+        if not (array(select x from unnest(seen[1:28]) x) <@ seen) or cardinality(seen) < 28 then
+          raise exception 'FAIL: % showed % cards, want the 28 unseen ones first', rl, cardinality(seen);
+        end if;
+      else
+        if n is not null then raise exception 'FAIL: % must not set seen_from (seen exclusion is For you only)', rl; end if;
+        if not (viewed <@ seen) then raise exception 'FAIL: % dropped a viewed macro card', rl; end if;
       end if;
     end loop;
     delete from core.user_events where user_id = ua;
