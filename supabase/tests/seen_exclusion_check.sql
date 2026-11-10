@@ -274,6 +274,8 @@ begin
   perform set_config('role', 'none', true);
 
   -- ---- 10. exceptions: a liked card and an updated story come back ---------------------------------------------
+  -- (liked cards only with seen_liked_comeback = 1, the behaviour before 20261120000300; 0 is checked in seen_liked_check.sql)
+  update core.rank_params set value = 1 where key = 'seen_liked_comeback';
   insert into core.user_events (user_id, blurb_id, kind) values (ua, cards[5], 'like');
   update core.blurbs set updated_at = now() - interval '1 hour', revision = 2 where id = cards[7];   -- seen 3 h ago, updated since
   update core.blurbs set updated_at = now() - interval '5 hours', revision = 2 where id = cards[8];  -- updated before it was seen
@@ -287,6 +289,7 @@ begin
   perform set_config('role', 'none', true);
   delete from core.user_events where user_id = ua and kind = 'like';
   update core.blurbs set updated_at = null, revision = 1 where id in (cards[7], cards[8]);
+  update core.rank_params set value = 0 where key = 'seen_liked_comeback';
 
   -- ---- 11. the window: old views age out; the count cap keeps the newest views ----------------------------------
   update core.user_events set created_at = now() - interval '20 days' where user_id = ua and blurb_id = cards[30];
