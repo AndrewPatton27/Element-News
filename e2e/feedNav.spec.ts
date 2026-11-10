@@ -137,20 +137,30 @@ test('Undo after a like goes back exactly one card and clears the like', async (
   expect(n.cur).toBe(liked);
 });
 
-test('the like toast sits bottom-left, small, and covers no card text or buttons', async ({ page }, info) => {
-  await ready(page);
-  await page.keyboard.press('ArrowRight');
+// The corner toast: small, bottom-left, aria-live, a 44 px Undo target, and clear of the card the
+// reader is on (headline, More detail, like / dislike / follow / share buttons).
+async function checkCornerToast(page: Page, shot: string) {
   const toast = page.getByTestId('undo-toast');
   await expect(toast).toBeVisible();
   await expect(toast).toHaveAttribute('aria-live', 'polite');
   await page.waitForTimeout(900);
-  const box = (await toast.boundingBox())!;
+  const pill = (await toast.boundingBox())!;
+  const undoBtn = toast.getByRole('button', { name: /undo/i });
+  await expect(undoBtn).toBeVisible();
+  const hit = (await undoBtn.boundingBox())!;
   const vp = page.viewportSize()!;
-  await page.screenshot({ path: info.outputPath(`toast-${info.project.name}.png`) });
-  // Small and in the lower-left corner.
-  expect(box.height).toBeLessThanOrEqual(48);
-  expect(box.width).toBeLessThanOrEqual(Math.min(260, vp.width * 0.6));
-  expect(box.y + box.height).toBeGreaterThan(vp.height * 0.6);
+  await page.screenshot({ path: shot });
+  // The pill looks small (about 36 px); the Undo tap target is a full 44 px.
+  expect(pill.height).toBeLessThanOrEqual(40);
+  expect(hit.height).toBeGreaterThanOrEqual(44);
+  expect(hit.width).toBeGreaterThanOrEqual(44);
+  expect(pill.width).toBeLessThanOrEqual(Math.min(200, vp.width * 0.5));
+  // Lower-left corner.
+  expect(pill.x).toBeLessThan(vp.width / 2);
+  expect(pill.y + pill.height).toBeGreaterThan(vp.height * 0.6);
+  // Everything the toast can catch a tap on: the pill and the Undo target.
+  const x0 = Math.min(pill.x, hit.x), y0 = Math.min(pill.y, hit.y);
+  const box = { x: x0, y: y0, width: Math.max(pill.x + pill.width, hit.x + hit.width) - x0, height: Math.max(pill.y + pill.height, hit.y + hit.height) - y0 };
   // Over the small print, not over the card the reader is now on: its headline, body text,
   // sources and action buttons stay clear.
   const blockers = await page.evaluate((sel) => {
@@ -166,14 +176,35 @@ test('the like toast sits bottom-left, small, and covers no card text or buttons
       if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) out.push({ what, x: r.left, y: r.top, w: r.width, h: r.height });
     };
     add('headline', cur);
-    document.querySelectorAll('[aria-label="More like this"], [aria-label="Less like this"], [aria-label^="Follow this story"], [aria-label^="Following this story"]').forEach((b) => add('button', b));
+    document
+      .querySelectorAll('[aria-label="More like this"], [aria-label="Less like this"], [aria-label^="Follow this story"], [aria-label^="Following this story"], [aria-label="Share"]')
+      .forEach((b) => add('button', b));
     document.querySelectorAll('[aria-label^="More detail"]').forEach((b) => add('more detail', b));
     return out;
   }, H);
   const overlaps = blockers.filter((b) => !(b.x >= box.x + box.width || b.x + b.w <= box.x || b.y >= box.y + box.height || b.y + b.h <= box.y));
   expect(overlaps, 'toast overlaps').toEqual([]);
-  // The Undo action stays reachable.
-  await expect(toast.getByRole('button', { name: /undo/i })).toBeVisible();
+}
+
+test('the like toast sits bottom-left, small, and covers no card text or buttons', async ({ page }, info) => {
+  await ready(page);
+  await page.keyboard.press('ArrowRight');
+  await checkCornerToast(page, info.outputPath(`toast-${info.project.name}.png`));
+});
+
+test('the hide-topic toast uses the same corner and covers nothing', async ({ page }, info) => {
+  await ready(page);
+  const idx = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[aria-label="More options for this card"]')).findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.top >= 0 && r.bottom <= window.innerHeight;
+    }),
+  );
+  expect(idx).toBeGreaterThanOrEqual(0);
+  await page.locator('[aria-label="More options for this card"]').nth(idx).click();
+  await page.getByText(/^Hide .* topics$/).click();
+  await expect(page.getByTestId('undo-toast')).toHaveAttribute('aria-label', /topics hidden\./);
+  await checkCornerToast(page, info.outputPath(`toast-hide-${info.project.name}.png`));
 });
 
 test('swipe right (touch) moves exactly one card forward', async ({ page, browserName }, info) => {
