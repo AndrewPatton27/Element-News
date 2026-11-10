@@ -273,7 +273,7 @@ export function Card(props: Props) {
             </View>
           ) : null}
           {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
-          <Text numberOfLines={1} style={[styles.metaText, wide && { fontSize: 14 }, { color: p.accentInk }]}>
+          <Text testID="card-meta" numberOfLines={1} style={[styles.metaText, wide && { fontSize: 14 }, { color: p.accentInk }]}>
             {metaLine(card, categories)}
           </Text>
           {onMore ? (

@@ -103,10 +103,17 @@ test('sources sheet opens with a link to the original and closes', async ({ page
   await expect(sheet).toBeVisible();
   const link = sheet.getByRole('link').first();
   await expect(link).toBeVisible();
+  // real anchors (M9 trust): every source link has an https href, opens in a new tab and is noopener
+  const links = sheet.locator('a[href]');
+  expect(await links.count()).toBeGreaterThan(0);
+  for (const el of await links.all()) {
+    await expect(el).toHaveAttribute('href', /^https:\/\//);
+    await expect(el).toHaveAttribute('target', '_blank');
+    await expect(el).toHaveAttribute('rel', /noopener/);
+  }
+  // the browser does the navigation; stop it here so the test stays offline
+  await page.evaluate(() => document.addEventListener('click', (e) => e.preventDefault(), true));
   await link.click();
-  const opened = await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened);
-  expect(opened.length).toBeGreaterThan(0);
-  expect(opened[0]).toMatch(/^https:\/\//);
   await page.getByRole('button', { name: 'Close', exact: true }).first().click();
   await expect(sheet).toBeHidden();
 });
