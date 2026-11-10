@@ -154,7 +154,8 @@ export function Card(props: Props) {
   const view = useRef({ h: 0, content: 0 });
   const checkFit = () => {
     const { h, content } = view.current;
-    if (h > 0 && content > h + 1 && points > 1) setFit({ key: fitKey, points: points - 1 });
+    // 8 = middleContent paddingBottom
+    if (h > 0 && content + 8 > h + 1 && points > 1) setFit({ key: fitKey, points: points - 1 });
   };
   const takeaways = cardTakeaways(card, points);
   const showTakeaways = takeaways.kind !== 'none' && !(denseData && compact);
@@ -304,11 +305,14 @@ export function Card(props: Props) {
               contentContainerStyle={styles.middleContent}
               scrollEnabled={!!compact}
               onLayout={(e) => { view.current.h = e.nativeEvent.layout.height; checkFit(); }}
-              onContentSizeChange={(_, h) => { view.current.content = h; checkFit(); }}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
-              <View style={[styles.group, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }]}>
+              {/* the group's own height is the content's natural height (the container centres it) */}
+              <View
+                onLayout={(e) => { view.current.content = e.nativeEvent.layout.height; checkFit(); }}
+                style={[styles.group, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }]}
+              >
                 <Pressable
                   onPress={opensDetail ? openDetailFromPress : undefined}
                   onPressIn={opensDetail ? detailPressIn : undefined}
