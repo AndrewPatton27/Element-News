@@ -75,6 +75,8 @@ Custom secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets s
 | `GEMINI_API_KEY` | both | Gemini is skipped (Groq, then the template) |
 | `GROQ_API_KEY` | both | Groq is skipped; the report-card scorer is off |
 | `FRED_API_KEY` | `ingest-source` macro | macro numbers are skipped |
+| `BEA_API_KEY`, `BEA_DATA_ENABLED=1` | `ingest-source` beadata | the BEA data source logs "disabled" / "key not set" and does nothing (off by default) |
+| `BLS_API_KEY` | `ingest-source` bls, optional | BLS runs on API v1 (25 requests a day, 6 used) |
 | `SEC_USER_AGENT` | `ingest-source` sec and wiki (`"Element <contact email>"`) | those sources fail with a clear error |
 | `CRON_SECRET` | the watchdog Worker (re-triggers `ingest-source`) | the Worker's re-trigger gets HTTP 401 |
 | `REPORT_CARD_PROTOCOL` | `ingest-source`, optional | `1` = Groq scores each AI card before publishing (as in `ingest/run-ingest.cmd`) |

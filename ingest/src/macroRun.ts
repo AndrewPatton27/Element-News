@@ -37,7 +37,7 @@ export async function runMacro(deps: Deps, stats: RunStats): Promise<void> {
 }
 
 /** One series' points -> Numbers panel row and, if `cardAllowed` and the move is big enough, a data card. */
-async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean): Promise<void> {
+export async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean): Promise<void> {
   const obs = buildObservation(id, points);
   if (!obs) { deps.log(`${tag}: ${id}: not enough data`); return; }
   await deps.publisher.upsertMacro(obs);

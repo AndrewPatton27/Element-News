@@ -21,6 +21,9 @@ export interface FunctionEnv {
   geminiApiKey: string | null;
   groqApiKey: string | null;
   fredApiKey: string | null;
+  blsApiKey: string | null;        // optional: switches the BLS source to API v2 (500 requests/day)
+  beaApiKey: string | null;
+  beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -39,6 +42,9 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     geminiApiKey: clean(get('GEMINI_API_KEY')),
     groqApiKey: clean(get('GROQ_API_KEY')),
     fredApiKey: clean(get('FRED_API_KEY')),
+    blsApiKey: clean(get('BLS_API_KEY')),
+    beaApiKey: clean(get('BEA_API_KEY')),
+    beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };
@@ -46,7 +52,7 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
 
 export function describeFunctionEnv(e: FunctionEnv): string {
   const s = (v: string | null) => (v ? '[set]' : '[missing]');
-  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
+  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} BEA_API_KEY=${s(e.beaApiKey)} BLS_API_KEY=${s(e.blsApiKey)} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
 }
 
 /** Length-independent string compare (the token is a secret). */
