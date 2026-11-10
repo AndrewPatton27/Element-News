@@ -39,7 +39,7 @@ export interface AccountApi {
   /** Saves followed topics (and optionally hidden ones); marks the user onboarded. */
   setPrefs(followed: string[], hidden?: string[], hiddenSources?: string[]): Promise<UserPrefs>;
   /** `followed`: ids of followed stories (device-side); For you leaves out cards the reader has seen, except these. */
-  feedForYou(cursor: string | null, limit?: number, followed?: string[]): Promise<FeedPage>;
+  feedForYou(cursor: string | null, limit?: number, followed?: string[], tickers?: string[]): Promise<FeedPage>;
   /** `ms` only with 'dwell' (how long the card was looked at). */
   track(cardId: string, event: TrackEvent, ms?: number, shadow?: ShadowContext | null): Promise<void>;
   /** The last dwell when the page is closing: fire and forget, sent with fetch `keepalive` so it
@@ -107,6 +107,8 @@ const SESSION_KEY = 'element.session.v1';
 // ---- RPC names and arguments (supabase/migrations/20261017030000_accounts.sql) ----
 export const FOLLOWED_IDS_MAX = 200; // same as core.rank_params seen_followed_max
 const FOLLOWED_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const FOLLOWED_TICKERS_MAX = 100; // same as core.rank_params fy_follow_tickers_max
+const FOLLOWED_TICKER = /^[A-Z]{1,5}([.-][A-Z]{1,2})?$/;
 
 export const ACCOUNT_RPC = {
   getPrefs: { fn: 'get_prefs', args: () => ({}) },
@@ -123,8 +125,11 @@ export const ACCOUNT_RPC = {
   feedForYou: {
     fn: 'feed_for_you',
     // p_followed only when there are followed stories (an older server has no such argument), at most FOLLOWED_IDS_MAX ids.
-    args: (cursor: string | null, limit: number, followed?: string[]): FeedForYouParams => {
+    // p_tickers (followed companies) only when there are some; the 4-argument form needs p_followed too (may be []).
+    args: (cursor: string | null, limit: number, followed?: string[], tickers?: string[]): FeedForYouParams => {
       const ids = (followed ?? []).filter((x) => FOLLOWED_ID.test(x)).slice(0, FOLLOWED_IDS_MAX);
+      const tk = [...new Set((tickers ?? []).map((t) => t.trim().toUpperCase()).filter((t) => FOLLOWED_TICKER.test(t)))].slice(0, FOLLOWED_TICKERS_MAX);
+      if (tk.length) return { p_cursor: cursor, p_limit: limit, p_followed: ids, p_tickers: tk };
       return { p_cursor: cursor, p_limit: limit, ...(ids.length ? { p_followed: ids } : {}) };
     },
   },
@@ -302,6 +307,7 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
 
   let shadowRejected = false;
   let followedRejected = false;
+  let tickersRejected = false;
   return {
     sample: false,
     currentUser: () => session?.user ?? null,
@@ -336,11 +342,17 @@ export function createSupabaseAccount(opts: SupabaseAccountOptions): AccountApi 
     async setPrefs(followed, hidden, hiddenSources) {
       return parseUserPrefs(await rpc(ACCOUNT_RPC.setPrefs.fn, ACCOUNT_RPC.setPrefs.args(followed, hidden, hiddenSources)));
     },
-    async feedForYou(cursor, limit, followed) {
+    async feedForYou(cursor, limit, followed, tickers) {
       const send = !followedRejected ? followed : undefined;
+      const sendTk = !tickersRejected && !followedRejected ? tickers : undefined;
       try {
-        return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit), send)));
+        return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit), send, sendTk)));
       } catch (e) {
+        // A server without the 4-argument For you (migration 20261126000000 not applied): stop sending tickers.
+        if (sendTk?.length && e instanceof AccountError && isUnknownArgsError(e.status)) {
+          tickersRejected = true;
+          return parseFeedPage(await rpc(ACCOUNT_RPC.feedForYou.fn, ACCOUNT_RPC.feedForYou.args(cursor, clampLimit(limit), send)));
+        }
         // A server without the 3-argument For you (migration not applied): stop sending the list and ask again once.
         if (send?.length && e instanceof AccountError && isUnknownArgsError(e.status)) {
           followedRejected = true;
