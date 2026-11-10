@@ -81,8 +81,8 @@ begin
   if not (c_co = any (core.seen_ids(ua, now()))) then
     raise exception 'FAIL: setup, the view does not count as seen (updated_at %)', (select updated_at from core.blurbs where id = c_co); end if;
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
-  -- Trending (pages are at least 10, so the whole fixture is one page): unseen cards first, the viewed
-  -- company card only after seen_from
+  -- Trending (pages are at least 10, so the whole fixture is one page): seen exclusion applies to For you
+  -- only (D-84), so the viewed card is still listed and there is no seen_from
   i := 0; sf := null; allids := '{}'; cur := null;
   loop
     r := api.feed('top', cur, 10);
@@ -91,8 +91,8 @@ begin
     cur := r ->> 'next_cursor'; i := i + 1;
     exit when cur is null or i > 10;
   end loop;
-  if allids is distinct from array[c_fruit::text, c_other::text, c_co::text] or sf is distinct from 2 then
-    raise exception 'FAIL: Trending with a viewed card should be fruit, other, then the seen card at seen_from 2: % (seen_from %)', allids, sf; end if;
+  if (select array_agg(x order by x) from unnest(allids) x) is distinct from (select array_agg(x order by x) from unnest(array[c_fruit::text, c_other::text, c_co::text]) x) or sf is not null then
+    raise exception 'FAIL: Trending must still list the viewed card (no seen exclusion outside For you): % (seen_from %)', allids, sf; end if;
   -- For you (what "Suggested for you" picks from, signed in): the viewed card only after seen_from
   r := api.feed_for_you(null, 10);
   ids := (select array_agg(x ->> 'id' order by n) from jsonb_array_elements(r -> 'items') with ordinality e(x, n));
