@@ -6,7 +6,7 @@
 
 import { aiDailyCap, config, minIntervalMs } from '../config.ts';
 import { fetchAllowed, type FetchLike } from '../allowlist.ts';
-import { AI_CATEGORY_SLUGS, requiresFigures } from '../validate.ts';
+import { AI_CATEGORY_SLUGS, assertPaidKeyFor, requiresFigures } from '../validate.ts';
 import type { SummarizeInput, Summarizer, SummaryDraft } from '../types.ts';
 
 /** A provider answered 429; the chain puts it in a cooldown and moves on. */
@@ -42,11 +42,13 @@ export function modelFallback(primary: string, fallback: string | undefined | nu
   return {
     get model() { return active; },
     get missing() { return missing; },
-    async call<R extends { status: number; text: string }>(fn: (model: string) => Promise<R>): Promise<R> {
+    // onExtraCall runs before the repeated request, so the caller counts it against the daily cap.
+    async call<R extends { status: number; text: string }>(fn: (model: string) => Promise<R>, onExtraCall?: () => void): Promise<R> {
       const res = await fn(active);
       if (!missing && fallback && fallback !== active && isModelMissing(res.status, res.text)) {
         missing = true;
         active = fallback;
+        onExtraCall?.();
         return fn(active);
       }
       return res;
@@ -182,16 +184,21 @@ export function createGeminiSummarizer(opts: {
   dailyCap?: number;
   timeoutMs?: number;
   fallbackModel?: string | null;
+  /** true only for a paid (billing-enabled) key; rule 3: Guardian text is refused otherwise. Default false (D-13 free tier). */
+  paidKey?: boolean;
 }): Summarizer {
   const mf = modelFallback(opts.model ?? config.gemini.model, opts.fallbackModel === undefined ? config.gemini.fallbackModel : opts.fallbackModel);
+  const paidKey = opts.paidKey === true;
   return {
     name: 'gemini',
     usesAi: true,
+    paidKey,
     get model() { return mf.model; },
     get modelMissing() { return mf.missing; },
     dailyCap: opts.dailyCap ?? aiDailyCap(),
     minIntervalMs: opts.minIntervalMs ?? minIntervalMs(config.gemini.freeRpm, 5000),
     async summarize(input): Promise<SummaryDraft> {
+      assertPaidKeyFor(input.item, { name: 'gemini', paidKey });   // rule 3, before any request
       const res = await mf.call((model) => fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
         kind: 'api',
         method: 'POST',
@@ -207,7 +214,7 @@ export function createGeminiSummarizer(opts: {
             responseSchema: RESPONSE_SCHEMA,
           },
         }),
-      }));
+      }), input.onExtraCall);
       if (res.status === 429) throw new RateLimitedError('gemini', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) {
         throw new ProviderError(`gemini: HTTP ${res.status}: ${res.text.slice(0, 200)}`);

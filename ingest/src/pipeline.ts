@@ -6,7 +6,7 @@
 // Outputs: RunStats counts; cards and items are written through deps.publisher.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { config, fedRegisterUrls } from './config.ts';
+import { config, fedRegisterUrls, groqDailyCap } from './config.ts';
 import { createGuard, normalizeUrl } from './dedupe.ts';
 import { buildPublishPayload, type Publisher } from './publish.ts';
 import { beaItemToItem } from './sources/bea.ts';
@@ -330,7 +330,14 @@ async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof cre
       if (!d.ok) { stats.skipped++; deps.log(`skip ${d.reason}: ${it.title}`); continue; }
       // narrow-source cap (config.reportCard.narrowSourceCaps.usgs_quake = 1 new card per run); the rest wait for the next run
       if (narrowCapReached(it, runState().topic)) { stats.skipped++; deps.log(`skip report_card_variety_cap: ${it.title}`); continue; }
-      const row = await deps.publisher.upsertItem(it);
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {                                  // one bad row must not end the USGS run
+        stats.failed++;
+        deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+        continue;
+      }
       if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
       recordTopic(it, runState().topic);
       try {
@@ -454,7 +461,14 @@ async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: nu
         deps.log(`skip ${lg.skip} (max ${lg.max} ${lg.label} per run): ${it.title.slice(0, 80)}`);
         continue;
       }
-      const row = await deps.publisher.upsertItem(it);
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {                                  // one bad row must not end this source's run
+        ctx.stats.failed++;
+        deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+        continue;
+      }
       if (!row.is_new && row.status !== 'new') { ctx.stats.skipped++; job.alreadyHandled++; continue; }   // handled in an earlier run
       if (group !== null) groupNew.set(group, (groupNew.get(group) ?? 0) + 1);
       newHere++;
@@ -553,7 +567,14 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     return;
   }
 
-  const row = known ?? await deps.publisher.upsertItem(it);
+  let row: ItemRow;
+  try {
+    row = known ?? await deps.publisher.upsertItem(it);
+  } catch (e) {                                      // one bad row must not end this source's run
+    stats.failed++;
+    deps.log(`failed: record item ${it.url}: ${(e as Error).message}`);
+    return;
+  }
   if (!known && !row.is_new && row.status !== 'new') { stats.skipped++; job.alreadyHandled++; return; }   // handled in an earlier run
   job.fresh++;
   recordTopic(it, runState().topic);
@@ -616,7 +637,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       if (g && stop !== undefined && deps.counter.used('groq') >= stop) return null;   // Groq calls are reserved for writing and the Brief
       const perRun = deps.reportCard?.scorerMaxPerRun;
       if (g && perRun !== undefined && stats.report_scored >= perRun) return null;           // per-run cap: the rest publish unscored
-      return g ? { generate: (prompt: string) => g.generate!(prompt) } : null;
+      if (!g) return null;
+      const cap = g.dailyCap ?? groqDailyCap();
+      if (deps.counter.used('groq') >= cap) return null;                                     // Groq's daily cap: publish unscored
+      // Every scorer request counts against Groq's daily cap like a writing call (laptop: state/ai-usage.json).
+      return {
+        generate: (prompt: string) => {
+          if (deps.counter.used('groq') >= cap) return Promise.reject(new Error(`groq: daily cap ${cap} reached`));
+          deps.counter.add('groq');
+          return g.generate!(prompt, { onExtraCall: () => deps.counter.add('groq') });
+        },
+      };
     })();
     if (protocolOn && r.ai_generated && scorer) {
       stats.report_scored++;
@@ -625,10 +656,19 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       const writer = deps.providers.find((p) => p.name === r.provider && p.usesAi) ?? deps.providers.find((p) => p.usesAi);
       const rv = await reviewCard({
         client: scorer, card: candidate, payload, recent,
+        // The rewrite goes through the chain with only the writer and one attempt, so it is counted against the
+        // writer's daily cap and runs every draft check of the first draft (shape, relevance score, advice words,
+        // numbers and tickers in the source, product codes, copy limits, repetition, length trim, detail checks).
+        // A rewrite that fails them (or no AI draft at all) throws: reviewCard gives 'revise_failed', not published.
         rewrite: async (recs) => {
           if (!writer) throw new Error('writer unavailable');
-          const d2 = await writer.summarize({ item: it, text, retryErrors: recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'] });
-          const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: writer.model ?? null });
+          const retryErrors = recs.length ? recs : ['report card: fix the lowest-scored parts using only the source text'];
+          const r2 = await summarizeWithChain({ item: it, text, retryErrors }, [writer], deps.counter, {
+            state: chain, requireRelevance: true, maxAttempts: 1,
+          });
+          if (!r2.ai_generated) throw new Error(`rewrite rejected: ${r2.log.join(' | ')}`);
+          const d2 = r2.draft;
+          const p2 = buildPublishPayload(it, d2, { itemId: row.id, aiGenerated: true, model: r2.model ?? writer.model ?? null });
           const v2 = validatePublish(p2);
           if (!v2.ok) throw new Error(v2.errors.join('; '));
           if (requiresFigures(it) && !hasFigures(p2.body)) throw new Error('no_figures');
