@@ -10,8 +10,8 @@ import { resolveSecClassification } from './sources/sec.ts';
 import type { MacroObservation, PublishPayload, RawItem, RevisableCard, RevisePayload, SummaryDraft } from './types.ts';
 
 export interface Publisher {
-  upsertItem(item: RawItem): Promise<{ id: string; is_new: boolean; status: string }>;
-  setItemStatus(id: string, status: 'skipped' | 'failed', note: string): Promise<void>;
+  upsertItem(item: RawItem): Promise<{ id: string; is_new: boolean; status: string; status_note?: string | null }>;
+  setItemStatus(id: string, status: 'new' | 'skipped' | 'failed', note: string): Promise<void>;   // 'new' + note = retry counter (src/retry.ts)
   publishBlurb(p: PublishPayload): Promise<{ status: 'published' | 'duplicate' | 'ticker_cap'; id: string | null }>;
   upsertMacro(o: MacroObservation): Promise<void>;
   /** --rewrite: published cards whose prompt_version is not in `current` (api.blurbs_to_revise). */

@@ -75,7 +75,8 @@ test('protocol on: PASS publishes, ABANDON/DUPLICATE do not, REVISE gets one rew
   assert.equal(s.report_abandon, 3);                                         // bravo, charlie (duplicate), echo (revise failed)
   assert.equal(s.report_revise, 2);                                          // delta and echo each got one rewrite
   assert.deepEqual(t.wlog.filter((w) => w.retry).map((w) => w.name), ['delta', 'echo'], 'exactly one rewrite each');
-  assert.deepEqual([...t.statuses].sort(), ['skipped:duplicate_story', 'skipped:report_card_abandon', 'skipped:report_card_revise_failed']);
+  // DUPLICATE is final at once; ABANDON and a failed rewrite stay retryable (status 'new', counter 1) until config.reportCard.maxRetries failures
+  assert.deepEqual([...t.statuses].sort(), ['new:report_card_retry:1:report_card_abandon', 'new:report_card_retry:1:report_card_revise_failed', 'skipped:duplicate_story']);
   assert.equal(t.links.length, 1);
   assert.deepEqual([t.links[0]![1], t.links[0]![2]], ['old-1', 'update']);
 });
@@ -142,7 +143,7 @@ test('protocol on: a REVISE rewrite that copies 15 words from an 8-K and invents
   assert.ok(wlog.includes('rewrite'), `the rewrite ran: ${t.lines.join('\n')}`);
   assert.equal(s.published, 0, t.dry.cards.map((c) => c.body).join('\n'));
   assert.ok(!t.dry.cards.some((c) => /987654/.test(c.body ?? '')), 'the invented number never reaches a card');
-  assert.ok(t.statuses.includes('skipped:report_card_revise_failed'), t.statuses.join(', '));
+  assert.ok(t.statuses.includes('new:report_card_retry:1:report_card_revise_failed'), t.statuses.join(', '));
 });
 
 // ---- --fix-category ------------------------------------------------------------------------------------

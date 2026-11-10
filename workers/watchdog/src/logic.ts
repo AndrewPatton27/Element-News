@@ -8,6 +8,11 @@ export const QUIET_HOURS_WEEKEND = 48;
 export const EXPECTED_JOBS = 15;
 export const AI_WARN_FRACTION = 0.8;
 export const DB_WARN_MB = 400;
+/** Supply floors (setting `supply_floor_cards_24h`, `supply_floor_cards_market_hour`; the Worker vars SUPPLY_FLOOR_CARDS_24H / SUPPLY_FLOOR_CARDS_MARKET_HOUR override them). 0 = check off. */
+export const SUPPLY_FLOOR_CARDS_24H = 10;            // 2 x the 30-day median of 5 cards a day (D-114, R-254)
+export const SUPPLY_FLOOR_CARDS_MARKET_HOUR = 0;     // off until the readout is rerun
+export interface SupplyFloors { cards24h: number; cardsMarketHour: number }
+export const DEFAULT_SUPPLY_FLOORS: SupplyFloors = { cards24h: SUPPLY_FLOOR_CARDS_24H, cardsMarketHour: SUPPLY_FLOOR_CARDS_MARKET_HOUR };
 export const RETRIGGER_EVERY_HOURS = 6;
 export const RETRIGGER_COUNT = 4;
 /** Same order as pg_cron's hourly schedule (supabase/migrations/20261019050000_cron_schedule.sql). */
@@ -25,10 +30,13 @@ export interface OpsStatus {
   model_missing: number;
   ai: AiRow[];
   db_size_mb: number | null;
+  /** Cards published in the last 24 h / 60 min (api.ops_status since 20261129000000_supply_ops.sql); absent on an older database. */
+  cards_24h?: number | null;
+  cards_1h?: number | null;
 }
 
-export type Kind = 'stale' | 'quiet' | 'jobs' | 'cron' | 'hung' | 'model' | 'ai' | 'db' | 'supabase';
-export const ALL_KINDS: readonly Kind[] = ['stale', 'quiet', 'jobs', 'cron', 'hung', 'model', 'ai', 'db', 'supabase'];
+export type Kind = 'stale' | 'quiet' | 'jobs' | 'cron' | 'hung' | 'model' | 'ai' | 'db' | 'supply' | 'supabase';
+export const ALL_KINDS: readonly Kind[] = ['stale', 'quiet', 'jobs', 'cron', 'hung', 'model', 'ai', 'db', 'supply', 'supabase'];
 
 export interface Problem { kind: Kind; title: string; detail: string }
 
@@ -57,8 +65,22 @@ export function quietThresholdHours(now: Date): number {
   return weekend ? QUIET_HOURS_WEEKEND : QUIET_HOURS;
 }
 
+/** True during US market hours in New York: Mon-Fri, 10:00-16:59 ET, so the last 60 minutes sit inside the 09:30-16:00 session. DST handled by Intl. */
+export function isMarketHourEt(now: Date): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(now);
+  const wd = parts.find((p) => p.type === 'weekday')?.value ?? '';
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+  return !['Sat', 'Sun'].includes(wd) && hour >= 10 && hour <= 16;
+}
+
+/** Parses a floor from a Worker var: a whole number of 0 or more, else the default. */
+export function parseFloor(v: unknown, fallback: number): number {
+  const n = typeof v === 'string' && /^\d{1,4}$/.test(v.trim()) ? Number(v.trim()) : typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
 /** Every current problem, at most one per kind. `ops` or `feed` null = that call failed (the 'supabase' kind covers it). */
-export function evaluate(feed: FeedStatus | null, ops: OpsStatus | null, now: Date, supabaseError?: string): Problem[] {
+export function evaluate(feed: FeedStatus | null, ops: OpsStatus | null, now: Date, supabaseError?: string, floors: SupplyFloors = DEFAULT_SUPPLY_FLOORS): Problem[] {
   const out: Problem[] = [];
   if (!feed || !ops) {
     out.push({
@@ -103,6 +125,13 @@ export function evaluate(feed: FeedStatus | null, ops: OpsStatus | null, now: Da
     }
     if (ops.db_size_mb !== null && ops.db_size_mb > DB_WARN_MB) {
       out.push({ kind: 'db', title: 'Database size', detail: `${ops.db_size_mb} MB of the 500 MB free tier.` });
+    }
+    // Supply floor: one problem, 24 h floor first. A missing count (older database) skips the check.
+    const c24 = ops.cards_24h, c1 = ops.cards_1h;
+    if (floors.cards24h > 0 && typeof c24 === 'number' && c24 < floors.cards24h) {
+      out.push({ kind: 'supply', title: `Card supply low: ${c24} cards in 24 hours`, detail: `floor is ${floors.cards24h} cards in 24 h (2 x the 30-day median). Run node scripts/supply-readout.mjs to see which source or gate is limiting.` });
+    } else if (floors.cardsMarketHour > 0 && typeof c1 === 'number' && c1 < floors.cardsMarketHour && isMarketHourEt(now)) {
+      out.push({ kind: 'supply', title: `Card supply low: ${c1} cards in the last market hour`, detail: `floor is ${floors.cardsMarketHour} cards per market hour. Run node scripts/supply-readout.mjs (market_hour_gaps_14d).` });
     }
   }
   return out;

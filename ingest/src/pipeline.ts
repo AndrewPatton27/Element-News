@@ -30,6 +30,7 @@ import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, type TopicFilterState } from './topicFilter.ts';
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
+import { decideReportCardRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
@@ -418,7 +419,7 @@ async function runSec(
   }
 }
 
-interface ItemRow { id: string; is_new: boolean; status: string }
+interface ItemRow { id: string; is_new: boolean; status: string; status_note?: string | null }
 
 /** One source's candidates plus everything handleItem needs; counters are per job (per source run). */
 interface Job {
@@ -689,8 +690,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
         if (rv.verdict === 'duplicate') stats.report_duplicate++;
         stats.report_abandon++;
         const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
-        stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
-        await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
+        stats.skipped++;
+        if (rv.verdict === 'duplicate') {
+          deps.log(`skip ${code}: ${it.title}`);
+          await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
+        } else {
+          // ABANDON or a rewrite that failed its checks may be transient: keep the item retryable (status 'new', counter in
+          // status_note), skip it for good only after config.reportCard.maxRetries failures (src/retry.ts).
+          const d = decideReportCardRetry(row.status_note, code);
+          deps.log(`skip ${code} (failure ${d.failures} of ${config.reportCard.maxRetries}, ${d.status === 'new' ? 'will retry' : 'final'}): ${it.title}`);
+          await deps.publisher.setItemStatus(row.id, d.status, d.note).catch(() => {});
+        }
         return;
       } else {
         payload = rv.payload;
