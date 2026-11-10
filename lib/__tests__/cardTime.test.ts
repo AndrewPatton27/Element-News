@@ -30,8 +30,10 @@ test('the feed card and the detail sheet both show time through the shared bar (
   assert.match(read('../shared/cardBody.ts'), /cardTime\(card, opts\.now\)/);
   assert.match(read('../../components/card/CardBar.tsx'), /cardBarMeta\(card/);
   assert.match(read('../../components/card/Card.tsx'), /<CardBar\b/);
-  assert.match(read('../../components/card/DetailSheet.tsx'), /<BarSource\b/);
-  for (const file of ['../../components/card/Card.tsx', '../../components/card/DetailSheet.tsx', '../../components/card/CardBar.tsx']) {
+  // the detail sheet's body lives in DetailBody.tsx (shared with the /b/<id> share page)
+  assert.match(read('../../components/card/DetailSheet.tsx'), /<DetailBody\b/);
+  assert.match(read('../../components/card/DetailBody.tsx'), /<BarSource\b/);
+  for (const file of ['../../components/card/Card.tsx', '../../components/card/DetailSheet.tsx', '../../components/card/DetailBody.tsx', '../../components/card/CardBar.tsx']) {
     assert.doesNotMatch(read(file), /relativeTime/, `${file} should not format times itself`);
   }
 });

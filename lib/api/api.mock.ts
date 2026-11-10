@@ -63,6 +63,7 @@ export function createMockApi(): Api {
     numberTrends: () => wait(trends.map((t) => ({ ...t, points: [...t.points] }))),
     search: (q, cursor, limit) => wait(features.search(q, cursor, limit)),
     relatedCards: (id, limit) => wait(features.relatedCards(id, limit)),
+    card: (id) => wait(cards.find((c) => c.id.toLowerCase() === String(id).toLowerCase()) ?? null),
     followingFeed: (f) => wait(features.followingFeed(f)),
     dailyBrief: () => wait(features.dailyBrief()),
     weeklyBrief: () => wait(features.weeklyBrief()),
