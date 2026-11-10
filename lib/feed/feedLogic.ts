@@ -2,7 +2,7 @@
 
 import type { BlurbCard, CategorySlug, FeedMode, FeedPage } from '../../contract/types.ts';
 import { isBlurbCard } from '../shared/types.ts';
-import { diversifyFeed } from './diversify.ts';
+import { diversifyAppend } from './diversify.ts';
 import { pulledAt } from './feedOrder.ts';
 import { applyMicroFocus } from './microFocus.ts';
 
@@ -63,7 +63,8 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
     case 'page':
       return {
         ...state,
-        items: state.key.startsWith('top|') ? diversifyFeed(appendPage(state.items, action.page)) : appendPage(state.items, action.page),
+        // Trending: only the new page and a bounded tail are re-mixed (diversifyAppend), not the whole list.
+        items: state.key.startsWith('top|') ? diversifyAppend(state.items, appendPage(state.items, action.page)) : appendPage(state.items, action.page),
         cursor: action.page.next_cursor,
         done: action.page.next_cursor === null,
         loading: false,

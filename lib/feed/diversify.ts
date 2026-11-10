@@ -31,25 +31,82 @@ export function pickTopStories(cards: BlurbCard[], n = 5): BlurbCard[] {
   return chosen;
 }
 
-export function diversifyFeed(cards: BlurbCard[], options: { maxRun?: 1 | 2; window?: number } = {}): BlurbCard[] {
+// Trending's category mix. Greedy, one place at a time; at each place the first remaining card (in
+// the input order) wins that:
+//   1. is at most 6 places later than its input place, is not the previous card's topic, and whose
+//      topic appears fewer than `maxRun` times among the last `window - 1` placed cards;
+//   2. else the same without the 6-place bound (the window cap still holds);
+//   3. else the first remaining card.
+// "First remaining with an allowed topic" is the smallest input index over the allowed topics, so each
+// topic keeps a pointer to its first candidate and each place costs O(topics), not O(cards): the whole
+// pass is O(cards x topics) instead of O(cards^2) (P2-13). Same output as the old list scan
+// (lib/__tests__/diversify.test.ts compares them on random feeds).
+// `before`: cards already placed ahead of these (kept as they are); they count for the topic rules.
+export function diversifyFeed(cards: BlurbCard[], options: { maxRun?: 1 | 2; window?: number; before?: BlurbCard[] } = {}): BlurbCard[] {
   const cap = options.maxRun ?? 2, window = Math.max(cap + 1, Math.trunc(options.window ?? 5));
-  const remaining = cards.map((card, index) => ({ card, index })), out: BlurbCard[] = [];
-  while (remaining.length) {
-    const pos = out.length;
-    const eligible = (x: typeof remaining[number]) => {
-      if (pos - x.index > 6) return false;
-      if (pos && out[pos - 1].category === x.card.category) return false;
-      const start = Math.max(0, pos - window + 1);
-      return out.slice(start).filter((c) => c.category === x.card.category).length < cap;
-    };
-    let i = remaining.findIndex(eligible);
-    // Preserve the window cap even when satisfying the six-place quality bound is impossible.
-    if (i < 0) i = remaining.findIndex((x) => {
-      const start = Math.max(0, pos - window + 1);
-      return out.slice(start).filter((c) => c.category === x.card.category).length < cap && !(pos && out[pos - 1].category === x.card.category);
-    });
-    if (i < 0) i = 0;
-    out.push(remaining.splice(i, 1)[0].card);
+  const span = window - 1; // how many placed cards the window cap looks back at
+  const n = cards.length;
+  const removed = new Uint8Array(n);
+  const byTopic = new Map<string, number[]>();
+  cards.forEach((c, i) => { const list = byTopic.get(c.category); if (list) list.push(i); else byTopic.set(c.category, [i]); });
+  const topics = [...byTopic.keys()];
+  const near = new Map<string, number>(topics.map((t) => [t, 0])); // pointer: first card not removed and not too far behind
+  const any = new Map<string, number>(topics.map((t) => [t, 0])); // pointer: first card not removed
+  let first = 0; // first card not removed, any topic
+  const placed: string[] = (options.before ?? []).slice(-span).map((c) => c.category);
+  const recent = new Map<string, number>();
+  for (const t of placed) recent.set(t, (recent.get(t) ?? 0) + 1);
+  const out: BlurbCard[] = [];
+  for (let pos = 0; pos < n; pos++) {
+    const last = placed.length ? placed[placed.length - 1] : null;
+    let pick = -1;
+    // 1. allowed topic, within six places
+    for (const t of topics) {
+      if (t === last || (recent.get(t) ?? 0) >= cap) continue;
+      const list = byTopic.get(t)!;
+      let k = near.get(t)!;
+      while (k < list.length && (removed[list[k]] || pos - list[k] > 6)) k++;
+      near.set(t, k);
+      if (k < list.length && (pick < 0 || list[k] < pick)) pick = list[k];
+    }
+    // 2. allowed topic, any distance (preserve the window cap when the six-place bound cannot hold)
+    if (pick < 0) for (const t of topics) {
+      if (t === last || (recent.get(t) ?? 0) >= cap) continue;
+      const list = byTopic.get(t)!;
+      let k = any.get(t)!;
+      while (k < list.length && removed[list[k]]) k++;
+      any.set(t, k);
+      if (k < list.length && (pick < 0 || list[k] < pick)) pick = list[k];
+    }
+    // 3. the first remaining card
+    if (pick < 0) {
+      while (removed[first]) first++;
+      pick = first;
+    }
+    removed[pick] = 1;
+    const card = cards[pick];
+    out.push(card);
+    placed.push(card.category);
+    recent.set(card.category, (recent.get(card.category) ?? 0) + 1);
+    if (placed.length > span) {
+      const gone = placed[placed.length - 1 - span];
+      recent.set(gone, recent.get(gone)! - 1);
+    }
   }
   return out;
+}
+
+/** Cards from the end of the loaded list that a new page may still mix with. */
+export const DIVERSIFY_TAIL = 30;
+
+/**
+ * Trending paging: `next` is `prev` with a new page appended (lib/feed/feedLogic.ts appendPage). Only the
+ * last DIVERSIFY_TAIL cards of `prev` plus the new cards are re-mixed; everything before stays where it is
+ * and counts as context for the topic rules. Each page costs O(tail + page), not O(whole list) (P2-13).
+ */
+export function diversifyAppend(prev: BlurbCard[], next: BlurbCard[], tail: number = DIVERSIFY_TAIL): BlurbCard[] {
+  const cut = Math.max(0, prev.length - Math.max(0, Math.trunc(tail)));
+  if (cut === 0) return diversifyFeed(next);
+  const frozen = next.slice(0, cut);
+  return frozen.concat(diversifyFeed(next.slice(cut), { before: frozen.slice(-8) }));
 }

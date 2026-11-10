@@ -3,7 +3,7 @@
 // (api.company_cards, keyset paged). Cards carry their sources, AI label and disclaimer like every
 // list. News only: no prices (rule 9).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { BlurbCard } from '../../contract/types.ts';
@@ -14,7 +14,6 @@ import { withoutHiddenSources } from '../../lib/sources/sourceKeys';
 import { useFollows } from '../../lib/following/useFollows';
 import { usePagedCards } from '../../lib/feed/usePagedCards';
 import { useAppData } from '../../lib/shared/appData';
-import { aiNoticeText, disclaimerText } from '../../lib/shared/labels';
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts, font, radius } from '../../lib/theme/theme';
 import { ScreenShell } from '../../components/shell/ScreenShell';
@@ -44,12 +43,17 @@ export default function CompanyScreen() {
   const hiddenSources = acct.viewPrefs?.hiddenSources ?? [];
   const visible = useCallback((cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources), [hidden, hiddenSources]);
 
+  // The ticker on screen now: a first page that lands after the reader moved to another company
+  // must not write the old company's header (P2-11). usePagedCards drops its cards by key.
+  const tickerRef = useRef(ticker);
+  tickerRef.current = ticker;
   useEffect(() => { setCompany(null); setMissing(false); }, [ticker]);
   const { state, loadMore, retry } = usePagedCards(
     ticker ? `company|${ticker}` : null,
     async (cursor, limit) => {
-      const page = await api.companies.cards(ticker!, cursor, limit);
-      if (cursor === null) {
+      const asked = ticker!;
+      const page = await api.companies.cards(asked, cursor, limit);
+      if (cursor === null && tickerRef.current === asked) {
         setCompany(page.company);
         setMissing(page.company === null);
       }
@@ -77,7 +81,9 @@ export default function CompanyScreen() {
   }
 
   return (
-    <ScreenShell tab="search" title={title} meta={wide && company ? cardCountText(company) : undefined} onBack={back}>
+    // notice: the AI notice + disclaimer as the persistent line under the card area (rule 5, D-80), not a
+    // footer after the list, which scrolled off screen for companies with many cards.
+    <ScreenShell tab="search" title={title} meta={wide && company ? cardCountText(company) : undefined} onBack={back} notice>
       <View style={[styles.header, { borderColor: p.border, backgroundColor: p.surface }]}>
         <View style={styles.headerText}>
           <Text accessibilityRole="header" style={[styles.name, wide && styles.nameWide, { color: p.ink }]}>{company?.name ?? ticker}</Text>
@@ -110,7 +116,6 @@ export default function CompanyScreen() {
           </View>
         }
       />
-      <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} · {disclaimerText(config)}</Text>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
       <DetailSheet card={detailCard} config={config} categories={categories} onClose={() => setDetailCard(null)} />
     </ScreenShell>
@@ -128,5 +133,4 @@ const styles = StyleSheet.create({
   help: { fontFamily: fonts.sans, fontSize: font.chip, lineHeight: 20, textAlign: 'center', maxWidth: 520 },
   left: { textAlign: 'left', paddingHorizontal: 4, maxWidth: 680 },
   button: { minHeight: 44, paddingHorizontal: 20, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  footer: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingTop: 4 },
 });

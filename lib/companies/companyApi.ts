@@ -14,7 +14,7 @@ export interface CompanyApi {
   cards(ticker: string, cursor?: string | null, limit?: number): Promise<CompanyPage>;
   /** Every company with its recent card count. [] when unavailable. */
   directory(): Promise<CompanySummary[]>;
-  /** Company tags of up to 50 cards, by card id. {} when unavailable. */
+  /** Company tags of up to 50 cards, by card id. Rejects when the request fails (the tag batcher retries after 60 s). */
   tags(cardIds: string[]): Promise<Record<string, CardCompany[]>>;
 }
 
@@ -43,7 +43,8 @@ export function createSupabaseCompanyApi(rpc: (name: string, body: Record<string
     tags: (ids) => {
       const list = [...new Set(ids.filter((x) => typeof x === 'string' && x !== ''))].slice(0, COMPANY_LIMITS.batchIds);
       if (!list.length) return Promise.resolve({});
-      return safe(rpc('card_companies', { p_ids: list }), parseCardCompanies, {});
+      // Errors are not swallowed here: the tag batcher keeps a failed answer for 60 s only, then asks again.
+      return rpc('card_companies', { p_ids: list }).then(parseCardCompanies);
     },
   };
 }

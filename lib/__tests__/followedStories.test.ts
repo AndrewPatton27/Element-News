@@ -66,3 +66,33 @@ test('story update loading tolerates API errors and caches results for two minut
   clearStoryUpdatesCache();
   assert.deepEqual(await loadStoryUpdates({ relatedCards: async () => { throw new Error('offline'); } }, story, 999_999), []);
 });
+
+test('followed stories belong to who is signed in: a different user never gets the previous list', async () => {
+  const { memoryStore } = await import('../storage/storage.ts');
+  const { FOLLOWED_STORIES_KEY, switchFollowedStoriesOwner, followedStoryIdsFor } = await import('../following/followedStories.ts');
+  const s = memoryStore();
+  const ids = (uid: string | null) => followedStoryIdsFor(s, uid, 200);
+  // a guest follows two stories
+  s.set(FOLLOWED_STORIES_KEY, serializeFollowedStories(toggleStory(toggleStory([], 'g1', 1), 'g2', 2)));
+  assert.deepEqual(ids(null), ['g2', 'g1']);
+  assert.deepEqual(ids('alice'), [], 'not sent for alice before the list is hers');
+  // the guest signs in as alice: the guest list joins her account
+  assert.equal(switchFollowedStoriesOwner(s, 'alice'), true);
+  assert.deepEqual(ids('alice'), ['g2', 'g1']);
+  s.set(FOLLOWED_STORIES_KEY, serializeFollowedStories(toggleStory(parseFollowedStories(s.get(FOLLOWED_STORIES_KEY)), 'a1', 3)));
+  // alice signs out: the next guest starts empty
+  switchFollowedStoriesOwner(s, null);
+  assert.deepEqual(ids(null), []);
+  assert.deepEqual(ids('alice'), []);
+  // bob signs in on the same device: none of alice's ids are sent
+  switchFollowedStoriesOwner(s, 'bob');
+  assert.deepEqual(ids('bob'), []);
+  s.set(FOLLOWED_STORIES_KEY, serializeFollowedStories(toggleStory([], 'b1', 4)));
+  // alice signs in straight after bob (no sign-out in between): her list comes back, bob's is put aside
+  switchFollowedStoriesOwner(s, 'alice');
+  assert.deepEqual(ids('alice'), ['a1', 'g2', 'g1']);
+  assert.deepEqual(ids('bob'), []);
+  switchFollowedStoriesOwner(s, 'bob');
+  assert.deepEqual(ids('bob'), ['b1']);
+  assert.equal(switchFollowedStoriesOwner(s, 'bob'), false, 'same owner: nothing changes');
+});
