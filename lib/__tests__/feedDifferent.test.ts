@@ -8,7 +8,7 @@ import { diversifyFeed } from '../feed/diversify.ts';
 import { localScore } from '../feed/localRank.ts';
 import { mockRankScore } from '../feed/feedLogic.ts';
 import { cardSourceKey } from '../sources/sourceKeys.ts';
-import { capTopics, mergePool, rankForYou, spreadFromTrending } from '../feed/forYouRank.ts';
+import { capTopics, isOffMarket, mergePool, rankForYou, spreadFromTrending } from '../feed/forYouRank.ts';
 import { sortLatest, trendingOrder } from '../feed/feedOrder.ts';
 
 type Prefs = Parameters<typeof rankForYou>[1];
@@ -38,7 +38,8 @@ function pool(n = 60, seed = 7): BlurbCard[] {
   return Array.from({ length: n }, (_, i) => {
     const t = new Date(NOW - Math.floor(r() * 48 * 60) * 60_000).toISOString();
     return { id: `c${String(i).padStart(2, '0')}`, kind: 'summary', category: TOPICS[Math.floor(r() * 8)], importance: 1 + Math.floor(r() * 8), published_at: t, as_of: t, sort_at: t, headline: `h${i}`, sources: [], tickers: [], macro: [] } as unknown as BlurbCard;
-  });
+  // science/world cards carry a (unique) macro number here so the market-relevance gate (tested separately) does not thin these pools
+  }).map((c) => ({ ...c, macro: ['science', 'world'].includes(c.category) ? [{ series_id: `M-${c.id}`, source_name: '' }] : [] }) as unknown as BlurbCard);
 }
 const noPrefs: Prefs = { reactions: {}, hiddenTopics: [], hiddenSources: [], follows: { topics: [] } };
 const like = (cards: BlurbCard[], topics: string[], n: number): Prefs['reactions'] => {
@@ -115,7 +116,7 @@ test('cold reader: topic round-robin by importance, not Latest order, not Trendi
 });
 
 test('a seen card does not sink below every unseen card (soft penalty)', () => {
-  const hi = { ...pool(1)[0], id: 'big', importance: 8, category: 'markets' } as BlurbCard;
+  const hi = { ...pool(1)[0], id: 'big', importance: 16, category: 'markets' } as BlurbCard;
   const lo = { ...pool(1)[0], id: 'small', importance: 1, category: 'tech' } as BlurbCard;
   const old = new Date(NOW - 40 * 3_600_000).toISOString();
   const lo2 = { ...lo, id: 'old', published_at: old, as_of: old, sort_at: old, category: 'sports' } as BlurbCard;
@@ -135,7 +136,10 @@ test('real-shaped fixtures: same cards in, no repeats, hidden respected, report 
   const topIds = new Set(top.map((c) => c.id));
   const v1 = rankForYouV1(mergePool(top, latest), prefs, new Set(), top[0]?.id ?? null, topIds), v2 = rankForYou(mergePool(top, latest), prefs, new Set(), top[0]?.id ?? null, topIds);
   console.log(`[algo] real fixtures n=${v2.length}: jaccard vs Trending V1 ${jaccard(v1.slice(0, 10), top).toFixed(2)} V2 ${jaccard(v2.slice(0, 10), top).toFixed(2)}; vs Latest V1 ${jaccard(v1.slice(0, 10), latest).toFixed(2)} V2 ${jaccard(v2.slice(0, 10), latest).toFixed(2)}`);
-  assert.deepEqual([...ids(v2)].sort(), [...ids(v1)].sort());
+  // V2 may only drop cards V1 kept, and only off-market science/world cards with no follow (M9 market-relevance gate)
+  const kept2 = new Set(ids(v2));
+  assert.ok(ids(v1).filter((id) => !kept2.has(id)).every((id) => isOffMarket(v1.find((c) => c.id === id)!)));
+  assert.ok(ids(v2).every((id) => ids(v1).includes(id)));
   assert.equal(new Set(ids(v2)).size, v2.length);
   assert.ok(!v2.some((c) => prefs.hiddenTopics.includes(c.category)));
 });

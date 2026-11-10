@@ -32,7 +32,7 @@ export function FollowingWatchlist({ tickers, onToggle }: { tickers: string[]; o
   return (
     <View style={styles.section}>
       <SectionLabel>Watchlist</SectionLabel>
-      <Text style={[styles.help, { color: p.inkSoft }]}>Follow company tickers to see their latest cards. Element shows news, not prices.</Text>
+      <Text style={[styles.help, { color: p.inkSoft }]}>Follow company tickers to see their latest cards. Element shows news, no stock prices.</Text>
       <View style={styles.chips} accessibilityRole="list">
         {tickers.map((t) => (
           <Pressable

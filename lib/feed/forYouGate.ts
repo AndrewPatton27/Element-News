@@ -1,11 +1,14 @@
 // For you unlocks after the reader has given the algorithm a little to learn from:
 // FOR_YOU_MIN_STORIES stories (reacted to, or looked at for 2 seconds) across at
-// least FOR_YOU_MIN_TOPICS different topics. Pure apart from the store it is given.
+// least FOR_YOU_MIN_TOPICS different topics, OR as soon as the reader follows one topic or company
+// (M9 F4: it was 10 stories / 4 topics, and follows did not count). These two constants are the only
+// place the bar lives (context/settings.md, rows foryou.min_stories / foryou.min_topics).
+// Pure apart from the store it is given.
 
 import type { KeyValueStore } from '../storage/storage.ts';
 
-export const FOR_YOU_MIN_STORIES = 10;
-export const FOR_YOU_MIN_TOPICS = 4;
+export const FOR_YOU_MIN_STORIES = 3;
+export const FOR_YOU_MIN_TOPICS = 1;
 export const FOR_YOU_SEEN_MS = 2000;
 export const SEEN_KEY = 'element.seen-stories';
 export const MAX_SEEN = 300; // newest ids kept on this device, oldest dropped (also the guest seen-card exclusion list)
@@ -24,15 +27,16 @@ export interface ForYouProgress {
   ready: boolean;
 }
 
-/** `reacted` and `seen` may overlap; a story counts once by card id. */
-export function forYouProgress(signals: { reacted?: StorySignal[]; seen?: StorySignal[] }): ForYouProgress {
+/** `reacted` and `seen` may overlap; a story counts once by card id. `followed` = topics + companies + sources the
+ *  reader follows: one is enough to open For you. */
+export function forYouProgress(signals: { reacted?: StorySignal[]; seen?: StorySignal[]; followed?: number }): ForYouProgress {
   const byId = new Map<string, string>();
   for (const s of [...(signals.reacted ?? []), ...(signals.seen ?? [])]) {
     if (s && typeof s.id === 'string' && s.id !== '' && !byId.has(s.id)) byId.set(s.id, s.category);
   }
   const stories = byId.size;
   const topics = new Set([...byId.values()].filter((c) => typeof c === 'string' && c !== '')).size;
-  return { stories, topics, ready: stories >= FOR_YOU_MIN_STORIES && topics >= FOR_YOU_MIN_TOPICS };
+  return { stories, topics, ready: (signals.followed ?? 0) >= 1 || (stories >= FOR_YOU_MIN_STORIES && topics >= FOR_YOU_MIN_TOPICS) };
 }
 
 export function readSeen(store: KeyValueStore): SeenStory[] {

@@ -8,6 +8,7 @@ test('About lists every source with a site and terms link (https only)', () => {
     'SEC',
     'Federal Reserve',
     'BEA',
+    'BLS',
     'FRED',
     'Federal Register',
     'Wikipedia',

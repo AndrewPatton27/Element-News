@@ -29,6 +29,7 @@ export function UndoToast({
   token,
   placement = 'top',
   wide,
+  showUndo = true,
 }: {
   message: string | null;
   onUndo: () => void;
@@ -37,6 +38,7 @@ export function UndoToast({
   token?: number; // changes with every new toast, so the same message twice restarts the timer
   placement?: 'top' | 'corner';
   wide?: boolean;
+  showUndo?: boolean; // false for a plain confirmation (a report was sent)
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -86,9 +88,11 @@ export function UndoToast({
           </Text>
           {/* 44 px tap target inside a 36 px pill: the extra height is handed back with negative
               margins (react-native-web ignores hitSlop). */}
-          <Pressable onPress={onUndo} accessibilityRole="button" accessibilityLabel="Undo" style={styles.pillUndo}>
-            <Text style={[styles.pillUndoText, { color: p.accentSoft }]}>Undo</Text>
-          </Pressable>
+          {showUndo ? (
+            <Pressable onPress={onUndo} accessibilityRole="button" accessibilityLabel="Undo" style={styles.pillUndo}>
+              <Text style={[styles.pillUndoText, { color: p.accentSoft }]}>Undo</Text>
+            </Pressable>
+          ) : null}
         </View>
       </Animated.View>
     );

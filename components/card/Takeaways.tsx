@@ -15,9 +15,11 @@ interface Props {
   max?: number; // bullets that fit
   lines?: number; // cap for the summary paragraph (list tiles)
   maxWidth?: number;
+  /** Longest a single bullet may run before it ends in an ellipsis (never cut mid-sentence without one). */
+  bulletLines?: number;
 }
 
-export function Takeaways({ card, fontSize, lineHeight, max, lines, maxWidth }: Props) {
+export function Takeaways({ card, fontSize, lineHeight, max, lines, maxWidth, bulletLines }: Props) {
   const p = usePalette();
   const body = cardTakeaways(card, max);
   if (body.kind === 'none') return null;
@@ -36,7 +38,7 @@ export function Takeaways({ card, fontSize, lineHeight, max, lines, maxWidth }: 
           <View style={[styles.dotBox, { height: lineHeight }]}>
             <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: p.accent }} />
           </View>
-          <Text style={[styles.text, styles.itemText, { color: p.inkBody, fontSize, lineHeight }]}>{point}</Text>
+          <Text numberOfLines={bulletLines} ellipsizeMode="tail" style={[styles.text, styles.itemText, { color: p.inkBody, fontSize, lineHeight }]}>{point}</Text>
         </View>
       ))}
     </View>

@@ -90,15 +90,23 @@ begin
   if r is distinct from r2 then raise exception 'FAIL: same query, same answer'; end if;
 
   -- 7. paging: one card per page, no repeats, same set and order as one big page
-  r := api.search('vantrel zelquin quixor glimmora', null, 1);
-  select coalesce(array_agg(x->>'id'),'{}') into seen from jsonb_array_elements(r->'items') x;
-  cur := r->>'next_cursor';
-  while cur is not null and i < 20 loop
-    r := api.search('vantrel zelquin quixor glimmora', cur, 1);
-    select seen || coalesce(array_agg(x->>'id'),'{}') into seen from jsonb_array_elements(r->'items') x;
-    cur := r->>'next_cursor'; i := i + 1;
-  end loop;
-  ids := (select array_agg(x->>'id' order by n) from jsonb_array_elements(api.search('vantrel zelquin quixor glimmora', null, 30)->'items') with ordinality e(x,n));
+  -- (v8: several words are AND, so each of the four words is paged on its own; together they hold all 8 cards)
+  seen := '{}'; ids := '{}';
+  declare q5 text; ids5 text[];
+  begin
+    foreach q5 in array array['vantrel','zelquin','quixor','glimmora'] loop
+      r := api.search(q5, null, 1);
+      select seen || coalesce(array_agg(x->>'id'),'{}') into seen from jsonb_array_elements(r->'items') x;
+      cur := r->>'next_cursor'; i := 0;
+      while cur is not null and i < 20 loop
+        r := api.search(q5, cur, 1);
+        select seen || coalesce(array_agg(x->>'id'),'{}') into seen from jsonb_array_elements(r->'items') x;
+        cur := r->>'next_cursor'; i := i + 1;
+      end loop;
+      select array_agg(x->>'id' order by n) into ids5 from jsonb_array_elements(api.search(q5, null, 30)->'items') with ordinality e(x,n);
+      ids := ids || coalesce(ids5,'{}');
+    end loop;
+  end;
   if seen is distinct from ids then raise exception 'FAIL: paged order % differs from one page %', seen, ids; end if;
   if cardinality(seen) <> 8 then raise exception 'FAIL: expected all 8 test cards across pages, got %', cardinality(seen); end if;
 
@@ -110,7 +118,7 @@ begin
 
   -- 9. time: a search over this small fixture stays fast (the prior is a few numbers per matched card)
   t0 := clock_timestamp();
-  perform api.search('vantrel zelquin quixor glimmora', null, 20);
+  perform api.search('vantrel zelquin', null, 20);
   ms := extract(epoch from clock_timestamp() - t0) * 1000;
   if ms > 2000 then raise exception 'FAIL: search took % ms', round(ms); end if;
 

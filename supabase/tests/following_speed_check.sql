@@ -35,8 +35,11 @@ begin
     raise exception 'FAIL: the ZNTR leadership card is a direct ticker match'; end if;
   if not exists (select 1 from jsonb_array_elements(items) x where x->>'id' = c_cat::text and x->>'follow_reason' = 'Related to Earnings') then
     raise exception 'FAIL: same-topic card must be related with "Related to Earnings": %', items; end if;
-  if not exists (select 1 from jsonb_array_elements(items) x where x->>'id' = c_ser2::text and x->>'follow_reason' like 'Related to %') then
-    raise exception 'FAIL: the older reading of the followed series must be related (series key prefix / series id)'; end if;
+  -- M9 (20261122000200_series_supersede.sql): the older reading of a series is superseded (hidden), so only the newest shows
+  if exists (select 1 from jsonb_array_elements(items) x where x->>'id' = c_ser2::text) then
+    raise exception 'FAIL: the older reading of the followed series must be superseded, not shown'; end if;
+  if not exists (select 1 from jsonb_array_elements(items) x where x->>'id' = c_ser::text) then
+    raise exception 'FAIL: the newest reading of the followed series must show'; end if;
   if exists (select 1 from jsonb_array_elements(items) x where x->>'id' = c_unrel::text) then
     raise exception 'FAIL: an unrelated filing card must not be listed just because both dedupe keys are URLs'; end if;
 

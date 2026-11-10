@@ -91,7 +91,7 @@ export function SearchIdle({ recent, topics, onPickRecent, onClearRecent, onPick
 
       <View style={styles.section} accessibilityLabel="Company tickers">
         <Text style={[styles.label, { color: p.muted }]}>Try a company</Text>
-        <Text style={[styles.help, wide && styles.helpWide, { color: p.inkSoft }]}>Search a ticker to see its latest cards. Element shows news, not prices.</Text>
+        <Text style={[styles.help, wide && styles.helpWide, { color: p.inkSoft }]}>Search a ticker to see its latest cards. Element shows news, no stock prices.</Text>
         <View style={styles.chips}>
           {SUGGESTED_TICKERS.map((t) => (
             <Pressable

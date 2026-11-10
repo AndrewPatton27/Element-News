@@ -15,7 +15,7 @@ import { categoryName, clampHeadline, eventLabel } from '../../lib/shared/format
 import { primarySource, shareAlikeCredit } from '../../lib/shared/labels';
 import { cardTakeaways } from '../../lib/shared/cardBody';
 import { OPEN_DETAIL_HINT, cardDetail } from '../../lib/shared/detail';
-import { openUrl } from '../../lib/shared/openUrl';
+import { linkProps } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts, radius } from '../../lib/theme/theme';
@@ -273,7 +273,7 @@ export function Card(props: Props) {
             </View>
           ) : null}
           {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
-          <Text numberOfLines={1} style={[styles.metaText, wide && { fontSize: 14 }, { color: p.accentInk }]}>
+          <Text testID="card-meta" numberOfLines={1} style={[styles.metaText, wide && { fontSize: 14 }, { color: p.accentInk }]}>
             {metaLine(card, categories)}
           </Text>
           {onMore ? (
@@ -290,7 +290,7 @@ export function Card(props: Props) {
             <View style={styles.spacer} />
             {src ? (
               <Pressable
-                onPress={() => openUrl(src.url, card.id)}
+                {...linkProps(src.url, card.id)}
                 accessibilityRole="link"
                 accessibilityLabel={`Read on the publisher's site, ${src.name}. Opens the original.`}
                 style={({ pressed }) => [styles.readBtn, { backgroundColor: p.accent, opacity: pressed ? 0.85 : 1 }]}
@@ -348,7 +348,7 @@ export function Card(props: Props) {
                   {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} /> : null}
 
                   {showTakeaways ? (
-                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} maxWidth={wide || tablet ? 720 : undefined} />
+                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />
                   ) : null}
 
                   {/* Which companies the card is about; a chip opens the company page (components/companies/AboutChips). */}

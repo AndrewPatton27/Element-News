@@ -21,8 +21,8 @@
 // the card was when it was caught, so a card grabbed mid spring-back does not jump). On release
 // the fly-off continues at the finger's speed (lib/theme/motion.ts flingDuration, strong
 // ease-out) and the spring-back is a damping-0.8 spring seeded with the release velocity.
-// Keyboard moves (arrow keys) are instant: no smooth scroll on a key press. Buttons and swipes
-// still glide to the next card.
+// Every move to another card glides (arrow keys, the Next button, swipes); Drew restored the
+// scroll animation for arrow keys in M9. Reduced motion jumps instead.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -322,12 +322,12 @@ export function FeedPager({
   }, []);
 
   const apply = useCallback(
-    (r: NavResult, viaKey = false) => {
+    (r: NavResult) => {
       if (!r.accepted) return false;
       nav.current = r.state;
       const i = currentIndex(r.state);
-      // Arrow keys move instantly (no animation on a keyboard action); buttons and swipes glide.
-      if (r.cause === 'step' || r.cause === 'undo') scrollToRow(i, !reducedRef.current && !viaKey);
+      // Arrow keys, buttons and swipes all glide to the next card (reduced motion: jump).
+      if (r.cause === 'step' || r.cause === 'undo') scrollToRow(i, !reducedRef.current);
       else if (r.cause === 'settle') listAt.current = i;
       rerender();
       return true;
@@ -368,7 +368,7 @@ export function FeedPager({
   );
   useEffect(() => () => { if (restTimer.current) clearTimeout(restTimer.current); }, []);
 
-  const step = useCallback((dir: 1 | -1, viaKey = false) => apply(stepNav(nav.current!, dir, Date.now()), viaKey), [apply]);
+  const step = useCallback((dir: 1 | -1) => apply(stepNav(nav.current!, dir, Date.now())), [apply]);
   const next = useCallback(() => void step(1), [step]);
 
   const [touch] = useState(detectTouch);
@@ -404,7 +404,7 @@ export function FeedPager({
   // A completed swipe or a like / dislike arrow key: only for the card on screen and outside the
   // navigation lock. Sets the reaction (never toggles it off), offers Undo, moves on exactly one.
   const swiped = useCallback(
-    (card: BlurbCard, r: Feedback, viaKey = false): boolean => {
+    (card: BlurbCard, r: Feedback): boolean => {
       dismissCoach();
       if (!onReact) return false;
       const now = Date.now();
@@ -418,7 +418,7 @@ export function FeedPager({
         setUndo({ card, previous, sent, message: t.text, label: t.label, seq: ++undoSeq.current });
       }
       const res = reactNav(nav.current!, card.id, now);
-      apply(res, viaKey);
+      apply(res);
       return res.accepted && res.cause === 'step';
     },
     [onReact, dismissCoach, apply],
@@ -459,13 +459,13 @@ export function FeedPager({
       // Holding a key fires auto-repeat keydowns: one press, one card.
       if (isKeyRepeat(e)) return;
       const a = keyActions.current;
-      if (e.key === 'ArrowDown') a.step(1, true);
-      else if (e.key === 'ArrowUp') a.step(-1, true);
+      if (e.key === 'ArrowDown') a.step(1);
+      else if (e.key === 'ArrowUp') a.step(-1);
       else {
         // Drew: the right arrow is a right swipe (like) and the left arrow a left swipe (dislike).
         const id = nav.current?.currentId;
         const card = id ? a.byId.get(id) : undefined;
-        if (card) a.swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike', true);
+        if (card) a.swiped(card, e.key === 'ArrowRight' ? 'like' : 'dislike');
       }
     };
     window.addEventListener('keydown', onKey);

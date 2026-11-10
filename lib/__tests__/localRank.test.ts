@@ -7,7 +7,7 @@ import type { BlurbCard } from '../../contract/types.ts';
 
 const at = (h: number) => new Date(Date.UTC(2026, 9, 17, h)).toISOString();
 const c = (id: string, category: string, hour: number, over: Partial<BlurbCard> = {}) =>
-  card({ id, category: category as BlurbCard['category'], sort_at: at(hour), importance: 1, ...over });
+  card({ id, headline: `headline ${id} here`, category: category as BlurbCard['category'], sort_at: at(hour), importance: 1, ...over });
 const ids = (l: BlurbCard[]) => l.map((x) => x.id);
 
 test('no choices: newest first (recency kept), deterministic ties', () => {

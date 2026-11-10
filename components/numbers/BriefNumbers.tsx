@@ -15,7 +15,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { changeColor } from '../card/DataCard';
 import { ChevronLeftIcon, ChevronRightIcon } from '../shell/Icons';
-import { openUrl } from '../card/SourceChip';
+import { linkProps } from '../card/SourceChip';
 import { BASELINE, CHART_H, CHART_W, chartShape, stepIndex, trendColors } from '../card/trendChart';
 
 export function BriefNumbers({
@@ -50,7 +50,7 @@ export function BriefNumbers({
         return (
           <Pressable
             key={f.series_id}
-            onPress={() => openUrl(f.source_url)}
+            {...linkProps(f.source_url)}
             accessibilityRole="link"
             accessibilityLabel={withToneLabel(factA11yLabel(f), f.series_id, f.direction)}
             style={({ pressed }) => [styles.row, { borderTopColor: p.divider, opacity: pressed ? 0.75 : 1 }]}
@@ -71,7 +71,7 @@ export function BriefNumbers({
         <Text
           key={n.key}
           style={[styles.notice, { color: p.muted }]}
-          onPress={n.url ? () => openUrl(n.url as string) : undefined}
+          {...(n.url ? linkProps(n.url) : {})}
           accessibilityRole={n.url ? 'link' : 'text'}
         >
           {n.text}

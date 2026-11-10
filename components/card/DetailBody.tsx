@@ -44,7 +44,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
       </Text>
       {original ? (
         <View style={[styles.sourceLine, { borderColor: p.divider }]}>
-          <BarSource card={card} link onPress={() => openUrl(original, card.id)} size={wide ? 'wide' : 'phone'} />
+          <BarSource card={card} link linkUrl={original} timeLabel="added" onPress={() => openUrl(original, card.id)} size={wide ? 'wide' : 'phone'} />
         </View>
       ) : null}
 

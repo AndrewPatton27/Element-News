@@ -38,6 +38,8 @@ import { WideAside, useAsideData } from '../components/shell/WideAside';
 import { SortToggle } from '../components/feed/SortToggle';
 import { SourcesSheet } from '../components/card/SourcesSheet';
 import { DetailSheet } from '../components/card/DetailSheet';
+import { reportToast } from '../lib/api/report';
+import type { ReportReason } from '../lib/api/report';
 import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
@@ -73,7 +75,9 @@ export default function FeedScreen() {
   type FeedUndo =
     | { message: string; label: string; kind: 'topic'; previous: { followed: string[]; hidden: string[] } }
     | { message: string; label: string; kind: 'source'; previous: string[] }
-    | { message: string; label: string; kind: 'follow'; slug: string };
+    | { message: string; label: string; kind: 'follow'; slug: string }
+    | { message: string; label: string; kind: 'fewer'; card: BlurbCard }
+    | { message: string; label: string; kind: 'report' };
   const [undo, setUndoState] = useState<(FeedUndo & { seq: number }) | null>(null);
   const toastSeq = useRef(0);
   const setUndo = useCallback((u: FeedUndo | null) => setUndoState(u ? { ...u, seq: ++toastSeq.current } : null), []);
@@ -115,7 +119,7 @@ export default function FeedScreen() {
     [hidden, hiddenSources],
   );
   const local = acct.localPrefs;
-  // For you stays locked until 10 stories across 4 topics have been read or reacted to.
+  // For you stays locked until 3 stories have been read or reacted to, or one topic or company is followed (forYouGate.ts).
   const [seenList, setSeenList] = useState(() => readSeen(store));
   // "Clear data on this device" / delete: forget the For you history and the dismissed prompt at once.
   useEffect(
@@ -129,6 +133,8 @@ export default function FeedScreen() {
   const gate = forYouProgress({
     reacted: Object.entries(local.reactions).map(([id, v]) => ({ id, category: v.topic })),
     seen: seenList,
+    // One followed topic, company or source opens For you at once (M9 F4).
+    followed: local.follows.topics.length + local.follows.tickers.length + local.follows.sources.length + (acct.viewPrefs?.followed.length ?? 0),
   });
   const locked = forYou && !gate.ready;
   const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -222,7 +228,28 @@ export default function FeedScreen() {
     },
     [acct, setUndo],
   );
+  // "Fewer like this" = a dislike for the card (a no-op when it is already disliked); Undo takes it back.
+  const fewerLikeThis = useCallback(
+    (c: BlurbCard) => {
+      setMenuCard(null);
+      if (acct.reactions[c.id] !== 'dislike') acct.react(c, 'dislike');
+      const t = cornerToastText('dislike');
+      setUndo({ message: 'Fewer like this', label: t.label, kind: 'fewer', card: c });
+    },
+    [acct, setUndo],
+  );
+  const reportCard = useCallback(
+    (c: BlurbCard, reason: ReportReason) => {
+      setMenuCard(null);
+      api.reportBlurb(c.id, reason).then((r) => {
+        const text = reportToast(r);
+        setUndo({ message: r.ok ? 'Reported' : 'Not sent', label: text, kind: 'report' }); // the corner pill is narrow: short word visible, full sentence spoken
+      });
+    },
+    [api, setUndo],
+  );
   const undoHide = useCallback(() => {
+    if (undo?.kind === 'fewer' && acct.reactions[undo.card.id] === 'dislike') acct.react(undo.card, 'dislike'); // pressing again clears it
     if (undo?.kind === 'topic') void acct.restoreTopics(undo.previous).catch(() => undefined);
     if (undo?.kind === 'source') void acct.saveSources(undo.previous).catch(() => undefined);
     if (undo?.kind === 'follow') {
@@ -472,6 +499,8 @@ export default function FeedScreen() {
         card={menuCard}
         categories={categories}
         onHideTopic={hideTopic}
+        onFewer={fewerLikeThis}
+        onReport={reportCard}
         onHideSource={sourcesSupported ? hideSource : undefined}
         onClose={() => setMenuCard(null)}
       />
@@ -482,6 +511,7 @@ export default function FeedScreen() {
         placement="corner"
         wide={wide}
         onUndo={undoHide}
+        showUndo={undo?.kind !== 'report'}
         onDone={clearUndo}
       />
     </Shell>

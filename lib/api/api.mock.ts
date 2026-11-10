@@ -12,6 +12,7 @@ import { createMockFeatureApi } from './api.mockFeatures.ts';
 import { mockFeedStatus } from './mockStatus.ts';
 import { wantsWorstCase, worstCaseCards } from '../shared/mockWorst.ts';
 import { createMockCompanyApi } from '../companies/companyApi.ts';
+import { isValidReport } from './report.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 
 import page1 from '../../contract/fixtures/feed.page1.json';
@@ -64,6 +65,7 @@ export function createMockApi(): Api {
     search: (q, cursor, limit) => wait(features.search(q, cursor, limit)),
     relatedCards: (id, limit) => wait(features.relatedCards(id, limit)),
     card: (id) => wait(cards.find((c) => c.id.toLowerCase() === String(id).toLowerCase()) ?? null),
+    reportBlurb: (id, reason) => wait(isValidReport(id, reason) && cards.some((c) => c.id === id) ? { ok: true, status: 'ok' as const } : { ok: false, status: 'invalid' as const }),
     followingFeed: (f) => wait(features.followingFeed(f)),
     dailyBrief: () => wait(features.dailyBrief()),
     weeklyBrief: () => wait(features.weeklyBrief()),

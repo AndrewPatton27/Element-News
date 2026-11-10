@@ -17,6 +17,7 @@ import { reorderUnseen, splitSeen, withDeviceSeen, type SeenContext } from './se
 import type { BlurbCard } from '../../contract/types.ts';
 import { FOLLOWED_IDS_MAX } from '../account/account.ts';
 import { finishForYou, mergePool, rankForYou } from './forYouRank.ts';
+import { fetchExtraPool } from './forYouPool.ts';
 import { assignFirstCards, dedupeCards, sortLatest, trendingOrder } from './feedOrder.ts';
 import { isInvalidCursor, rawDetail, userMessage } from '../api/errors.ts';
 import {
@@ -70,11 +71,14 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
   useEffect(() => {
     if (!focused || pulled.current === pullKey) return;
     pulled.current = pullKey;
+    const guest = !(userId && account);
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
       api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
       userId && account ? account.feedForYou(null, 10, followedStoryIds(userId)) : Promise.resolve(null),
-    ]).then(([topRaw, latestRaw, personalRaw]) => {
+      // Same wider pool as the signed-out For you feed, so the head card is one the feed also ranks (shared short cache).
+      guest ? fetchExtraPool(api, readLocal(defaultStore()).follows, readLocal(defaultStore()).hiddenTopics).catch(() => []) : Promise.resolve([] as BlurbCard[][]),
+    ]).then(([topRaw, latestRaw, personalRaw, extra]) => {
       const store = defaultStore();
       // Trending and Latest list everything. Only the For you head skips cards this device has seen (signed in on
       // the real back end the server already did).
@@ -82,7 +86,7 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
       const top = topRaw;
       const latest = latestRaw;
       const personal = personalRaw ? { ...personalRaw, items: unseen(personalRaw.items) } : null;
-      let fy = personal?.items ?? unseen(rankForYou(mergePool(top.items, latest.items), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id))));
+      let fy = personal?.items ?? unseen(rankForYou(mergePool(top.items, latest.items, ...extra), readLocal(store), new Set(readSeen(store).map((x) => x.id)), trendingOrder(top.items)[0]?.id ?? null, new Set(trendingOrder(top.items).slice(0, 10).map((x) => x.id))));
       if (category) fy = fy.filter((c) => c.category === category);
       const orders = assignFirstCards(filter(sortLatest(latest.items)), filter(trendingOrder(top.items)), filter(fy));
       setHeads((old) => ({ ...old, [key]: { latest: orders.latest[0]?.id ?? null, top: orders.trending[0]?.id ?? null, for_you: orders.forYou[0]?.id ?? null } }));
@@ -145,7 +149,10 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
                 c && cur.l === null ? Promise.resolve(null) : api.feed({ mode: 'latest', category: null, cursor: cur.l, limit: 10 }),
               ]);
               const store = defaultStore();
-              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? []), readLocal(store), new Set(readSeen(store).map((x) => x.id)), c ? null : trendingOrder((top?.items ?? []).slice(0, 10))[0]?.id ?? null, c ? new Set() : new Set(trendingOrder((top?.items ?? []).slice(0, 10)).map((x) => x.id)));
+              // Page 1 also pulls the followed topics/companies and Economy (lib/feed/forYouPool.ts, at most 2 cached GETs).
+              const local = readLocal(store);
+              const extra = c ? [] : await fetchExtraPool(api, local.follows, local.hiddenTopics).catch(() => [] as BlurbCard[][]);
+              const items = rankForYou(mergePool(top?.items ?? [], latest?.items ?? [], ...extra), local, new Set(readSeen(store).map((x) => x.id)), c ? null : trendingOrder((top?.items ?? []).slice(0, 10))[0]?.id ?? null, c ? new Set() : new Set(trendingOrder((top?.items ?? []).slice(0, 10)).map((x) => x.id)));
               const t = top ? top.next_cursor : null, l = latest ? latest.next_cursor : null;
               return { items, next_cursor: t === null && l === null ? null : JSON.stringify({ t, l }) };
             }
@@ -216,7 +223,11 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
 
   const rerank = useCallback((signals: LocalPrefs, seenCount: number, signedIn = false) => {
     if (query.mode === 'latest') return;
-    dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn, new Set(stateRef.current.seenIds)) });
+    // Right after a tab or topic change the ref still holds the previous list: re-ranking it would refill the new key with old cards.
+    if (stateRef.current.key !== key) return;
+    const forYou = query.mode === 'for_you' && !signedIn;
+    const seenStoryIds = forYou ? new Set(readSeen(defaultStore()).map((x) => x.id)) : undefined;
+    dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn, new Set(stateRef.current.seenIds), { forYou, seenStoryIds }) });
   }, [key, query.mode]);
 
   // Keep the unseen queue filled while there is still a cursor. One chain at a time;
@@ -232,5 +243,8 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
     }
   }, [buffered, aheadTarget, state, key, load]);
 
-  return { state, loadMore, retry, rerank };
+  // The render right after a tab or topic change still holds the old list (the reset happens in an effect).
+  // Never hand it out under the new key: the pager would mount with, and freeze, the old cards.
+  const shown = state.key === key ? state : initialFeedState(key);
+  return { state: shown, loadMore, retry, rerank };
 }

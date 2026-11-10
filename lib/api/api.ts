@@ -7,6 +7,7 @@ import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
 import { createMockAccount, createSupabaseAccount, type AccountApi } from '../account/account.ts';
 import { createSupabaseApi } from './api.supabase.ts';
+import type { ReportReason, ReportResult } from './report.ts';
 import type { CompanyApi } from '../companies/companyApi.ts';
 
 export interface FeedRequest {
@@ -47,6 +48,8 @@ export interface Api {
   unsubscribeMine(kind: 'daily' | 'weekly'): Promise<MyBriefChangeResult>;
   /** status 'unavailable' when the RPC does not exist yet. */
   updateMyTime(kind: 'daily' | 'weekly', hour: number, tz: string): Promise<MyBriefChangeResult>;
+  /** "Report a problem" on a card. Never throws. Backend contract: lib/api/report.ts (api.report_blurb). */
+  reportBlurb(cardId: string, reason: ReportReason): Promise<ReportResult>;
   /** Company directory, company search, a company's cards and card -> company tags (lib/companies/companyApi.ts). */
   companies: CompanyApi;
 }

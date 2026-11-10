@@ -5,21 +5,22 @@ import { memoryStore } from '../storage/storage.ts';
 
 const mk = (n: number, topics: number, p = 's') => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, category: `t${i % topics}` }));
 
-test('thresholds are 10 stories and 4 topics', () => {
-  assert.equal(FOR_YOU_MIN_STORIES, 10);
-  assert.equal(FOR_YOU_MIN_TOPICS, 4);
+test('thresholds are 3 stories and 1 topic (M9 F4)', () => {
+  assert.equal(FOR_YOU_MIN_STORIES, 3);
+  assert.equal(FOR_YOU_MIN_TOPICS, 1);
 });
 
 test('locked below and unlocked exactly at the thresholds', () => {
   assert.equal(forYouProgress({}).ready, false);
-  assert.equal(forYouProgress({ seen: mk(9, 4) }).ready, false);
-  assert.equal(forYouProgress({ seen: mk(10, 3) }).ready, false);
-  assert.deepEqual(forYouProgress({ seen: mk(10, 4) }), { stories: 10, topics: 4, ready: true });
+  assert.equal(forYouProgress({ seen: mk(2, 2) }).ready, false);
+  assert.deepEqual(forYouProgress({ seen: mk(3, 1) }), { stories: 3, topics: 1, ready: true });
   assert.equal(forYouProgress({ seen: mk(15, 6) }).ready, true);
 });
 
-test('one-topic readers stay locked however much they read', () => {
-  assert.equal(forYouProgress({ seen: mk(50, 1) }).ready, false);
+test('one followed topic or company opens For you at once, with no stories read', () => {
+  assert.equal(forYouProgress({ followed: 1 }).ready, true);
+  assert.equal(forYouProgress({ followed: 0 }).ready, false);
+  assert.equal(forYouProgress({ seen: mk(1, 1), followed: 2 }).ready, true);
 });
 
 test('reacted and seen are combined and deduped by id', () => {

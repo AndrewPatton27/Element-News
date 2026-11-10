@@ -15,6 +15,7 @@ import type { Feedback, UserPrefs } from '../account/accountLogic.ts';
 import { FOLLOWS_KEY, parseFollows, serializeFollows, type Follows } from '../following/followingLogic.ts';
 import { RECENT_KEY } from '../search/searchLogic.ts';
 import { cardSourceKey } from '../sources/sourceKeys.ts';
+import { reactionKeys, type ReactionKeys } from '../feed/cardKeys.ts';
 import { TUTORIAL_SEEN_KEY } from '../tutorial/tutorialLogic.ts';
 import { SEEN_KEY } from '../feed/forYouGate.ts';
 import { FOLLOWED_STORIES_KEY } from '../following/followedStories.ts';
@@ -25,7 +26,7 @@ export const MAX_LOCAL_REACTIONS = 200;
 const MAX_LIST = 50;
 export const migratedKey = (uid: string) => `element.local-migrated.${uid}`;
 
-export interface LocalReaction {
+export interface LocalReaction extends ReactionKeys {
   r: Feedback;
   topic: string;
   source: string | null;
@@ -55,6 +56,11 @@ function reactions(x: unknown): Record<string, LocalReaction> {
     const o = v as Partial<LocalReaction> | null;
     if (!o || (o.r !== 'like' && o.r !== 'dislike') || typeof o.topic !== 'string') continue;
     out[id] = { r: o.r, topic: o.topic, source: typeof o.source === 'string' ? o.source : null, at: typeof o.at === 'number' ? o.at : 0 };
+    // Optional card keys (twin removal, entity and family learning); anything malformed is ignored.
+    if (typeof o.head === 'string') out[id].head = o.head.slice(0, 80);
+    if (typeof o.key === 'string') out[id].key = o.key.slice(0, 200);
+    if (typeof o.family === 'string') out[id].family = o.family.slice(0, 120);
+    if (Array.isArray(o.tickers)) out[id].tickers = o.tickers.filter((t): t is string => typeof t === 'string').slice(0, 5);
   }
   return out;
 }
@@ -78,10 +84,10 @@ export function writeLocal(store: KeyValueStore, p: LocalPrefs): void {
 }
 
 /** Pressing the same button again clears it; the other one switches. Keeps the newest MAX_LOCAL_REACTIONS. */
-export function withReaction(p: LocalPrefs, card: Pick<BlurbCard, 'id' | 'category' | 'kind' | 'sources'>, pressed: Feedback, now = Date.now()): LocalPrefs {
+export function withReaction(p: LocalPrefs, card: Pick<BlurbCard, 'id' | 'category' | 'kind' | 'sources'> & Partial<Pick<BlurbCard, 'headline' | 'macro' | 'tickers' | 'story_link'>>, pressed: Feedback, now = Date.now()): LocalPrefs {
   const next = { ...p.reactions };
   if (next[card.id]?.r === pressed) delete next[card.id];
-  else next[card.id] = { r: pressed, topic: card.category, source: cardSourceKey(card), at: now };
+  else next[card.id] = { r: pressed, topic: card.category, source: cardSourceKey(card), at: now, ...reactionKeys(card) };
   const ids = Object.keys(next);
   if (ids.length > MAX_LOCAL_REACTIONS) {
     ids.sort((a, b) => next[a].at - next[b].at || (a < b ? -1 : 1));
