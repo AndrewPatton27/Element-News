@@ -122,3 +122,10 @@ secrets described at the top of `20261019050000_cron_schedule.sql` (`element_fun
 Deno itself, the deploy bundler (relative imports outside `supabase/functions`), the real CPU and wall time
 per call (the SEC source parses about 170 company filing lists and is the most likely to approach 2 s CPU),
 pg_cron, pg_net and Vault on Supabase.
+
+## Scaling notes
+
+- One source per call and 5 new items per call keep each call far under 150 s wall / 2 s CPU. For 100x more sources add a source name to `SOURCE_NAMES` and one cron row; do not raise `work_cap` above 20.
+- Gemini and Groq daily caps are enforced in the database (`api.ai_usage_take`), so any number of calls and isolates share them.
+- Pipeline state is per run (`AsyncLocalStorage`), so concurrent requests in one isolate are safe.
+- A failed source fetch is not retried inside the call; the next scheduled call retries it (items are deduped by URL, so re-runs are safe).
