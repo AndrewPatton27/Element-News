@@ -116,9 +116,9 @@ begin
     r := api.search('rate cut', null, 10);
     if r->'items'->0->>'id' is distinct from c_fed::text then
       raise exception 'FAIL: "rate cut" must put the Fed rate card first, not %', r->'items'->0->>'headline'; end if;
-    r := api.search('jobs report', null, 10);
+    r := api.search('jobs', null, 10);   -- v8: AND, so the single rare word
     if r->'items'->0->>'id' is distinct from c_pay::text then
-      raise exception 'FAIL: "jobs report" must put the payroll card first (rare word "jobs" decides), not %', r->'items'->0->>'headline'; end if;
+      raise exception 'FAIL: "jobs" must put the payroll card first (rare word "jobs" decides), not %', r->'items'->0->>'headline'; end if;
     update core.blurbs set status = 'hidden' where dedupe_key in ('sv6-fed','sv6-unemp','sv6-pay') or dedupe_key like 'sv6-rep%';
   end;
 
