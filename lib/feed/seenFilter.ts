@@ -7,8 +7,10 @@
 // dropped) and entries older than SEEN_EXCLUDE_DAYS no longer count: a seen card can come back after that, or
 // after the cap pushes it out. That is the intended trade-off (cheap and bounded; a rare repeat is fine).
 //
-// A seen card may still show when the reader liked it, follows its story, or the story was updated after
-// the reader saw it (card.updated_at later than the time it was seen).
+// A seen card may still show when the reader follows its story, or the story was updated after the reader saw it
+// (card.updated_at later than the time it was seen). A liked card counts as seen (SEEN_LIKED_COMEBACK = false, the
+// mirror of core.rank_params seen_liked_comeback = 0, migration 20261120000300_seen_liked.sql): liked cards that came
+// back climbed to the top of For you and made it stale.
 //
 // Never an empty feed: seen cards that were left out are kept (bounded) and appended last, newest first,
 // when the feed runs out of unseen ones; the page then says where the re-shown cards start (seen_from).
@@ -20,6 +22,7 @@ import { sortLatest } from './feedOrder.ts';
 import type { LoadPagesOptions } from './feedLogic.ts';
 
 export const SEEN_EXCLUDE_DAYS = 14; // same value as core.rank_params seen_exclude_days
+export const SEEN_LIKED_COMEBACK = false; // same as core.rank_params seen_liked_comeback = 0
 const DAY_MS = 86_400_000;
 
 export interface SeenContext {
@@ -34,7 +37,7 @@ export function isSeenCard(card: BlurbCard, ctx: SeenContext, at: ReadonlyMap<st
   const when = at.get(card.id);
   if (when === undefined) return false;
   if (ctx.now - when > SEEN_EXCLUDE_DAYS * DAY_MS) return false; // aged out of the window
-  if (ctx.liked.has(card.id) || ctx.followed.has(card.id)) return false;
+  if ((SEEN_LIKED_COMEBACK && ctx.liked.has(card.id)) || ctx.followed.has(card.id)) return false;
   const updated = card.updated_at ? Date.parse(card.updated_at) : NaN;
   return !(Number.isFinite(updated) && updated > when);
 }
