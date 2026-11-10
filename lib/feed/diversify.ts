@@ -42,18 +42,20 @@ export function pickTopStories(cards: BlurbCard[], n = 5): BlurbCard[] {
 // pass is O(cards x topics) instead of O(cards^2) (P2-13). Same output as the old list scan
 // (lib/__tests__/diversify.test.ts compares them on random feeds).
 // `before`: cards already placed ahead of these (kept as they are); they count for the topic rules.
-export function diversifyFeed(cards: BlurbCard[], options: { maxRun?: 1 | 2; window?: number; before?: BlurbCard[] } = {}): BlurbCard[] {
+// `topicOf` (default: the category) lets For you treat each macro data series as its own topic (CPI, payrolls, gas).
+export function diversifyFeed(cards: BlurbCard[], options: { maxRun?: 1 | 2; window?: number; before?: BlurbCard[]; topicOf?: (c: BlurbCard) => string } = {}): BlurbCard[] {
+  const topicOf = options.topicOf ?? ((c: BlurbCard) => c.category);
   const cap = options.maxRun ?? 2, window = Math.max(cap + 1, Math.trunc(options.window ?? 5));
   const span = window - 1; // how many placed cards the window cap looks back at
   const n = cards.length;
   const removed = new Uint8Array(n);
   const byTopic = new Map<string, number[]>();
-  cards.forEach((c, i) => { const list = byTopic.get(c.category); if (list) list.push(i); else byTopic.set(c.category, [i]); });
+  cards.forEach((c, i) => { const k = topicOf(c); const list = byTopic.get(k); if (list) list.push(i); else byTopic.set(k, [i]); });
   const topics = [...byTopic.keys()];
   const near = new Map<string, number>(topics.map((t) => [t, 0])); // pointer: first card not removed and not too far behind
   const any = new Map<string, number>(topics.map((t) => [t, 0])); // pointer: first card not removed
   let first = 0; // first card not removed, any topic
-  const placed: string[] = (options.before ?? []).slice(-span).map((c) => c.category);
+  const placed: string[] = (options.before ?? []).slice(-span).map(topicOf);
   const recent = new Map<string, number>();
   for (const t of placed) recent.set(t, (recent.get(t) ?? 0) + 1);
   const out: BlurbCard[] = [];
@@ -86,8 +88,9 @@ export function diversifyFeed(cards: BlurbCard[], options: { maxRun?: 1 | 2; win
     removed[pick] = 1;
     const card = cards[pick];
     out.push(card);
-    placed.push(card.category);
-    recent.set(card.category, (recent.get(card.category) ?? 0) + 1);
+    const key = topicOf(card);
+    placed.push(key);
+    recent.set(key, (recent.get(key) ?? 0) + 1);
     if (placed.length > span) {
       const gone = placed[placed.length - 1 - span];
       recent.set(gone, recent.get(gone)! - 1);

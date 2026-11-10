@@ -29,6 +29,11 @@ export function cardFamily(c: KeyCard): string {
   return key ? `k:${key.replace(DATE_TAIL, '')}` : '';
 }
 
+/** Key series whose newest reading is a headline economic report (mirrors fy_key_series:* in core.rank_params). */
+export const KEY_SERIES = new Set(['CPIAUCSL', 'CPILFESL', 'PAYEMS', 'UNRATE', 'GDP', 'GDPC1', 'PCEPI', 'PCEPILFE', 'DFEDTARU', 'FEDFUNDS', 'HOUST', 'RSAFS']);
+export const isKeySeries = (c: Partial<Pick<BlurbCard, 'kind' | 'macro'>>): boolean =>
+  c.kind === 'data' && KEY_SERIES.has((c.macro?.[0]?.series_id ?? '').toUpperCase());
+
 export const tickerList = (c: KeyCard): string[] => (c.tickers ?? []).map((t) => t.symbol.toUpperCase()).filter(Boolean);
 
 /** What a stored reaction knows about its card (all optional: reactions made before this field existed have none). */
