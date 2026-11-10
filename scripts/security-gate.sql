@@ -6,7 +6,8 @@ select 'fn' as k, n.nspname as s, p.proname as name, pg_get_function_identity_ar
        p.prosecdef as secdef, coalesce(array_to_string(p.proconfig, ','), '') as cfg,
        has_function_privilege('anon', p.oid, 'execute') as anon,
        has_function_privilege('authenticated', p.oid, 'execute') as authd,
-       null::boolean as rls
+       null::boolean as rls,
+       case when to_regrole('authenticator') is not null then has_function_privilege('authenticator', p.oid, 'execute') else false end as authr
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname in ('api', 'core', 'ingest', 'public', 'net', 'vault')
 union all
@@ -15,11 +16,12 @@ select 'rel', n.nspname, c.relname, c.relkind::text, null, '',
          or has_table_privilege('anon', c.oid, 'update') or has_table_privilege('anon', c.oid, 'delete'),
        has_table_privilege('authenticated', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'insert')
          or has_table_privilege('authenticated', c.oid, 'update') or has_table_privilege('authenticated', c.oid, 'delete'),
-       c.relrowsecurity
+       c.relrowsecurity, false
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname in ('api', 'core', 'ingest', 'public') and c.relkind in ('r', 'v', 'm', 'p')
 union all
 select 'schema', n.nspname, '', '', null, '', has_schema_privilege('anon', n.oid, 'usage'),
-       has_schema_privilege('authenticated', n.oid, 'usage'), null
-from pg_namespace n where n.nspname in ('api', 'core', 'ingest', 'vault', 'cron')
+       has_schema_privilege('authenticated', n.oid, 'usage'), null,
+       case when to_regrole('authenticator') is not null then has_schema_privilege('authenticator', n.oid, 'usage') else false end
+from pg_namespace n where n.nspname in ('api', 'core', 'ingest', 'vault', 'cron', 'net')
 order by 1, 2, 3;

@@ -146,3 +146,5 @@ These are not in SQL; set them by hand in every project.
 | Authentication → Rate Limits | Supabase defaults |
 
 Tunable ranking and account values (half-life, weights, For you boosts, tracking limits) are rows in `core.rank_params` and `core.rank_event_weights`; change them with `update`.
+
+M9 hardening migrations (not applied): `20261130000000_revoke_pg_net.sql` revokes pg_net (schema `net`) from the client roles by running each REVOKE as the object owner (the earlier revoke ran as `postgres` and did nothing); `20261130000100_report_blurb.sql` adds `api.report_blurb(uuid, text)` (private `core.blurb_reports` table, per-client, per-card and global rate limits, 90-day purge job). Checks: `tests/pg_net_revoke_check.sql`, `tests/report_blurb_check.sql`.
