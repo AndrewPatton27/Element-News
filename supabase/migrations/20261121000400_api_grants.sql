@@ -23,6 +23,7 @@ do $$
 declare
   -- name(args) as regprocedure text  ->  roles that may call it ('a' = anon + authenticated, 'u' = authenticated)
   v_allow jsonb := '{
+    "api.card_by_id(uuid)": "a",
     "api.card_companies(uuid[])": "a",
     "api.companies_directory(integer)": "a",
     "api.company_cards(text,text,integer)": "a",

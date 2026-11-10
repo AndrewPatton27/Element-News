@@ -87,8 +87,9 @@ function listFiles(dir) {
 
 // ---- database grants ---------------------------------------------------------------------------------------
 /** api functions anon may execute (public read RPCs and the token-gated brief/ops calls). */
-export const ANON_API = ['card_by_id', 'confirm_brief', 'daily_brief', 'feed', 'feed_status', 'following_feed', 'number_trends', 'ops_status',
-  'related_cards', 'search', 'sources', 'subscribe_brief', 'top_stories', 'unsubscribe_brief', 'update_brief_subscription', 'weekly_brief'];
+export const ANON_API = ['card_by_id', 'card_companies', 'companies_directory', 'company_cards', 'confirm_brief', 'daily_brief', 'feed', 'feed_status',
+  'followed_micro', 'following_feed', 'number_trends', 'ops_status', 'related_cards', 'search', 'search_companies', 'sources', 'subscribe_brief',
+  'top_stories', 'unsubscribe_brief', 'update_brief_subscription', 'weekly_brief'];
 /** api functions only signed-in users may execute (in addition to ANON_API). */
 export const AUTH_API = ['delete_account', 'delete_my_data', 'feed_for_you', 'get_prefs', 'my_brief_subscriptions', 'my_categories',
   'set_prefs', 'track', 'unsubscribe_my_brief', 'update_my_brief_time'];
