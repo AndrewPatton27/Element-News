@@ -4,7 +4,7 @@
 // Numbers and About are peers (tab-like), not modals. On the first visit the quick
 // tour (components/Tutorial.tsx) is drawn over whichever screen opened.
 
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, useColorScheme } from 'react-native';
@@ -23,6 +23,8 @@ import { ConfigErrorScreen } from '../components/shell/States';
 import { AppErrorBoundary, ErrorBoundary } from '../components/shell/ErrorBoundary';
 import { installChunkReload, type WindowLike } from '../lib/shared/crashReport';
 import { installWebGlobalCss } from '../lib/theme/webGlobalStyles';
+import { hasSeenTutorial } from '../lib/tutorial/tutorialLogic';
+import { defaultStore } from '../lib/storage/storage';
 const TutorialGate = lazy(() => import('../components/tutorial/Tutorial').then((module) => ({ default: module.TutorialGate })));
 
 // Web: a screen file from an older deploy that fails to load outside React also reloads once
@@ -36,6 +38,9 @@ export default function RootLayout() {
   const scheme = useColorScheme();
   const p = paletteFor(scheme);
   const result = getApi();
+  // The gate checks "seen" once on mount and then stays closed, so a reader who has seen the tour
+  // never needs its chunk: skip loading it (one request and ~16 KB less on every later visit).
+  const [tourMayShow] = useState(() => !hasSeenTutorial(defaultStore()));
   // If a font fails to load the app still renders with the system font.
   useFonts({
     Newsreader_600SemiBold,
@@ -68,7 +73,7 @@ export default function RootLayout() {
               </Stack>
               {/* First-run tour over every screen, once per device (also at /tutorial). */}
               {/* Its own boundary: if the tour cannot load, the app still works without it. */}
-              <ErrorBoundary where="tutorial" fallback={noTour}><Suspense fallback={null}><TutorialGate /></Suspense></ErrorBoundary>
+              {tourMayShow ? <ErrorBoundary where="tutorial" fallback={noTour}><Suspense fallback={null}><TutorialGate /></Suspense></ErrorBoundary> : null}
             </AccountProvider>
           </AppDataProvider>
         </AppErrorBoundary>
