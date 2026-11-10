@@ -53,9 +53,8 @@ test('search: signed-out suggestions are called "Popular right now"', async ({ p
   await expect(page.getByTestId('search-suggestions').getByText('Popular right now')).toBeVisible({ timeout: 30_000 });
 });
 
-// Known failing (I-01): on Trending, the Economy tab still shows Business, Government, Earnings and Energy cards;
-// Latest + Economy is correct. Owned by the feed-logic agent; remove `.fixme` when fixed.
-test.fixme('Trending + a category chip shows only that category (I-01 check)', async ({ page }) => {
+// I-01 (fixed in M9): a rerank right after a chip change refilled the new list with the old cards.
+test('Trending + a category chip shows only that category (I-01 check)', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => page.locator('[data-testid="card-headline"]').count(), { timeout: 30_000 }).toBeGreaterThan(0);
   await page.getByRole('tab', { name: /^Trending/ }).first().click();

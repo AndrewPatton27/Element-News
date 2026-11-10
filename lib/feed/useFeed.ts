@@ -223,6 +223,8 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
 
   const rerank = useCallback((signals: LocalPrefs, seenCount: number, signedIn = false) => {
     if (query.mode === 'latest') return;
+    // Right after a tab or topic change the ref still holds the previous list: re-ranking it would refill the new key with old cards.
+    if (stateRef.current.key !== key) return;
     const forYou = query.mode === 'for_you' && !signedIn;
     const seenStoryIds = forYou ? new Set(readSeen(defaultStore()).map((x) => x.id)) : undefined;
     dispatch({ type: 'rerank', key, items: rerankQueue(stateRef.current.items, signals, seenCount, signedIn, new Set(stateRef.current.seenIds), { forYou, seenStoryIds }) });
@@ -241,5 +243,8 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
     }
   }, [buffered, aheadTarget, state, key, load]);
 
-  return { state, loadMore, retry, rerank };
+  // The render right after a tab or topic change still holds the old list (the reset happens in an effect).
+  // Never hand it out under the new key: the pager would mount with, and freeze, the old cards.
+  const shown = state.key === key ? state : initialFeedState(key);
+  return { state: shown, loadMore, retry, rerank };
 }
