@@ -98,6 +98,7 @@ Keys are never printed (`[set]` / `[missing]` only), never put in URLs except wh
 | `src/config.ts` | every tunable value (models, caps, pacing, limits, hosts, watch list) + environment check |
 | `src/main.ts` | command line (`--dry-run`, `--once`, `--loop`, `--rewrite`, `--only`, `--limit`, `--json`), live and dry-run wiring, end-of-run Trending refresh |
 | `src/pipeline.ts` | one run (sources, guards, summarize, publish) with injected I/O |
+| `src/macroRun.ts` | numeric sources of a run: FRED series and Treasury FiscalData (no AI); called by `pipeline.ts` |
 | `src/allowlist.ts` | the only way to make an outbound request (host lists, https only, redirect re-check, rate limit, cache) |
 | `src/rewrite.ts` | `--rewrite`: redoes older published cards in place |
 | `src/detail.ts` | factual in-depth detail for template and data cards (no AI) |
@@ -163,3 +164,7 @@ Keys are never printed (`[set]` / `[missing]` only), never put in URLs except wh
 - Most 8-K primary documents are thin cover pages, so many SEC cards will be template cards. That is intended: they stay truthful.
 - The SEC ticker-list layout and the Gemini and Groq request/response fields follow the official docs but were not checked against a live response. If Groq rejects the JSON schema mode with HTTP 400, the adapter retries that call once in plain JSON mode.
 - Groq pacing (30 s between calls) means a run where Gemini is down entirely takes about 10 minutes for 20 items.
+
+## Per-run state
+
+`runOnce` keeps its mutable state (topic counters and narrow-source caps, recent-card list, selection queue) in an `AsyncLocalStorage`, so two runs in one process (a warm Edge Function isolate) never share it (`test/concurrent-runs.test.ts`).
