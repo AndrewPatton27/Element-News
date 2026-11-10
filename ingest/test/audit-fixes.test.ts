@@ -342,7 +342,7 @@ test('prompt: earnings cards must state figures; retry hint names no_figures; ot
 
 // ---- (f) versions ---------------------------------------------------------------------------------
 
-test('versions: prompt sum-v6 and template tpl-v5 (the next --rewrite revisits every older card)', () => {
+test('versions: prompt sum-v6 and template tpl-v6 (the next --rewrite revisits every older card)', () => {
   assert.equal(config.promptVersion, 'sum-v6');
-  assert.equal(config.templateVersion, 'tpl-v5');
+  assert.equal(config.templateVersion, 'tpl-v6');
 });

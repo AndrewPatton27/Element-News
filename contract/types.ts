@@ -66,7 +66,7 @@ export interface MacroFact {
   series_id: string;                    // "DGS10"
   label: string;                        // "10-yr Treasury"
   value: string;                        // preformatted: "4.12%", "$61.40"
-  change: string | null;                // signed with unit: "+0.05 pts", "-0.8%"
+  change: string | null;                // signed with unit: "+5 bp" (rates), "+0.1 pts", "-0.8%"
   direction: 'up' | 'down' | 'flat' | null;
   period: string | null;                // "Sep 2026" for monthly data, null for daily
   as_of: string;                        // ISO date or datetime

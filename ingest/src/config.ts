@@ -63,7 +63,7 @@ export const config = {
   // `--rewrite` redoes every published card whose prompt_version is neither this nor promptVersion.
   // v4: plain USGS headline+body and plain Federal Register headline. v5: sentence-case template headlines,
   // generic CPSC template (no product codes), figure-less earnings and low-interest quake template cards dropped.
-  templateVersion: 'tpl-v5',
+  templateVersion: 'tpl-v6',     // v6 (M9): bp not pts, no Change/Period bullets, why-it-matters lines, yield-curve card, no From/Published/Title stub
   providerOrder: ['gemini', 'groq', 'template'] as const, // a list on purpose: adding a provider is one entry
 
   // Deterministic editorial gate, before any model call. Per-run narrow-source diversity cap.
@@ -208,12 +208,13 @@ export const config = {
     fredObservations: 'https://api.stlouisfed.org/fred/series/observations',
     treasuryCsv: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv',
   },
-  macroSeries: ['DGS2', 'DGS10', 'DFF', 'CPIAUCSL', 'UNRATE', 'DCOILWTICO',
+  // DFEDTARU/DFEDTARL come first so the fed funds card (DFF) can state the target range from the same run.
+  macroSeries: ['DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'DFF', 'CPIAUCSL', 'UNRATE', 'DCOILWTICO',
     'GASREGW', 'ICSA', 'RSAFS', 'HOUST', 'PAYEMS', 'A191RL1Q225SBEA',
     // Finance and rates (2026-11-08): all Federal Reserve Board H.15 series. SPREAD_10Y2Y is not fetched: it is
     // computed from DGS10 and DGS2 (FRED's own T10Y2Y and SOFR pages carry a copyright flag, so they stay out).
     // Check each series' notes on its FRED page for a "Copyright" line before enabling in production.
-    'DGS3MO', 'DGS5', 'DGS30', 'EFFR', 'DFEDTARU', 'DFEDTARL'],
+    'DGS3MO', 'DGS5', 'DGS30', 'EFFR'],
   // Derived series: id -> [minuend, subtrahend] (both must be fetched in the same run).
   derivedSeries: { SPREAD_10Y2Y: ['DGS10', 'DGS2'] } as Record<string, [string, string]>,
   // FRED series that must never be fetched or shown (not public domain). MORTGAGE30US: Freddie Mac copyright.
@@ -222,21 +223,26 @@ export const config = {
   // (daily and weekly series). Monthly and quarterly series (CPI, unemployment, retail sales,
   // housing starts, payrolls, GDP) always get one card per new period.
   dataCardMinMove: {
-    DGS2: 0.05,          // percentage points
-    DGS10: 0.05,
-    DFF: 0.05,
+    // Treasury maturities no longer get a card each: one daily yield-curve card (config.yieldCurve) covers 2/5/10/30-year.
+    DGS2: 99,            // numbers panel only (see yieldCurve)
+    DGS10: 99,
+    DFF: 0.05,           // percentage points
     DCOILWTICO: 2.0,     // percent
     GASREGW: 1.0,        // percent, weekly
     ICSA: 5.0,           // percent, weekly
-    DGS3MO: 0.10,        // percentage points
-    DGS5: 0.10,
-    DGS30: 0.10,
+    DGS3MO: 99,          // numbers only
+    DGS5: 99,
+    DGS30: 99,
     EFFR: 99,            // numbers panel only: DFF already carries the fed funds card
     DFEDTARU: 0.05,      // the rate-range upper limit changes only at FOMC decisions (one card per change)
     DFEDTARL: 99,        // lower limit moves together with the upper one: numbers only
     SPREAD_10Y2Y: 99,    // numbers only
     TREAS_DEBT: 1e9,     // grows every day: numbers only
   } as Record<string, number>,
+  // One daily Treasury yield-curve card (2, 5, 10, 30-year + 10y-2y gap, moves in bp). Published when the largest
+  // move of the four is at least minMovePoints (percentage points; 0 = every day with a new reading, about 250/year,
+  // and only the newest stays live because core.supersede_series hides the older ones).
+  yieldCurve: { minMovePoints: 0 },
   fredLookbackDays: 500,                       // enough history for CPI year-over-year
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
   backfillPauseMs: 700,                        // --backfill-macro: pause between FRED requests (limit is 120/minute)

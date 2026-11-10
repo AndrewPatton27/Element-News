@@ -140,6 +140,7 @@ export async function runRewrite(deps: Deps, opts: { limit?: number } = {}): Pro
   for (const card of cards) {
     try {
       // 1. data cards: same numbers, current plain template
+      if (card.kind === 'data' && card.dedupe_key.startsWith('YIELDCURVE:')) { stats.kept++; deps.log(`kept (yield curve card is rebuilt daily): ${card.headline}`); continue; }
       if (card.kind === 'data') {
         const facts = card.macro.map(observationFromFact);
         if (!facts[0] || facts.some((f) => !f)) { stats.kept++; deps.log(`kept (unknown series): ${card.headline}`); continue; }
