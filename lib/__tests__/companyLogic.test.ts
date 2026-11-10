@@ -195,8 +195,39 @@ test('Supabase company API: RPC names, bounded arguments, safe fallbacks, cards 
   fail = true;
   assert.deepEqual(await api.search('x'), []);
   assert.deepEqual(await api.directory(), []);
-  assert.deepEqual(await api.tags(['a']), {});
+  // tags rejects so the batcher can expire the failure and ask again (P2-10)
+  await assert.rejects(api.tags(['a']), /404/);
   await assert.rejects(api.cards('AAPL'), /404/);
+});
+
+test('tag batcher: a failed request expires after 60 s, then the ids are asked for again (P2-10)', async () => {
+  let t = 1_000;
+  let fail = true;
+  const calls: string[][] = [];
+  const queue: (() => void)[] = [];
+  const b = createTagBatcher(async (ids) => {
+    calls.push(ids);
+    if (fail) throw new Error('network');
+    return Object.fromEntries(ids.map((id) => [id, [{ ticker: 'AAPL', name: 'Apple Inc.', short_name: 'Apple', confidence: 1 }]]));
+  }, { schedule: (fn) => queue.push(fn), now: () => t });
+  b.request('x', () => undefined);
+  queue.shift()!();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(b.get('x'), [], 'failure answers no tags for now');
+  t += 59_000;
+  b.request('x', () => undefined);
+  assert.equal(queue.length, 0, 'still inside the 60 s window: no new request');
+  t += 1_000;
+  assert.equal(b.get('x'), undefined, 'expired after 60 s');
+  fail = false;
+  let got = -1;
+  b.request('x', (tags) => { got = tags.length; });
+  queue.shift()!();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(got, 1);
+  assert.equal(calls.length, 2);
+  t += 10 * 60_000;
+  assert.equal(b.get('x')?.length, 1, 'successful answers never expire');
 });
 
 test('no stray encoding characters (Â·, â€) in app, component or library source', () => {

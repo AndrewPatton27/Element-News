@@ -12,7 +12,7 @@ import type { LocalPrefs } from '../storage/localPrefs.ts';
 import { readLocal } from '../storage/localPrefs.ts';
 import { defaultStore } from '../storage/storage.ts';
 import { readSeen } from './forYouGate.ts';
-import { FOLLOWED_STORIES_KEY, parseFollowedStories } from '../following/followedStories.ts';
+import { FOLLOWED_STORIES_KEY, followedStoryIdsFor, parseFollowedStories } from '../following/followedStories.ts';
 import { reorderUnseen, splitSeen, withDeviceSeen, type SeenContext } from './seenFilter.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 import { FOLLOWED_IDS_MAX } from '../account/account.ts';
@@ -41,9 +41,10 @@ export interface UseFeed {
 
 const SHOW_ALL: CardFilter = (cards) => cards;
 
-/** Ids of the stories this reader follows (device-side), newest first, for the server's seen-card exemption. */
-export function followedStoryIds(): string[] {
-  return parseFollowedStories(defaultStore().get(FOLLOWED_STORIES_KEY)).map((s) => s.id).slice(0, FOLLOWED_IDS_MAX);
+/** Ids of the stories this reader follows (device-side), newest first, for the server's seen-card exemption.
+ *  Only when the device list belongs to `userId` (lib/following/followedStories.ts switchFollowedStoriesOwner). */
+export function followedStoryIds(userId: string | null): string[] {
+  return followedStoryIdsFor(defaultStore(), userId, FOLLOWED_IDS_MAX);
 }
 
 /** What this device knows about seen cards, likes and followed stories (lib/feed/seenFilter.ts). */
@@ -72,7 +73,7 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
       api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
-      userId && account ? account.feedForYou(null, 10, followedStoryIds()) : Promise.resolve(null),
+      userId && account ? account.feedForYou(null, 10, followedStoryIds(userId)) : Promise.resolve(null),
     ]).then(([topRaw, latestRaw, personalRaw]) => {
       const store = defaultStore();
       // Trending and Latest list everything. Only the For you head skips cards this device has seen (signed in on
@@ -130,7 +131,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
             if (query.mode === 'for_you' && query.user && account) {
               // Server order stays; each page gets the shared post-step (spread from Trending's top stories,
               // diversify last). Trending's top ids are only needed on page 1.
-              const [page, top] = await Promise.all([account.feedForYou(c, 10, followedStoryIds()), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
+              const [page, top] = await Promise.all([account.feedForYou(c, 10, followedStoryIds(query.user ?? null)), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
               const topItems = trendingOrder(top?.items ?? []);
               pageIds.note('for_you', page);
               return reorderUnseen(page, (xs) => finishForYou(xs, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null));

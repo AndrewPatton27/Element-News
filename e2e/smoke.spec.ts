@@ -121,10 +121,29 @@ test('share copies the card /b/<id> page link', async ({ page }) => {
   await expect(page.getByText('Link copied')).toBeVisible();
   const link = await page.evaluate(() => navigator.clipboard.readText());
   expect(link).toMatch(/^https:\/\/[^/]+\/b\/[0-9a-f-]{36}$/);
-  // The same path opens in the app without a crash (the real /b/<id> share page is served by the host in production).
+  // The same path opens the shared-card page (app/b/[id].tsx; in production the Pages Function adds the
+  // link-preview tags to the same shell).
   const res = await page.goto(new URL(link).pathname, { waitUntil: 'domcontentloaded' });
   expect(res!.status()).toBeLessThan(400);
-  await expect(page.locator('body')).not.toBeEmpty();
+  await expect(page.getByRole('heading', { level: 2, name: /\[SAMPLE\]/ }).filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+  // standalone view: BOTH notices inside the view (rule 5, D-80), a source link, like and dislike (D-63), Open Element
+  await expect(page.getByText(/Not investment advice/).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText(/may contain errors/i).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sources' }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Like this story', exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dislike this story', exact: true }).filter({ visible: true })).toBeVisible();
+  expect(await page.locator('img').count()).toBe(0);
+  await page.getByRole('link', { name: 'Open Element' }).filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('share page: an unknown or malformed card id shows a friendly page with a way into the app', async ({ page }) => {
+  for (const path of ['/b/00000000-0000-4000-8000-000000000000', '/b/not-a-card']) {
+    await page.goto(path);
+    await expect(page.getByText('This story is not available').filter({ visible: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Not investment advice/).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Element' }).filter({ visible: true })).toBeVisible();
+  }
 });
 
 test('Updates delayed banner shows only when the status says so', async ({ page }) => {
