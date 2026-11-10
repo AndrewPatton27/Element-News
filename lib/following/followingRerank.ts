@@ -11,5 +11,5 @@ export function rerankFollowing(cards: BlurbCard[], prefs: LocalPrefs): BlurbCar
     const reason = card.follow_reason ?? '';
     (reason.startsWith('Because you follow') || Boolean(card.story_link) || reason.toLowerCase().includes('story-link') ? direct : related).push(card);
   }
-  return [...rankLocal(direct, prefs), ...rankLocal(related, prefs)];
+  return [...rankLocal(direct, prefs, { microCap: false }), ...rankLocal(related, prefs, { microCap: false })];
 }

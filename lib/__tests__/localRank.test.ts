@@ -42,3 +42,16 @@ test('diversity: one topic does not fill the top of the page', () => {
   // Without the repeat cost safety (4h older) would be last; after one tech card it moves up.
   assert.deepEqual(ids(rankLocal(list, EMPTY_LOCAL)), ['t1', 's1', 't2', 't3']);
 });
+
+test('macro/finance page cap: a favorite science topic does not stack micro cards; Following opts out', () => {
+  const list = [
+    c('s1', 'science', 20), c('s2', 'science', 19), c('s3', 'science', 18),
+    ...Array.from({ length: 9 }, (_, i) => c(`e${i}`, i % 2 ? 'economy' : 'markets', 10 - i)),
+  ];
+  const prefs = withTopics(EMPTY_LOCAL, ['science'], []);
+  const out = ids(rankLocal(list, prefs));
+  assert.equal(out.length, 12);
+  assert.equal(out.slice(0, 10).filter((id) => id.startsWith('s')).length, 1); // at most 1 micro card in the first 10
+  const free = ids(rankLocal(list, prefs, { microCap: false }));
+  assert.ok(free.slice(0, 10).filter((id) => id.startsWith('s')).length >= 2); // without the cap they stack (Following)
+});
