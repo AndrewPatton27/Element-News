@@ -40,6 +40,7 @@ import { SourcesSheet } from '../components/card/SourcesSheet';
 import { DetailSheet } from '../components/card/DetailSheet';
 import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
+import { cornerToastText } from '../lib/feed/toastPlacement';
 import { EmptyState, ErrorState, LoadingState } from '../components/shell/States';
 
 // Below this window width the right column is dropped.
@@ -61,12 +62,15 @@ export default function FeedScreen() {
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
   const [menuCard, setMenuCard] = useState<BlurbCard | null>(null);
-  const [undo, setUndo] = useState<
-    | { message: string; kind: 'topic'; previous: { followed: string[]; hidden: string[] } }
-    | { message: string; kind: 'source'; previous: string[] }
-    | { message: string; kind: 'follow'; slug: string }
-    | null
-  >(null);
+  // The corner toast shows a short word (message) and reads the full sentence (label); seq
+  // restarts its 5 s timer when the same message shows twice.
+  type FeedUndo =
+    | { message: string; label: string; kind: 'topic'; previous: { followed: string[]; hidden: string[] } }
+    | { message: string; label: string; kind: 'source'; previous: string[] }
+    | { message: string; label: string; kind: 'follow'; slug: string };
+  const [undo, setUndoState] = useState<(FeedUndo & { seq: number }) | null>(null);
+  const toastSeq = useRef(0);
+  const setUndo = useCallback((u: FeedUndo | null) => setUndoState(u ? { ...u, seq: ++toastSeq.current } : null), []);
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   // The feed stays mounted under Numbers / About / Account; only drive it (keys,
   // view tracking) while it's the screen on top (B2).
@@ -183,27 +187,34 @@ export default function FeedScreen() {
       const topic = categoryName(c.category, categories);
       acct
         .hideTopic(c.category)
-        .then((previous) => setUndo({ message: `${topic} topics hidden.`, kind: 'topic', previous }))
+        .then((previous) => {
+          const t = cornerToastText('hideTopic', topic);
+          setUndo({ message: t.text, label: t.label, kind: 'topic', previous });
+        })
         .catch(() => setUndo(null));
     },
-    [acct, categories],
+    [acct, categories, setUndo],
   );
   const toggleCardFollow = useCallback((card: BlurbCard) => {
     const isFollowed = followedTopics.includes(card.category);
     setFollowOverrides((current) => ({ ...current, [card.category]: !isFollowed }));
     followsState.toggleTopic(card.category);
     const topic = categoryName(card.category, categories);
-    setUndo({ message: `${isFollowed ? 'Unfollowed' : 'Following'} ${topic}`, kind: 'follow', slug: card.category });
-  }, [followedTopics, followsState, categories]);
+    const t = cornerToastText(isFollowed ? 'unfollow' : 'follow', topic);
+    setUndo({ message: t.text, label: t.label, kind: 'follow', slug: card.category });
+  }, [followedTopics, followsState, categories, setUndo]);
   const hideSource = useCallback(
     (_c: BlurbCard, key: string) => {
       setMenuCard(null);
       acct
         .hideSource(key)
-        .then((previous) => setUndo({ message: `Cards from ${sourceName(key)} hidden.`, kind: 'source', previous }))
+        .then((previous) => {
+          const t = cornerToastText('hideSource', sourceName(key));
+          setUndo({ message: t.text, label: t.label, kind: 'source', previous });
+        })
         .catch(() => setUndo(null));
     },
-    [acct],
+    [acct, setUndo],
   );
   const undoHide = useCallback(() => {
     if (undo?.kind === 'topic') void acct.restoreTopics(undo.previous).catch(() => undefined);
@@ -214,8 +225,8 @@ export default function FeedScreen() {
       followsState.toggleTopic(undo.slug);
     }
     setUndo(null);
-  }, [acct, undo, followedTopics, followsState]);
-  const clearUndo = useCallback(() => setUndo(null), []);
+  }, [acct, undo, followedTopics, followsState, setUndo]);
+  const clearUndo = useCallback(() => setUndo(null), [setUndo]);
 
   const { noteCards, trackView, react, trackDwell, trackDwellOnExit, trackOpenDetail } = acct;
 
@@ -450,7 +461,15 @@ export default function FeedScreen() {
         onHideSource={sourcesSupported ? hideSource : undefined}
         onClose={() => setMenuCard(null)}
       />
-      <UndoToast message={undo?.message ?? null} onUndo={undoHide} onDone={clearUndo} />
+      <UndoToast
+        message={undo?.message ?? null}
+        label={undo?.label}
+        token={undo?.seq}
+        placement="corner"
+        wide={wide}
+        onUndo={undoHide}
+        onDone={clearUndo}
+      />
     </Shell>
   );
 }

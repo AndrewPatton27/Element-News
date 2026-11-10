@@ -75,6 +75,7 @@ import { CardErrorBoundary } from '../shell/ErrorBoundary';
 import type { Feedback } from '../../lib/account/accountLogic';
 import { ThumbDownIcon, ThumbUpIcon } from '../shell/Icons';
 import { UndoToast } from './UndoToast';
+import { cornerToastText } from '../../lib/feed/toastPlacement';
 import { shouldUseCompactCard } from '../../lib/feed/cardFit';
 
 interface Props {
@@ -389,8 +390,8 @@ export function FeedPager({
       if (sent) {
         onReact(card, sent);
         markCardSwiped(card.id);
-        const liked = sent === 'like';
-        setUndo({ card, previous, sent, message: liked ? 'Liked' : 'Disliked', label: liked ? 'Liked. More like this.' : 'Disliked. Less like this.', seq: ++undoSeq.current });
+        const t = cornerToastText(sent === 'like' ? 'like' : 'dislike');
+        setUndo({ card, previous, sent, message: t.text, label: t.label, seq: ++undoSeq.current });
       }
       const res = reactNav(nav.current!, card.id, now);
       apply(res);
