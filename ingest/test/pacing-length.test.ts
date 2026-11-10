@@ -46,10 +46,10 @@ function fake(name: string, outputs: (SummaryDraft | Error)[]): Summarizer & { c
 
 // ---- Fix 1: pacing and cooldown ---------------------------------------------------
 
-test('pacing uses the safety factor: Gemini 5 s (12/min, was 4 s = exactly 15/min), Groq floor 30 s', () => {
+test('pacing uses the safety factor: Gemini 5 s (12/min, was 4 s = exactly 15/min), Groq 30.1 s (TPM gap beats the 30 s floor)', () => {
   const { providers } = buildProviders({ geminiApiKey: 'gemini-test-key-not-real', groqApiKey: 'groq-test-key-not-real' });
   assert.equal(providers.find((p) => p.name === 'gemini')!.minIntervalMs, 5000);
-  assert.equal(providers.find((p) => p.name === 'groq')!.minIntervalMs, 30_000);
+  assert.equal(providers.find((p) => p.name === 'groq')!.minIntervalMs, 30_141);
   assert.ok(60_000 / 5000 <= config.gemini.freeRpm * config.rpmSafetyFactor);
 });
 

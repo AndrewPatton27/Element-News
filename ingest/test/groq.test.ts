@@ -128,16 +128,16 @@ test('Groq rejected twice (after Gemini 429) -> template card', async () => {
   console.log('  chain log:', r.log.join(' | '));
 });
 
-test('Groq limits (verified 2026-10-17): daily cap 74 (sum-v3 token estimate), pacing 30 s; cap reached -> skipped', async () => {
+test('Groq limits (verified 2026-10-17): daily cap 62 (sum-v7 token estimate, was 74), pacing 30.1 s; cap reached -> skipped', async () => {
   assert.deepEqual([config.groq.freeRpm, config.groq.freeRpd, config.groq.freeTpm, config.groq.freeTpd], [30, 1000, 8000, 200000]);
-  assert.equal(config.groq.estimatedTokensPerCall, 2700);  // card + detail (sum-v3)
+  assert.equal(config.groq.estimatedTokensPerCall, 3215);  // 2,700 (sum-v6) + 515 measured prompt tokens for sum-v7
   assert.ok(config.groq.maxCompletionTokens >= 2048);
-  assert.equal(groqDailyCap(), 74);                       // min(80, 1000, floor(200000 / 2700) = 74)
+  assert.equal(groqDailyCap(), 62);                       // min(80, 1000, floor(200000 / 3215) = 62)
   assert.equal(groqMinIntervalMs({ freeRpm: 30, freeTpm: 8000, estimatedTokensPerCall: 2700, minIntervalMsFloor: 0 }), 25_313);   // TPM gap below the 30 s floor
   const base = { dailyCapCode: 1000, freeRpd: 1000, freeTpd: 200_000, estimatedTokensPerCall: 2200 };
   assert.equal(groqDailyCap(base), 90);                   // token-per-day bound
   assert.equal(groqDailyCap({ ...base, freeRpd: 50 }), 50);
-  assert.equal(groqMinIntervalMs(), 30_000);              // floor wins over 16.5 s (TPM) and 2 s (RPM)
+  assert.equal(groqMinIntervalMs(), 30_141);              // TPM gap 60 s * 3215 / (8000 * 0.8) = 30.141 s beats the 30 s floor and the 2.5 s RPM gap
   // with the 0.8 safety factor: TPM gap 16.5 s / 0.8 = 20.6 s, RPM gap 2 s / 0.8 = 2.5 s
   assert.equal(groqMinIntervalMs({ freeRpm: 30, freeTpm: 8000, estimatedTokensPerCall: 2200, minIntervalMsFloor: 0 }), 20_625);
   assert.equal(groqMinIntervalMs({ freeRpm: 30, freeTpm: null, estimatedTokensPerCall: 2200, minIntervalMsFloor: 0 }), 2500);
@@ -145,11 +145,11 @@ test('Groq limits (verified 2026-10-17): daily cap 74 (sum-v3 token estimate), p
 
   const net = fakeNet({ gemini: () => new Response('{}', { status: 429 }), groq: () => groqOk(GOOD) });
   const c = memoryCounter();
-  for (let i = 0; i < 74; i++) c.add('groq');
+  for (let i = 0; i < 62; i++) c.add('groq');
   const r = await summarizeWithChain(input, realProviders(net).providers, c);
   assert.equal(net.count('api.groq.com'), 0);
   assert.equal(r.provider, 'template');
-  assert.match(r.log.join(), /groq: daily cap 74 reached/);
+  assert.match(r.log.join(), /groq: daily cap 62 reached/);
 });
 
 test('Groq gets at most 6,000 characters of source text', async () => {
@@ -226,11 +226,11 @@ test('pacing is per provider: Groq does not wait on Gemini\'s timer', async () =
   assert.ok(aGap >= 290, `same provider gap was only ${aGap} ms`);
 });
 
-test('real adapters carry their own pacing and caps: Gemini 5 s / 500, Groq 30 s / 74', () => {
+test('real adapters carry their own pacing and caps: Gemini 5 s / 500, Groq 30.1 s / 62', () => {
   const { providers } = buildProviders({ geminiApiKey: GEMINI_KEY, groqApiKey: GROQ_KEY });
   assert.deepEqual(providers.map((p) => [p.name, p.minIntervalMs, p.dailyCap, p.model ?? null]), [
     ['gemini', 5000, 500, 'gemini-3.5-flash-lite'],
-    ['groq', 30000, 74, 'openai/gpt-oss-120b'],
+    ['groq', 30141, 62, 'openai/gpt-oss-120b'],
     ['template', undefined, undefined, null],
   ]);
 });

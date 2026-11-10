@@ -35,15 +35,16 @@ export const config = {
     freeRpd: 1000 as number | null,
     freeTpm: 8000 as number | null,
     freeTpd: 200_000 as number | null,
-    // Tokens are the binding limit, so Groq gets less source text than Gemini. About 2.7k tokens per
-    // call since sum-v3 (prompt ~1.9k incl. 6,000 chars of source + ~0.8k output with the detail).
+    // Tokens are the binding limit, so Groq gets less source text than Gemini. 2,700 tokens per call with sum-v6
+    // (an estimate, never measured on Groq). sum-v7 (2026-11-10): the same two live Gemini calls with the same source text
+    // measured +515 prompt tokens (earnings 4,239 -> 4,754, recall 1,914 -> 2,429), so 2,700 + 515 = 3,215.
     sourceTextMaxChars: 6000,
-    estimatedTokensPerCall: 2700,
-    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 25.4 s,
+    estimatedTokensPerCall: 3215,
+    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 30.1 s,
     // this floor). The floor leaves room
     // for reasoning tokens we cannot measure offline.
     minIntervalMsFloor: 30_000,
-    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 74).
+    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 62; was 74 with sum-v6). core.ai_caps holds the live copy (reserve 5 for the brief).
     dailyCapCode: 80,
   },
   // Pacing safety margin for every AI provider: interval = ceil(60 s / (RPM * factor)).
@@ -128,6 +129,9 @@ export const config = {
     // words also appears in it (or it starts with the headline text). Tuned on the fixtures: a normal
     // first sentence reuses the entity and the topic noun (about 0.3 to 0.5), a restatement reuses nearly all.
     headlineOverlapMax: 0.7,
+    // Same test for the detail (paragraph 1 and key point 1 against the headline). Live sum-v7 runs dropped the detail in about 1 of 4
+    // cards for this reason; raise it (for example to 0.85) to keep more details, lower it to be stricter.
+    detailHeadlineOverlapMax: 0.7,
     minHeadlineWords: 3,                       // a headline with fewer content words is only checked for "starts with"
     // (b) two summary sentences are near-duplicates when this share of the shorter one's content words
     // appears in the other.
@@ -504,6 +508,9 @@ export const config = {
     summaryMinSentences: 8,
     summaryMaxSentences: 26,
     summaryMaxWords: 290, summaryMinWords: 200, summaryTargetWords: 250, summaryParagraphs: [3, 4] as readonly number[],
+    // Topic sections with these categories are left out of the text the AI summarizes (recalls and space or science items belong
+    // in the summary only when they are TOP STORIES: sum-v7 brief rule; the model ignored the written rule in 3 of 3 live runs).
+    summarySkipSectionCategories: ['safety', 'science'] as readonly string[],
     summaryCopyLimitWords: 10,                 // longest run copied from the brief's own cards (they are already short rewrites)
     summaryMaxTokens: 3000,                     // includes Groq reasoning tokens
     // Email provider. 'outbox' writes files; 'resend' needs RESEND_API_KEY + EMAIL_FROM + the --send flag.
