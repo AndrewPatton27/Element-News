@@ -128,6 +128,10 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       numbers: Array.isArray(row.numbers) ? row.numbers.filter(isMacroFact) : [],
       summary: parseBriefSummary(row.summary),
       markets: parseBriefMarkets(row.markets),
+      window_kind: row.window_kind === '24h' || row.window_kind === 'since_friday' || row.window_kind === 'week' ? row.window_kind : undefined,
+      brief_date: typeof row.brief_date === 'string' ? row.brief_date : undefined,
+      fallback: row.fallback === true,
+      as_of: typeof row.as_of === 'string' ? row.as_of : null,
     };
   }
   // Email-brief RPCs (migration 20261018040000_brief_email.sql). Sent as the anon key only,
@@ -246,7 +250,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const raw = await optional('weekly_brief');
       const brief = parseBrief(raw);
       const movers = raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).movers) ? parseNumberTrends((raw as Record<string, unknown>).movers) : [];
-      return { ...brief, window_hours: 168, movers };
+      return { ...brief, window_hours: Math.max(168, brief.window_hours), window_kind: 'week', movers };
     },
     async reportBlurb(cardId, reason): Promise<ReportResult> {
       if (!isValidReport(cardId, reason)) return { ok: false, status: 'invalid' };

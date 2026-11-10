@@ -97,3 +97,26 @@ export function dueBriefs(sub: SubscriptionRow, now: Date): DueBrief[] {
   }
   return out;
 }
+
+export interface DailyWindow {
+  hours: number;                       // 24, or 72 on Monday
+  kind: '24h' | 'since_friday';
+  label: string;                       // text for the reader: "Last 24 hours" / "Since Friday"
+  span: string;                        // text for the prompt: "the last 24 hours" / "the time since Friday"
+}
+
+/** The daily brief window for a moment: 24 h, or 72 h on Monday (judged in `tz`, default New York). */
+export function dailyWindow(now: Date, tz: string = config.mail.timezone): DailyWindow {
+  return localParts(now, tz).weekday === 1
+    ? { hours: config.mail.mondayWindowHours, kind: 'since_friday', label: 'Since Friday', span: 'the time since Friday' }
+    : { hours: config.mail.dailyWindowHours, kind: '24h', label: 'Last 24 hours', span: 'the last 24 hours' };
+}
+
+/** The span text the brief prompt and the card use, from the brief JSON's own window fields. */
+export function windowSpan(kind: string | undefined, hours: number | undefined): { label: string; span: string } {
+  if (kind === 'since_friday') return { label: 'Since Friday', span: 'the time since Friday' };
+  if (kind === 'week' || hours === 168) return { label: 'Last 7 days', span: 'this week' };
+  const h = Number.isFinite(hours) && (hours as number) > 0 ? Math.round(hours as number) : config.mail.dailyWindowHours;
+  if (h === config.mail.dailyWindowHours) return { label: 'Last 24 hours', span: 'the last 24 hours' };
+  return { label: `Last ${h} hours`, span: `the last ${h} hours` };
+}

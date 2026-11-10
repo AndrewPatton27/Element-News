@@ -36,7 +36,7 @@ const brief = (over = {}) =>
 
 test('briefView: a headline card is not repeated in a section and sections keep their order', () => {
   const v = briefView(brief(), []);
-  assert.deepEqual(v.headlines.map((c) => c.id), ['a', 'b']);
+  assert.deepEqual(v.headlines.map((c) => c.id), ['b', 'a']); // the data (macro) card comes before the company card
   assert.deepEqual(v.sections.map((s) => [s.category, s.cards.map((c) => c.id)]), [['earnings', ['c']], ['safety', ['d']]]);
 });
 
@@ -72,11 +72,11 @@ test('sectionTitle: a real server label wins; a slug label falls back to the cat
   assert.equal(sectionTitle({ category: 'policy', label: '' }, [{ slug: 'policy', name: 'Government' } as never]), 'Government');
 });
 
-test('generatedLine: "Generated 5 h ago · last 24 h"; unknown time shows only the window', () => {
-  assert.equal(generatedLine({ generated_at: '2026-10-17T13:00:00Z', window_hours: 24 }, NOW), 'Generated 5 h ago · last 24 h');
-  assert.equal(generatedLine({ generated_at: '2026-10-17T17:59:30Z', window_hours: 48 }, NOW), 'Generated just now · last 48 h');
-  assert.equal(generatedLine({ generated_at: new Date(0).toISOString(), window_hours: 168 }, NOW), 'Last 168 h');
-  assert.equal(generatedLine({ generated_at: 'bad', window_hours: 24 }, NOW), 'Last 24 h');
+test('generatedLine: "Generated 5 h ago · Last 24 hours"; unknown time shows only the span', () => {
+  assert.equal(generatedLine({ generated_at: '2026-10-17T13:00:00Z', window_hours: 24 }, NOW), 'Generated 5 h ago · Last 24 hours');
+  assert.equal(generatedLine({ generated_at: '2026-10-17T17:59:30Z', window_hours: 48 }, NOW), 'Generated just now · Last 2 days');
+  assert.equal(generatedLine({ generated_at: new Date(0).toISOString(), window_hours: 168 }, NOW), 'Last 7 days');
+  assert.equal(generatedLine({ generated_at: 'bad', window_hours: 24 }, NOW), 'Last 24 hours');
 });
 
 test('headlineLabel: weekly and a widened daily window say so', () => {
@@ -147,7 +147,7 @@ test('briefRowLabels: a non-https source gives no link, a Wikipedia card gets it
 });
 
 test('briefCards lists headlines then section cards', () => {
-  assert.deepEqual(briefCards(briefView(brief(), [])).map((c) => c.id), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(briefCards(briefView(brief(), [])).map((c) => c.id), ['b', 'a', 'c', 'd']);
 });
 
 test('trendA11yLabel names the direction in words and cites the agency', () => {

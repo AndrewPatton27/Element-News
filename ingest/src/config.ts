@@ -465,6 +465,10 @@ export const config = {
     siteUrl: 'https://element-news.pages.dev',
     timezone: 'America/New_York',              // the "day" and "week" of a brief summary; a subscriber's own tz decides when their email is due
     defaultSendHour: 7,
+    // Daily brief window (D-119): 24 h; Monday 72 h, labelled "since Friday". Mirrors core.brief_window_hours (migration 20261125000000).
+    dailyWindowHours: 24,
+    mondayWindowHours: 72,
+    fallbackMaxHours: 720,                     // never-empty brief: reach back at most this far for the last good cards
     // Brief summary (one AI call per brief per day/week): 3-5 sentences, at most this many words.
     summaryMinSentences: 8,
     summaryMaxSentences: 26,

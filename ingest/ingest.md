@@ -170,3 +170,5 @@ Keys are never printed (`[set]` / `[missing]` only), never put in URLs except wh
 ## Per-run state
 
 `runOnce` keeps its mutable state (topic counters and narrow-source caps, recent-card list, selection queue) in an `AsyncLocalStorage`, so two runs in one process (a warm Edge Function isolate) never share it (`test/concurrent-runs.test.ts`).
+
+Brief prompt (M9, D-119): `briefSourceText` lists NUMBERS first (one block), then stories in the macro-first order from `contract/briefOrder.ts` (economy, Fed and government; companies and markets; other; recalls, space and science last); `buildBriefPrompt` (sum-v7 section 2.4) asks for the Fed and economic data first and names the real span ("the last 24 hours", "the time since Friday" on Mondays, "this week"; `briefTime.ts` `dailyWindow`, `windowSpan`). The 3-bullet lead is built by the app, not the AI. A brief flagged `fallback` (no new cards in the window) is not summarized as today's; the last summary stays. Settings: `config.mail.dailyWindowHours` 24, `mondayWindowHours` 72, `fallbackMaxHours` 720 (mirror the SQL in `20261125000000_brief_window_fallback.sql`). Tests: `test/briefWindowOrder.test.ts`.

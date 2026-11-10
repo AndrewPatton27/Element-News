@@ -3,11 +3,13 @@
 // to show from the result: hidden topics and sources, no card twice, the "Generated"
 // line, the date labels, the one-line teaser and the footer wording.
 
-import type { AppConfig, BlurbCard, Brief, BriefKind, BriefMarkets, BriefSubscribeStatus, BriefSummary, Category, MacroFact, NumberTrend } from '../../contract/types.ts';
+import type { AppConfig, BlurbCard, Brief, BriefKind, BriefMarkets, BriefWindowKind, BriefSubscribeStatus, BriefSummary, Category, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { categoryName, clampText, relativeTime } from '../shared/format.ts';
 import { cardNotices, primarySource, shareAlikeCredit, type ShareAlikeCredit } from '../shared/labels.ts';
 import type { KeyValueStore } from '../storage/storage.ts';
 import { isHttpUrl } from '../shared/types.ts';
+import { spanLabel } from './briefWindow.ts';
+import { briefLeadCards, categoryTier, orderBriefCards } from '../../contract/briefOrder.ts';
 
 export type BriefMode = 'daily' | 'weekly';
 
@@ -37,6 +39,8 @@ export interface BriefView {
   numbers: MacroFact[];
   movers: NumberTrend[];
   summary: BriefSummary | null;
+  /** The 3-bullet lead: the first three stories in the macro-first order (no AI). */
+  lead: BlurbCard[];
   marketCards: BlurbCard[];
   marketNumbers: MacroFact[];
   marketsTotal: number;
@@ -58,6 +62,10 @@ export function toBriefData(raw: Brief & { movers?: NumberTrend[] }): BriefData 
     markets,
     generated_at: raw.generated_at,
     window_hours: raw.window_hours,
+    window_kind: raw.window_kind,
+    brief_date: raw.brief_date,
+    fallback: raw.fallback === true,
+    as_of: typeof raw.as_of === 'string' ? raw.as_of : null,
     headline_cards: raw.headline_cards ?? [],
     sections: raw.sections ?? [],
     numbers: raw.numbers ?? [],
@@ -98,23 +106,32 @@ export function briefView(
       seen.add(c.id);
       return true;
     });
-  const headlines = take(data.headline_cards);
+  // The lead is picked from every visible story before the lists below take them (a lead story also stays in its list).
+  const visibleAll = visible([...data.headline_cards, ...(data.markets?.cards ?? []), ...data.sections.flatMap((s) => s.cards)].filter(canShow));
+  const lead = briefLeadCards(visibleAll);
+  // Macro first (D-119, F-01): Fed and government before single companies, recalls and space last. Stable inside a tier.
+  const headlines = orderBriefCards(take(data.headline_cards));
   const marketCards = take(data.markets?.cards ?? []);
   const sections = data.sections
-    .map((s) => {
-      const cards = take(s.cards);
-      return { category: s.category, title: sectionTitle(s, categories), cards, slug: s.slug ?? s.category, total: Math.max(s.total ?? 0, cards.length) };
+    .map((s, i) => {
+      const cards = orderBriefCards(take(s.cards));
+      return { i, tier: categoryTier(s.category), category: s.category, title: sectionTitle(s, categories), cards, slug: s.slug ?? s.category, total: Math.max(s.total ?? 0, cards.length) };
     })
-    .filter((s) => s.cards.length > 0);
-  const marketNumbers = data.markets?.numbers ?? [];
+    .filter((s) => s.cards.length > 0)
+    .sort((a, b) => a.tier - b.tier || a.i - b.i)
+    .map(({ i: _i, tier: _t, ...s }) => s);
+  // One numbers block (F-04): the brief's numbers plus the market numbers, one entry per series.
+  const seenSeries = new Set<string>();
+  const numbers = [...data.numbers, ...(data.markets?.numbers ?? [])].filter((n) => (seenSeries.has(n.series_id) ? false : (seenSeries.add(n.series_id), true)));
   return {
     headlines,
     sections,
-    numbers: data.numbers,
+    numbers,
     movers: data.movers,
     summary: data.summary,
+    lead,
     marketCards,
-    marketNumbers,
+    marketNumbers: [],
     marketsTotal: Math.max(data.markets?.total ?? 0, marketCards.length),
   };
 }
@@ -176,6 +193,21 @@ export function summaryTitle(mode: BriefMode): string {
   return mode === 'weekly' ? 'Weekly summary' : 'Daily summary';
 }
 
+/** "Summary from Nov 6" when the stored summary is older than the brief it sits in (the day's own is not written yet); else null. */
+export function summaryAgeNote(summary: BriefSummary | null, mode: BriefMode, briefDate: string | undefined): string | null {
+  const f = summary?.for_date;
+  if (!f || !briefDate || !/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(briefDate)) return null;
+  const current = mode === 'weekly' ? mondayOf(briefDate) : briefDate;
+  if (f >= current) return null;
+  return `Summary from ${dayLabelShort(new Date(`${f}T12:00:00Z`), true)}`;
+}
+
+function mondayOf(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
 /** The muted line under the summary: the AI label, right by the AI-written text. The
  *  disclaimer is the Brief screen's persistent strip (D-80), so it is not repeated here. */
 export function summaryFooter(): string {
@@ -190,20 +222,80 @@ export function windowText(hours: number): string {
   return `last ${h} h`;
 }
 
-/** Heading of the ranked list. A daily brief that had to look back further says so. */
-export function headlineLabel(mode: BriefMode, windowHours: number): string {
+/** Heading of the ranked list. A Monday brief says "since Friday"; an older fallback names its span. */
+export function headlineLabel(mode: BriefMode, windowHours: number, kind?: BriefWindowKind): string {
   if (mode === 'weekly') return 'Top stories · last week';
-  if (!Number.isFinite(windowHours) || windowHours <= 24) return 'Today in a minute';
-  const days = Math.round(windowHours / 24);
-  return `Top stories · last ${days} days`;
+  if (kind === 'since_friday') return 'Top stories · since Friday';
+  if (kind === '24h' || !Number.isFinite(windowHours) || windowHours <= 24) return 'Today in a minute';
+  return `Top stories · ${spanLabel(kind, windowHours).toLowerCase()}`;
 }
 
-/** "Generated 5 h ago · last 24 h", or just the window when the time is unknown. */
-export function generatedLine(data: Pick<BriefData, 'generated_at' | 'window_hours'>, now: Date = new Date()): string {
-  const window = windowText(data.window_hours);
-  if (!hasRealTimestamp(data.generated_at)) return window.charAt(0).toUpperCase() + window.slice(1);
+/** "Generated 5 h ago · Last 24 hours" / "... · Since Friday", or just the span when the time is unknown. */
+export function generatedLine(data: Pick<BriefData, 'generated_at' | 'window_hours' | 'window_kind'>, now: Date = new Date()): string {
+  const span = spanLabel(data.window_kind, data.window_hours);
+  if (!hasRealTimestamp(data.generated_at)) return span;
   const ago = relativeTime(data.generated_at, now);
-  return ago ? `Generated ${ago} · ${window}` : window.charAt(0).toUpperCase() + window.slice(1);
+  return ago ? `Generated ${ago} · ${span}` : span;
+}
+
+export type BriefSource = 'live' | 'cached';
+
+/**
+ * The line under the title. A normal brief says when it was made and its real span. A brief built from
+ * the last good cards (nothing new in the window) or a saved copy says "Updated <date>" instead.
+ */
+export function briefStatusLine(data: BriefData, source: BriefSource, now: Date = new Date(), utc = false): string {
+  if (source === 'cached') return `Updated ${dayLabelShort(lastGoodDate(data), utc)} · saved copy, the latest could not be loaded`;
+  if (data.fallback) return `Updated ${dayLabelShort(lastGoodDate(data), utc)} · the latest stories we have`;
+  return generatedLine(data, now);
+}
+
+/** The day a fallback or saved brief really is from: its newest card, else its own time. */
+export function lastGoodDate(data: Pick<BriefData, 'as_of' | 'generated_at'>): Date {
+  const t = data.as_of ? Date.parse(data.as_of) : NaN;
+  if (!Number.isNaN(t) && t > Date.UTC(2000, 0, 1)) return new Date(t);
+  return hasRealTimestamp(data.generated_at) ? new Date(data.generated_at) : new Date();
+}
+
+/** true when the brief has at least one story card (numbers alone do not count). */
+export function briefHasStories(data: Pick<BriefData, 'headline_cards' | 'sections' | 'markets'>): boolean {
+  return data.headline_cards.length > 0 || data.sections.some((s) => s.cards.length > 0) || (data.markets?.cards.length ?? 0) > 0;
+}
+
+const CACHE_KEY = (mode: BriefMode) => `element.brief-last-good.${mode}`;
+const CACHE_MAX_CHARS = 400_000; // a brief is far smaller; this only guards a storage quota
+
+/** Keeps a brief that has stories as the last good one for this mode (a live fallback brief is saved too). */
+export function saveLastGoodBrief(store: KeyValueStore, mode: BriefMode, data: BriefData): void {
+  if (!briefHasStories(data)) return;
+  try {
+    const text = JSON.stringify(data);
+    if (text.length <= CACHE_MAX_CHARS) store.set(CACHE_KEY(mode), text);
+  } catch {
+    // storage full or blocked: the brief just has no saved copy
+  }
+}
+
+/** The last good brief for this mode, or null (unreadable or without stories counts as none). */
+export function loadLastGoodBrief(store: KeyValueStore, mode: BriefMode): BriefData | null {
+  try {
+    const raw = store.get(CACHE_KEY(mode));
+    if (!raw) return null;
+    const data = toBriefData(JSON.parse(raw) as Brief);
+    return briefHasStories(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Never empty: the live brief when it has stories, else the saved last good brief (labelled with its
+ * date), else the live brief as it is (the screen then shows its honest empty state).
+ */
+export function resolveBrief(live: BriefData | null, saved: BriefData | null): { data: BriefData | null; source: BriefSource } {
+  if (live && briefHasStories(live)) return { data: live, source: 'live' };
+  if (saved) return { data: saved, source: 'cached' };
+  return { data: live, source: 'live' };
 }
 
 const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

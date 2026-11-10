@@ -147,7 +147,7 @@ export function parseNumberTrends(x: unknown): NumberTrend[] {
 /** Brief summary from the server; anything malformed or empty becomes null (the box is hidden). */
 export function parseBriefSummary(x: unknown): BriefSummary | null {
   if (!isObj(x) || !isStr(x.text) || x.text.trim() === '') return null;
-  return { text: x.text, generated_at: isStr(x.generated_at) ? x.generated_at : '', model: isStr(x.model) ? x.model : '' };
+  return { text: x.text, generated_at: isStr(x.generated_at) ? x.generated_at : '', model: isStr(x.model) ? x.model : '', ...(isStr(x.for_date) ? { for_date: x.for_date } : {}) };
 }
 
 /** Markets section; bad cards/numbers are skipped. Missing = empty (the section is hidden). */
