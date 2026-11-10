@@ -10,7 +10,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | `api/` | The `Api` interface, mock and Supabase implementations, error types and app config |
 | `brief/` | Daily and weekly brief logic |
 | `companies/` | Company directory answers, sector grouping, "About: Apple" chips, the company API (Supabase and sample) and batched card tag lookups |
-| `feed/` | Feed ordering, paging, ranking (For you, local), swipe and early first-page logic |
+| `feed/` | Feed ordering, paging, ranking (For you, local), swipe and early-request logic (index.html starts the first feed pages, app_config, categories, numbers and feed status before the bundle runs; `earlyFeed.ts` hands them to the api) |
 | `following/` | Followed topics and stories, following re-rank |
 | `numbers/` | Number formatting, tone and trend sample data |
 | `search/` | Search logic |
