@@ -24,6 +24,13 @@ const db = await makeDb();
 await db.exec(`update core.blurbs set status = 'hidden'`);
 const corpus = synthCorpus(11, scale);
 const ids = await loadCards(db, corpus);
+// --set key=value (repeatable): try other core.rank_params values, e.g. --set foryou_personal_scale=6
+for (const [i, a] of process.argv.entries()) {
+  if (process.argv[i - 1] !== '--set') continue;
+  const [k, v] = a.split('=');
+  await db.query('insert into core.rank_params (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [k, Number(v)]);
+  console.log(`set ${k} = ${v}`);
+}
 const byId = new Map(ids.map((id, i) => [id, corpus[i]]));
 const gated = new Set((await rows(db, `select unnest(core.micro_gated_ids(array_agg(id))) id from core.blurbs where status = 'published'`)).map((r) => r.id));
 const macroIds = new Set((await rows(db, `select (c->>'id') id from jsonb_array_elements(core.cards_json((select array_agg(id) from core.blurbs where status='published'), null)) c
@@ -64,6 +71,8 @@ for (const sw of [0, 1]) {
 }
 await db.query(`update core.rank_params set value = 0 where key = 'fedreg_noneconomic_micro'`);
 const trendTop = (await scroll(null, `select api.feed('top', $1, $2, null) r`, 10, 1)).ids;
+// baseline per session: the guest Trending order, restricted to cards For you could show (30-day window) and not shown yet
+const trendAll = (await scroll(null, `select api.feed('top', $1, $2, null) r`)).ids.filter((id) => Date.now() - Date.parse(byId.get(id).at) < 30 * 864e5);
 
 // 2. personas
 const PERSONAS = [
@@ -84,7 +93,7 @@ for (const mlMode of modes) {
     await db.query(`insert into core.user_prefs (user_id, followed_categories) values ($1, $2) on conflict (user_id) do update set followed_categories = excluded.followed_categories`, [uid, p.follows]);
     const base = eligible.filter((id) => p.likes(byId.get(id))).length / eligible.length;
     const trendP = trendTop.filter((id) => p.likes(byId.get(id))).length / 10;
-    const r = rng(100 + pi); const shown = new Set(); const line = [];
+    const r = rng(100 + pi); const shown = new Set(); const line = []; const sums = { fy: 0, tr: 0, id: 0 };
     for (let s = 0; s < SESSIONS; s++) {
       const page = (await as(db, uid, () => rows(db, `select api.feed_for_you(null, 20) r`)))[0].r.items.map((c) => c.id);
       const top = page.slice(0, 10);
@@ -92,7 +101,11 @@ for (const mlMode of modes) {
       const topics = new Set(top.map((id) => byId.get(id).category)).size;
       const novel = top.filter((id) => !shown.has(id)).length / Math.max(top.length, 1);
       const mac = top.filter((id) => macroIds.has(id)).length / Math.max(top.length, 1);
-      line.push(`s${s + 1} P@10 ${prec.toFixed(1)} topics ${topics} new ${(novel * 100).toFixed(0)}% macro ${(mac * 100).toFixed(0)}%`);
+      const unseen = trendAll.filter((id) => !shown.has(id));
+      const trendP10 = unseen.slice(0, 10).filter((id) => p.likes(byId.get(id))).length / 10;
+      const ideal = Math.min(10, unseen.filter((id) => p.likes(byId.get(id))).length) / 10;
+      sums.fy += prec; sums.tr += trendP10; sums.id += ideal;
+      line.push(`s${s + 1} P@10 ${prec.toFixed(1)} (Trending ${trendP10.toFixed(1)}, best ${ideal.toFixed(1)}) topics ${topics} new ${(novel * 100).toFixed(0)}% macro ${(mac * 100).toFixed(0)}%`);
       page.forEach((id) => shown.add(id));
       for (const id of page) {
         const c = byId.get(id); const like = p.likes(c);
@@ -107,7 +120,8 @@ for (const mlMode of modes) {
         }
       }
     }
-    console.log(`  ${p.name.padEnd(24)} base rate ${base.toFixed(2)} | guest Trending P@10 ${trendP.toFixed(1)} | ${line.join(' | ')}`);
+    console.log(`  ${p.name.padEnd(24)} base rate ${base.toFixed(2)} | mean P@10 For you ${(sums.fy / SESSIONS).toFixed(2)} vs unseen Trending ${(sums.tr / SESSIONS).toFixed(2)} (best possible ${(sums.id / SESSIONS).toFixed(2)})
+     ${line.join(' | ')}`);
     if (pi === 1 || pi === 4) {
       const sc = await scroll(uid, `select api.feed_for_you($1, $2) r`, 10);
       // For you scores cards of the last for_you_window_days (30) only, and never shows disliked cards

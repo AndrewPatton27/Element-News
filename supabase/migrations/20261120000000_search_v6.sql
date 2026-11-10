@@ -24,9 +24,16 @@
 --   * Company industry words: a card tagged (>= 0.75) with a company also matches that company's sector and
 --     industry words as metadata (0.25, whole word, a plural "s" allowed), so "bank earnings" finds bank results
 --     whose text never says "bank". Metadata alone still cannot pass the 0.5 gate with one word.
+--   * Rare words weigh more (IDF, search_idf_weighting 1): each query word's weight is ln(1 + N / (1 + df)), N the
+--     scanned cards, df the cards it matches; relevance = weighted mean of the per-word relevance over the words
+--     that match anything. "jobs report" put two earnings cards ("... reports ...") above the payroll cards.
+--   * Interest-rate words: for "rate", "rates", "interest", the phrases "unemployment rate", "(annual rate)",
+--     "growth rate", "tax rate" ... are not evidence (the same idea as the Fed / Federal Register rule), so
+--     "rate cut" no longer lists Unemployment rate and Housing starts cards first.
 --
 -- Order key (higher first), unchanged in form:
---   10 x visible + 20 x company tier + (1 - w) x min(relevance / words, 1) + w x prior - micro penalty
+--   10 x visible + 20 x company tier + (1 - w) x min(relevance, 1) + w x prior - micro penalty
+--   relevance = IDF-weighted mean over the query words (v5: plain mean over all query words)
 --   per-word relevance = (1 - hw) x max(visible quality, 0.2 x detail quality) + hw x headline quality
 --   (hw = search_headline_weight). The 0.5 quality gate, the 2000-card scan cap, the dedupe, the cursor
 --   ("key|id|asof|gen|importance|sort_at"), security definer and the empty search_path are unchanged.
@@ -36,13 +43,15 @@
 insert into core.rank_params (key, value) values
   ('search_headline_weight', 0.15),          -- share of per-word relevance that comes from the headline
   ('search_micro_penalty', 0.5),            -- micro-topic cards drop this much unless the query names the topic
-  ('search_company_min_confidence', 0.75)   -- company tier only for tags at least this sure
+  ('search_company_min_confidence', 0.75),  -- company tier only for tags at least this sure
+  ('search_idf_weighting', 1)               -- 1: rarer query words weigh more (IDF); 0: every word weighs the same (v5)
 on conflict (key) do nothing;
 
 alter table core.rank_params drop constraint if exists rank_params_search_v6_range;
 alter table core.rank_params add constraint rank_params_search_v6_range
-  check ((key not in ('search_headline_weight', 'search_micro_penalty', 'search_company_min_confidence'))
-         or (value >= 0 and value <= 1));
+  check (((key not in ('search_headline_weight', 'search_micro_penalty', 'search_company_min_confidence'))
+          or (value >= 0 and value <= 1))
+         and (key <> 'search_idf_weighting' or value in (0, 1)));
 
 create or replace function api.search(p_q text, p_cursor text default null, p_limit int default 20)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
@@ -56,12 +65,13 @@ declare
   c_scan_cap constant int := 2000;
   c_typo_min_len constant int := 5;
   c_prefix_min_len constant int := 3;
+  c_rate_noise constant text := '(^|[^[:alnum:]])(unemployment|jobless|annual|growth|participation|vacancy|savings|exchange|birth|death|tax)[[:space:]]+rates?([^[:alnum:]]|$)';
   c_stop constant text[] := array['the','a','an','and','or','of','to','in','on','for','at','by','with','is','are','was','were','be','it','its','as','from','that','this','what','how','why','who','about','into'];
   v_uid uuid := auth.uid(); v_norm text; v_terms text[]; v_nterms int; v_limit int := least(greatest(coalesce(p_limit,20),1),30);
   v_key numeric := 1e30; v_imp numeric := 1e30; v_sort timestamptz := 'infinity';
   v_id uuid := 'ffffffff-ffff-ffff-ffff-ffffffffffff'; v_asof timestamptz := now(); v_gen bigint;
   v_h numeric; v_cap numeric; v_w numeric; v_aw numeric; v_now_h numeric;
-  v_hw numeric; v_mpen numeric; v_cmin numeric; v_mcats text[]; v_edit boolean;
+  v_hw numeric; v_mpen numeric; v_cmin numeric; v_mcats text[]; v_edit boolean; v_idf boolean;
   v_taste jsonb; v_rows jsonb; v_next text; v_co text[];
   v_empty constant jsonb := jsonb_build_object('items','[]'::jsonb,'next_cursor',null);
 begin
@@ -86,8 +96,9 @@ begin
          coalesce(max(value) filter(where key='search_prior_affinity_share'),0.5),
          coalesce(max(value) filter(where key='search_headline_weight'),0.15),
          coalesce(max(value) filter(where key='search_micro_penalty'),0.5),
-         coalesce(max(value) filter(where key='search_company_min_confidence'),0.75)
-    into v_h,v_cap,v_w,v_aw,v_hw,v_mpen,v_cmin from core.rank_params;
+         coalesce(max(value) filter(where key='search_company_min_confidence'),0.75),
+         coalesce(max(value) filter(where key='search_idf_weighting'),1)=1
+    into v_h,v_cap,v_w,v_aw,v_hw,v_mpen,v_cmin,v_idf from core.rank_params;
   v_h := greatest(v_h,0.5); v_w := least(greatest(v_w,0),0.5); v_aw := least(greatest(v_aw,0),1);
   v_hw := least(greatest(v_hw,0),1); v_mpen := least(greatest(v_mpen,0),1);
   v_mcats := array(select substr(key,16) from core.rank_params where starts_with(key,'micro_category:') and value>0);
@@ -145,33 +156,46 @@ begin
   ),
   field_scores as (
     -- v4 evidence rules (same results), visible text (v), detail text (d) and, new, the headline alone (h)
+    -- v6: for the interest-rate words, "unemployment rate", "(annual rate)", "growth rate" ... are not evidence
+    -- (like the Fed / Federal Register rule): those phrases are blanked out first (z.x)
     select p.id, t.t, f.f, greatest(
-      case when f.x ~ ('(^|[^[:alnum:]])'||t.t||'([^[:alnum:]]|$)')
+      case when z.x ~ ('(^|[^[:alnum:]])'||t.t||'([^[:alnum:]]|$)')
              and t.t not in ('fed','federal','federl') then 1.0
-           when t.t='federal' and f.x ~ '(^|[^[:alnum:]])federal[[:space:]]+reserve([^[:alnum:]]|$)' then 1.0
-           when t.t='fed' and (f.x ~ '(^|[^[:alnum:]])fed([^[:alnum:]]|$)'
-             or f.x ~ '(^|[^[:alnum:]])federal[[:space:]]+reserve([^[:alnum:]]|$)'
-             or f.x ~ '(^|[^[:alnum:]])fomc([^[:alnum:]]|$)') then 1.0 else 0 end,
-      case when (f.tv @@ t.tq
-             or f.x ~ ('(^|[^[:alnum:]])'||t.t||'[[:alnum:]]{1,}([^[:alnum:]]|$)'))
+           when t.t='federal' and z.x ~ '(^|[^[:alnum:]])federal[[:space:]]+reserve([^[:alnum:]]|$)' then 1.0
+           when t.t='fed' and (z.x ~ '(^|[^[:alnum:]])fed([^[:alnum:]]|$)'
+             or z.x ~ '(^|[^[:alnum:]])federal[[:space:]]+reserve([^[:alnum:]]|$)'
+             or z.x ~ '(^|[^[:alnum:]])fomc([^[:alnum:]]|$)') then 1.0 else 0 end,
+      case when ((case when z.blanked then to_tsvector('english',z.x) else f.tv end) @@ t.tq
+             or z.x ~ ('(^|[^[:alnum:]])'||t.t||'[[:alnum:]]{1,}([^[:alnum:]]|$)'))
            and t.t not in ('fed','federal','federl') then 0.8
            when f.f='v' and t.t in ('aapl','msft','ba') and p.tickers @> jsonb_build_array(jsonb_build_object('symbol',upper(t.t))) then 1.0
            when f.f='v' and p.macro @> jsonb_build_array(jsonb_build_object('series_id',upper(t.t))) then 1.0 else 0 end,
-      case when t.syn_re is not null and f.x ~ t.syn_re then 0.6 else 0 end,
-      case when t.typo_re is not null and f.x ~ t.typo_re
+      case when t.syn_re is not null and z.x ~ t.syn_re then 0.6 else 0 end,
+      case when t.typo_re is not null and z.x ~ t.typo_re
             and (t.t not in ('federl','federal') or p.content ~ '(^|[^[:alnum:]])federal[[:space:]]+reserve([^[:alnum:]]|$)') then 0.5 else 0 end,
       case when f.f='v' and p.meta ~ ('(^|[^[:alnum:]])'||t.t||'s?([^[:alnum:]]|$)') then 0.25 else 0 end
     ) q
     from pool p cross join terms t cross join lateral (values ('v',p.vis,p.tv),('d',p.deep,p.td),('h',p.hl,p.th)) f(f,x,tv)
+    cross join lateral (select case when t.t in ('rate','rates','interest') and f.x ~ c_rate_noise
+                                    then regexp_replace(f.x, c_rate_noise, ' ', 'g') else f.x end x,
+                               t.t in ('rate','rates','interest') and f.x ~ c_rate_noise blanked) z
   ), term_scores as (
     select id, t, max(q) filter (where f='v') qv, max(q) filter (where f='d') qd, max(q) filter (where f='h') qh
     from field_scores group by id, t
+  ), term_weights as (
+    -- v6 IDF: a query word found in few of the scanned cards weighs more than one found in many ("jobs report":
+    -- "jobs" decides, not "report", which half the earnings cards say). Words found nowhere do not count.
+    -- search_idf_weighting = 0: every word weighs 1 (v5).
+    select ts.t, case when v_idf then ln(1 + (select count(*) from pool)::numeric / (1 + count(*) filter (where greatest(ts.qv,ts.qd)>0))) else 1 end w
+    from term_scores ts group by ts.t
+    having count(*) filter (where greatest(ts.qv,ts.qd)>0) > 0
   ), matches as (
-    select id, sum(greatest(qv,qd)) quality,
-      sum((1-v_hw)*greatest(qv, c_detail_weight*qd) + v_hw*coalesce(qh,0)) relevance,
-      bool_or(coalesce(qv,0)>0) visible
-    from term_scores group by id
-    having sum(greatest(qv,qd))>=c_min_quality
+    select ts.id, sum(greatest(ts.qv,ts.qd)) quality,
+      sum(coalesce(tw.w,0)*((1-v_hw)*greatest(ts.qv, c_detail_weight*ts.qd) + v_hw*coalesce(ts.qh,0)))
+        / greatest((select sum(w) from term_weights),0.000001) relevance,
+      bool_or(coalesce(ts.qv,0)>0) visible
+    from term_scores ts left join term_weights tw on tw.t=ts.t group by ts.id
+    having sum(greatest(ts.qv,ts.qd))>=c_min_quality
   ), scored as (
     -- prior per matched card, computed inline (no extra pass over the pool):
     -- rank part x/(1+x), x = 2^((trend - now)/H), exponent clamped so power() never overflows;
@@ -179,7 +203,7 @@ begin
     select p.id,p.importance,p.sort_at,
       round((case when m.visible then c_visible_tier else 0 end
         + case when cardinality(v_co)>0 and exists(select 1 from core.card_companies cc where cc.blurb_id=p.id and cc.ticker=any(v_co) and cc.confidence>=v_cmin) then c_company_tier else 0 end
-        + (1-v_w)*least(round(m.relevance,4)/v_nterms,1)
+        + (1-v_w)*least(round(m.relevance,4),1)
         + v_w*case when v_uid is null then x.rp
             else (1-v_aw)*x.rp + v_aw*(least(greatest(
               coalesce(core.taste_hours(v_taste,p.category,coalesce(p.event_type,p.kind),case when p.kind='data' then 'fred' else core.source_key_of(p.kind,p.id) end),0)

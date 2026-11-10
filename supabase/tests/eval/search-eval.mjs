@@ -30,9 +30,9 @@ export const BATTERY = [
   ['topic', 'jobs report', /payroll|[Uu]nemployment|jobs report/], ['topic', 'housing', /[Hh]ousing starts|mortgage/],
   ['topic', 'earthquake', /[Ee]arthquake/], ['topic', 'recall', /[Rr]ecall/], ['topic', 'stablecoin', /stablecoin/],
   ['topic', 'gdp', /GDP|economy grew/], ['topic', 'trade deficit', /trade deficit/],
-  ['multi', 'bank earnings', /^(JPMorgan|Goldman|Wells Fargo|Citigroup|PNC|State Street).* reports .* revenue/],
+  ['multi', 'bank earnings', /^(JPMorgan|Goldman|Wells Fargo|Citigroup|PNC|State Street|U.S. Bancorp|Truist|Schwab|BlackRock|SoFi).* (reports|posts) /],
   ['multi', 'fed rate cut', /[Ff]ederal funds|FOMC|rate cut/], ['multi', 'ceo change', /top leaders|chief (executive|financial) officer/],
-  ['multi', 'credit facility', /credit facility|senior notes|borrowing/], ['multi', '10 year treasury', /10-year Treasury/],
+  ['multi', 'credit facility', /credit (facility|agreement|line)|senior notes|borrowing|financing|loan/], ['multi', '10 year treasury', /10-year Treasury/],
   ['multi', 'quarterly revenue record', /revenue/], ['multi', 'faa boeing', /FAA.*Boeing/],
 ];
 
@@ -79,7 +79,7 @@ console.log(`ALL      ${String(all.length).padStart(7)}  ${m('p5')}  ${m('p10')}
 // --ablate: the same battery with each v6 setting switched off in turn (core.rank_params, rolled back after)
 await battery('current settings', false);
 if (process.argv.includes('--ablate')) {
-  for (const [k, v] of [['search_headline_weight', 0], ['search_headline_weight', 0.15], ['search_micro_penalty', 0], ['search_company_min_confidence', 0]]) {
+  for (const [k, v] of [['search_headline_weight', 0], ['search_headline_weight', 0.15], ['search_micro_penalty', 0], ['search_company_min_confidence', 0], ['search_idf_weighting', 0]]) {
     const old = (await rows(db, 'select value from core.rank_params where key = $1', [k]))[0];
     if (!old) continue;
     await db.query('update core.rank_params set value = $2 where key = $1', [k, v]);
