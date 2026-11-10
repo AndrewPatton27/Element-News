@@ -35,7 +35,7 @@ export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; c
             accessible
             accessibilityLabel={withToneLabel(factA11yLabel(f), f.series_id, f.direction)}
           >
-            <Text style={[styles.label, { color: p.dataInk }]}>{f.label}</Text>
+            <Text numberOfLines={2} style={[styles.label, { color: p.dataInk }]}>{f.label}</Text>
             <View style={[styles.valueRow, multi && styles.valueCol]}>
               <Text style={[styles.value, { color: p.ink, fontSize: valueSize, lineHeight: Math.round(valueSize * 1.05), letterSpacing: -valueSize * 0.02 }]}>{f.value}</Text>
               {changeText(f) ? <Text style={[styles.change, { color: changeColor(p, f) }]}>{changeText(f)}</Text> : null}

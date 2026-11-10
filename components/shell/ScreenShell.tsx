@@ -27,10 +27,11 @@ export interface ScreenShellProps {
   onClose?: () => void;
   brandTitle?: boolean;
   hideTitle?: boolean;
+  notice?: boolean; // D-80: the persistent AI notice + disclaimer line (feed-style screens)
   children: ReactNode;
 }
 
-export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBack, backLabel = 'Back', onClose, brandTitle, hideTitle, children }: ScreenShellProps) {
+export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBack, backLabel = 'Back', onClose, brandTitle, hideTitle, notice, children }: ScreenShellProps) {
   const p = usePalette();
   const wide = useWide();
 
@@ -46,7 +47,7 @@ export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBa
       </View>
     );
     return (
-      <Shell active={tab} bare>
+      <Shell active={tab} bare notice={notice}>
         {scroll ? (
           <ScrollView style={styles.fill} contentContainerStyle={styles.columnWide}>
             {titleRow}
@@ -63,7 +64,7 @@ export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBa
   }
 
   return (
-    <Shell active={tab} bare noFab={Boolean(onClose)}>
+    <Shell active={tab} bare noFab={Boolean(onClose)} notice={notice}>
       <View
         style={[
           styles.header,

@@ -35,6 +35,16 @@ export function aiNoticeText(config: Pick<AppConfig, 'ai_notice'> | null | undef
   return nonEmpty(config?.ai_notice, AI_NOTICE_FALLBACK);
 }
 
+// D-80: feed-style screens (Trending, Latest, For you, Following, Search, Brief) show the
+// AI notice and the disclaimer ONCE, as a persistent line directly under the card area
+// (components/shell/FeedNotice.tsx), instead of inside every card. Standalone views
+// (detail sheet, the /b/<id> share page) still carry both texts themselves.
+export const FEED_AI_NOTICE = 'AI-generated summaries may contain errors';
+
+export function feedNoticeText(config: Pick<AppConfig, 'disclaimer'> | null | undefined): string {
+  return `${FEED_AI_NOTICE} · ${disclaimerText(config)}`;
+}
+
 export function primarySource(card: Pick<BlurbCard, 'sources'>) {
   return card.sources.find((s) => s.is_primary) ?? card.sources[0] ?? null;
 }
@@ -76,21 +86,6 @@ export function howMadeText(card: Pick<BlurbCard, 'kind' | 'ai'>): string {
     return 'An AI wrote this summary from the source above, then it was checked automatically against that text. It can still be wrong, so read the source for anything important.';
   }
   return 'Written from the filing’s details with a fixed template. No AI was used. Read the source for the full picture.';
-}
-
-// ---- Where the disclaimer goes on a card ----
-//
-// Every card shows the disclaimer exactly once. With reaction buttons the footer row is
-// taken by them, so the line goes underneath; without them it sits in the footer row.
-// One function decides, and exactly one of the two slots is ever true, whatever props
-// the card gets (Card.tsx renders from this; lib/__tests__/disclaimer.test.ts checks it).
-export interface DisclaimerPlacement {
-  inline: boolean; // in the footer row, beside the "next" hint
-  below: boolean; // under the footer row (the reaction buttons use the row)
-}
-
-export function disclaimerPlacement(hasReactions: boolean): DisclaimerPlacement {
-  return hasReactions ? { inline: false, below: true } : { inline: true, below: false };
 }
 
 // ---- Share-alike (Wikipedia, CC BY-SA 4.0) ----

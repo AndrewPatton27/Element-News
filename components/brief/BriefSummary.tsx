@@ -34,7 +34,7 @@ export function BriefSummary({ summary, mode, config, wide }: { summary: BriefSu
           {para.trim()}
         </Text>
       ))}
-      <Text style={[styles.label, { color: p.muted }]}>{summaryFooter(config)}</Text>
+      <Text style={[styles.label, { color: p.muted }]}>{summaryFooter()}</Text>
     </View>
   );
 }

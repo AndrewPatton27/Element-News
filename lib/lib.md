@@ -17,7 +17,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | `shared/` | Helpers used across folders: app data, card detail, formatting, labels, types, open-URL, card actions |
 | `sources/` | Source keys and source info |
 | `storage/` | Local preferences and storage wrapper |
-| `theme/` | Theme tokens, theme hook and tooltip helper |
+| `theme/` | Theme tokens, theme hook and tooltip helper (`webGlobalStyles.ts`: web-only global CSS for focus rings, long-word wrapping and reduced motion) |
 | `tutorial/` | Tutorial steps and logic |
 | `__tests__/` | Node test-runner tests (`npm run test:app`) |
 
@@ -79,7 +79,8 @@ Files in `lib/__tests__/`: `account`, `api`, `detail`, `dwell`, `feedLogic`, `fi
 
 - **`feedLogic.ts` – `loadFeedPages`, `decidePage`, `shouldLoadMore`, `needsRefill`.** Paging looks at the list the reader can *see* (hidden topics and sources removed, the same filter the feed screen uses). A page that adds nothing visible keeps fetching, at most `MAX_EMPTY_HOPS` (3) extra pages. The chain always stops when `next_cursor` is null or repeats (any cursor already requested), so it cannot loop; a chain that ends this way marks the feed done. A list that filtered down to nothing while the server has more refills itself (`needsRefill`); an error never refills (retry shows instead). `useFeed(api, query, account, filter)` wires this to React.
 - **`errors.ts`.** `friendlyHttpError(status, rawMessage, code)` maps HTTP and PostgREST errors (`invalid_cursor`, `unknown_card`, `PGRST301`, 42501, 4xx/5xx) to short sentences; `userMessage(err, fallback)` shows only our own `ApiError` / `AccountError` text and hides anything else (parse failures, TypeErrors). The raw text stays on the error as `.detail` and is printed with `console.warn` only when `__DEV__` is true. A rejected cursor makes Retry restart the list.
-- **`labels.ts` – `disclaimerPlacement(hasReactions)`.** Decides where the disclaimer goes (in the footer row, or under the reaction buttons). Exactly one slot is ever true, so every card renders the disclaimer once (`__tests__/disclaimer.test.ts`).
+- **`labels.ts` – `feedNoticeText(config)` / `FEED_AI_NOTICE`.** The text of the persistent feed notice strip (D-80): "AI-generated summaries may contain errors · " + the disclaimer (built-in fallback when the config is empty). Tested in `__tests__/disclaimer.test.ts`.
+- **`shared/cardBody.ts` – `cardTakeaways`, `cardBarMeta`, `shortTime`.** What a card shows under its headline (2-4 of its own key points, else its summary; link-out cards nothing) and what its bottom bar says (source, document label, time, short time, count, accessible names). Pure; `__tests__/cardBody.test.ts`.
 - **`account.ts` – `trackDwellOnExit` and `planRpc`.** The last dwell on `pagehide` is sent with `fetch` `keepalive: true` and the user's auth header (`sendBeacon` cannot set headers). It uses the stored token as it is (nothing can be awaited while the page closes), is skipped when signed out or expired, and never throws.
 - New tests: `errors`, `feedPaging`, `disclaimer` (`lib/__tests__/`).
 
@@ -146,7 +147,7 @@ The rules now:
 
 Tests: `__tests__/feedNav.test.ts` (422 cases: unit cases, 400 seeded fuzz sequences of key presses, auto-repeat, like/dislike/undo, swipes, user and stale scroll reports, refetch reshuffles, inserted cards, reranks and head swaps, plus Drew's case of a held ArrowRight during background refetches), and `e2e/feedNav.spec.ts`.
 
-`feed/toastPlacement.ts` holds the corner Undo toast's position and sizes. `CORNER_TOAST.bottom` (phone 64 px, wide 40 px from the bottom of the area the toast is drawn in) is the single value that sets how high it sits. The pill is 36 px tall and the Undo target is 44 px. `cornerToastText` gives the short visible word and the full spoken sentence. Tests: `__tests__/toastPlacement.test.ts`; the placement itself is checked in `e2e/feedNav.spec.ts`.
+`feed/toastPlacement.ts` holds the corner Undo toast's position and sizes (phones: bottom 28, over the left end of the card's bottom bar, since cards have no small print any more). `CORNER_TOAST.bottom` (phone 64 px, wide 40 px from the bottom of the area the toast is drawn in) is the single value that sets how high it sits. The pill is 36 px tall and the Undo target is 44 px. `cornerToastText` gives the short visible word and the full spoken sentence. Tests: `__tests__/toastPlacement.test.ts`; the placement itself is checked in `e2e/feedNav.spec.ts`.
 
 Note for code that filters the feed (for example seen-exclusion): removing a card that is already rendered drops it from the pager. If that card is the current one, the reader moves on. Filter new pages, not the cards already on screen.
 
