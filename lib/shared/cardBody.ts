@@ -9,7 +9,7 @@
 
 import type { BlurbCard } from '../../contract/types.ts';
 import { cardDetail } from './detail.ts';
-import { addedLabel, cardTime } from './format.ts';
+import { stampLabel } from './timestamp.ts';
 import { primarySource, sourcesText } from './labels.ts';
 
 export const TAKEAWAYS_MIN = 2;
@@ -81,16 +81,17 @@ export function cardBarMeta(
 ): CardBarMeta | null {
   const src = primarySource(card);
   if (!src) return null;
-  const base = cardTime(card, opts.now);
-  const time = opts.timeLabel === 'added' ? addedLabel(card, opts.now) || base : base;
+  const stamp = stampLabel(card, opts.timeLabel === 'added' ? 'sheet' : 'card', opts.now);
+  const used = stamp.label ? stamp : stampLabel(card, 'card', opts.now);
+  const time = used.label;
   const count = Math.max(1, card.source_count || 0, card.sources.length);
-  const when = time ? ` Published ${time.replace(/^Added /, '')}.` : '';
+  const when = !time ? '' : /^(Filed|Data as of) /.test(time) ? ` ${time}.` : ` Published ${time.replace(/^Added /, '')}.`;
   return {
     name: src.name,
     shortName: shortSourceName(src.name),
     docLabel: src.doc_label && src.doc_label.trim() !== '' ? src.doc_label : null,
     time,
-    timeShort: shortTime(time),
+    timeShort: used.short,
     count,
     a11y: `Sources: ${sourcesText(card)}.${when} Opens the list with links to the originals.`,
     a11yLink: `Source: ${src.name}${count > 1 ? `, ${count} sources` : ''}.${when} Opens the original.`,
