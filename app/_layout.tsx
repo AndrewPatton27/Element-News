@@ -22,11 +22,14 @@ import { light, paletteFor } from '../lib/theme/theme';
 import { ConfigErrorScreen } from '../components/shell/States';
 import { AppErrorBoundary, ErrorBoundary } from '../components/shell/ErrorBoundary';
 import { installChunkReload, type WindowLike } from '../lib/shared/crashReport';
+import { installWebGlobalCss } from '../lib/theme/webGlobalStyles';
 const TutorialGate = lazy(() => import('../components/tutorial/Tutorial').then((module) => ({ default: module.TutorialGate })));
 
 // Web: a screen file from an older deploy that fails to load outside React also reloads once
 // (lib/shared/crashReport.ts explains the stale-chunk crash).
 if (Platform.OS === 'web' && typeof window !== 'undefined') installChunkReload(window as unknown as WindowLike);
+// Web: keyboard focus rings, long-word wrapping and reduced-motion CSS (lib/theme/webGlobalStyles.ts).
+if (Platform.OS === 'web' && typeof document !== 'undefined') installWebGlobalCss(document);
 const noTour = () => null;
 
 export default function RootLayout() {
