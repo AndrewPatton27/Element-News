@@ -158,7 +158,7 @@ test('search: empty box suggests up to 5 stories above the topics, a suggestion 
   await page.goto('/search');
   const box = page.getByTestId('search-suggestions');
   await expect(box).toBeVisible({ timeout: 30_000 });
-  await expect(box.getByText('Suggested for you')).toBeVisible();
+  await expect(box.getByText('Popular right now')).toBeVisible();
   const rows = box.locator('[aria-label$="Opens more detail"]');
   const n = await rows.count();
   expect(n).toBeGreaterThan(0);

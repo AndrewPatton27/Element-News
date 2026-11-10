@@ -348,7 +348,7 @@ export function Card(props: Props) {
                   {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} /> : null}
 
                   {showTakeaways ? (
-                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} maxWidth={wide || tablet ? 720 : undefined} />
+                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />
                   ) : null}
 
                   {/* Which companies the card is about; a chip opens the company page (components/companies/AboutChips). */}

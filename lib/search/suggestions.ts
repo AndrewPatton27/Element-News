@@ -48,6 +48,11 @@ export function seenIdsOf(seen: readonly { id: string }[], reactions: Record<str
   return out;
 }
 
+/** Signed out nothing is personal, so the list is called what it is. */
+export function suggestionsHeading(signedIn: boolean): string {
+  return signedIn ? 'Suggested for you' : 'Popular right now';
+}
+
 /** The small line above a suggestion: "Economy · 2 h ago". */
 export function suggestionMeta(topic: string, time: string): string {
   return [topic, time].filter((x) => x && x.trim() !== '').join(' · ');

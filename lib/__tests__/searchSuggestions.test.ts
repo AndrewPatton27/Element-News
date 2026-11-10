@@ -34,3 +34,9 @@ test('meta line', () => {
   assert.equal(suggestionMeta('Economy', '2 h ago'), 'Economy · 2 h ago');
   assert.equal(suggestionMeta('Economy', ''), 'Economy');
 });
+
+test('heading: signed out is "Popular right now", signed in is "Suggested for you"', async () => {
+  const { suggestionsHeading } = await import('../search/suggestions.ts');
+  assert.equal(suggestionsHeading(false), 'Popular right now');
+  assert.equal(suggestionsHeading(true), 'Suggested for you');
+});

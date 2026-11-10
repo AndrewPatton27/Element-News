@@ -25,6 +25,13 @@ export const SOURCES: SourceInfo[] = [
     terms: { label: 'Website notice', url: 'https://www.federalreserve.gov/disclaimer.htm' },
   },
   {
+    key: 'bls',
+    name: 'Bureau of Labor Statistics (BLS)',
+    gives: 'Release pages for jobs, inflation and wages. The numbers on data cards come through FRED and name BLS as the agency.',
+    site: 'https://www.bls.gov/',
+    terms: { label: 'Website linking and copyright', url: 'https://www.bls.gov/opub/copyright-information.htm' },
+  },
+  {
     key: 'bea',
     name: 'Bureau of Economic Analysis (BEA)',
     gives: 'Economic releases such as GDP and personal income.',

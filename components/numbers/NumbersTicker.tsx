@@ -24,6 +24,8 @@ import { useNumbers } from './NumbersPanel';
 
 // Pixels travelled per second. Lower is calmer.
 const SPEED = 48;
+// Smallest text size in the strip (px).
+const MIN_FONT = 14;
 // Edge fade: bands of the strip colour, most opaque at the very edge.
 const FADE_STEPS = [0.95, 0.7, 0.45, 0.2];
 
@@ -70,9 +72,16 @@ export function NumbersTicker({ api }: { api: Api; config: AppConfig | null }) {
     };
     el.addEventListener('mouseenter', enter);
     el.addEventListener('mouseleave', leave);
+    // a finger on the strip holds it still too
+    el.addEventListener('touchstart', enter, { passive: true });
+    el.addEventListener('touchend', leave);
+    el.addEventListener('touchcancel', leave);
     return () => {
       el.removeEventListener('mouseenter', enter);
       el.removeEventListener('mouseleave', leave);
+      el.removeEventListener('touchstart', enter);
+      el.removeEventListener('touchend', leave);
+      el.removeEventListener('touchcancel', leave);
     };
   }, [reduced, facts]);
   useEffect(() => {
@@ -137,7 +146,8 @@ export function NumbersTicker({ api }: { api: Api; config: AppConfig | null }) {
     <View
       style={styles.row}
       onLayout={onMeasure ? (e) => onMeasure(e.nativeEvent.layout.width) : undefined}
-      // The whole strip is one link with a full label, so the items themselves are hidden.
+      // The whole strip is one link with a full label, so the items themselves are hidden (both the
+      // readable copy and the loop copy used for the seamless wrap).
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       aria-hidden
@@ -188,9 +198,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 44, paddingRight: 44, alignItems: 'center' },
   reduced: { paddingHorizontal: 16, alignItems: 'center' },
   item: { flexDirection: 'row', alignItems: 'baseline', gap: 8, minHeight: 44, paddingVertical: 10 },
-  label: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 0.48, textTransform: 'uppercase' },
+  label: { fontFamily: fonts.sans, fontSize: MIN_FONT, letterSpacing: 0.4, textTransform: 'uppercase' },
   value: { fontFamily: fonts.serif, fontSize: 18, lineHeight: 22 },
-  change: { fontFamily: fonts.sansSemi, fontSize: 12 },
+  change: { fontFamily: fonts.sansSemi, fontSize: MIN_FONT },
   fade: { position: 'absolute', top: 0, bottom: 0, width: 28, flexDirection: 'row' },
   fadeLeft: { left: 0 },
   fadeRight: { right: 0, flexDirection: 'row-reverse' },

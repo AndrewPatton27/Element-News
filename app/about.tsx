@@ -74,11 +74,19 @@ export default function AboutScreen() {
           from and how it is made.
         </Text>
 
+        <View style={[styles.tint, wide && styles.tintWide, { backgroundColor: p.accentSoft }]}>
+          <Text style={[wide ? styles.textWide : styles.text, { color: p.accentInk }]}>
+            <Text style={styles.strong}>What this is not.</Text>
+            {' '}Element is not investment, tax or retirement advice, and it does not tell you what to buy or sell. It is news and public data in plain language.
+          </Text>
+        </View>
+
         <AccountPrompt />
 
         <Section title="How a card is made">
           <Text style={text}>
-            Summary cards are written by AI from official filings and agency releases, then checked against the source. Data cards show new
+            Summary cards are written by AI from official filings and agency releases. Every number in a summary is checked automatically to
+            appear in the source. That check cannot catch every mistake, so open the source before you rely on a card. Data cards show new
             government numbers.
           </Text>
         </Section>
@@ -156,7 +164,7 @@ export default function AboutScreen() {
         <Section title="How cards are written">
           <Bullets
             items={[
-              'An AI writes each summary from the source text: Google Gemini (free tier), with Groq as a backup. Some cards use a fixed template and no AI at all.',
+              'An AI writes each summary from the source text: Google Gemini (on Google’s free tier today), with Groq as a backup. Some cards use a fixed template and no AI at all.',
               'Cards are written in plain words, at about an 8th-grade reading level.',
               'Every AI card is checked automatically: every number must appear in the source, there is no buy, sell or advice language, only short quotes are copied (at most 10 words from filings and Wikipedia, 25 from Fed and BLS text), and the length is limited.',
               'If a draft fails a check it gets one more try. If it still fails, a backup or a plain template card is used instead.',
