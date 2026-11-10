@@ -16,7 +16,7 @@
 // Inputs: SummarizeInput, the provider list, a usage counter and options (caps, cooldown, relevance).
 // Outputs: ChainResult (draft, provider, model, relevance, log lines without text or keys).
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { aiDailyCap, config } from '../config.ts';
 import { assertSummarizable, checkRelevance, checkShape, requiresFigures, trimBodyToFit, validateDetail, validateDraft, type SourceText } from '../validate.ts';
@@ -34,23 +34,66 @@ export function memoryCounter(): UsageCounter {
   return { used: (p) => m.get(p) ?? 0, add: (p) => m.set(p, (m.get(p) ?? 0) + 1) };
 }
 
-/** Per-day counter stored in a local JSON file (resets when the UTC date changes). */
+/** Blocks the thread for `ms` (the UsageCounter interface is synchronous). */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Runs `fn` while holding `<path>.lock`, created with O_EXCL ('wx'), so two processes (e.g. a --loop run
+ * and a manual run) never interleave a read-modify-write. A lock older than staleMs (a crashed process)
+ * is removed; after timeoutMs the call throws instead of counting without the lock.
+ */
+function withFileLock<T>(path: string, fn: () => T, staleMs = 10_000, timeoutMs = 15_000): T {
+  const lock = `${path}.lock`;
+  mkdirSync(dirname(path), { recursive: true });
+  const start = Date.now();
+  for (;;) {
+    try {
+      closeSync(openSync(lock, 'wx'));
+      break;
+    } catch (e) {
+      // Windows answers EPERM/EACCES/EBUSY while the previous holder's lock file is still being deleted.
+      if (!['EEXIST', 'EPERM', 'EACCES', 'EBUSY'].includes((e as { code?: string }).code ?? '')) throw e;
+      try { if (Date.now() - statSync(lock).mtimeMs > staleMs) { unlinkSync(lock); continue; } } catch { /* released meanwhile */ }
+      if (Date.now() - start > timeoutMs) throw new Error(`usage counter: could not lock ${lock}`);
+      sleepSync(2 + Math.floor(Math.random() * 5));
+    }
+  }
+  try { return fn(); } finally { try { unlinkSync(lock); } catch { /* already gone */ } }
+}
+
+/**
+ * Per-day counter stored in a local JSON file (resets when the UTC date changes). add() is atomic across
+ * processes: lockfile around read-modify-write, and the new state is written to a temp file and renamed.
+ */
 export function fileCounter(path: string, today = () => new Date().toISOString().slice(0, 10)): UsageCounter {
   const load = (): { day: string; counts: Record<string, number> } => {
-    try {
-      const s = JSON.parse(readFileSync(path, 'utf8'));
-      if (s.day === today()) return s;
-    } catch { /* first run */ }
+    for (let i = 0; ; i++) {
+      try {
+        const s = JSON.parse(readFileSync(path, 'utf8'));
+        if (s.day === today()) return s;
+        break;
+      } catch (e) {
+        // No file yet: first run today. Anything else (Windows EPERM during a rename) is retried briefly,
+        // so a busy file is never read as "0 calls used".
+        if ((e as { code?: string }).code === 'ENOENT' || i >= 50) break;
+        sleepSync(2);
+      }
+    }
     return { day: today(), counts: {} };
   };
   return {
     used: (p) => load().counts[p] ?? 0,
-    add: (p) => {
+    add: (p) => withFileLock(path, () => {
       const s = load();
       s.counts[p] = (s.counts[p] ?? 0) + 1;
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(s));
-    },
+      const tmp = `${path}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify(s));
+      for (let i = 0; ; i++) {                       // Windows: a reader holding the file open can make rename fail briefly
+        try { renameSync(tmp, path); break; } catch (e) { if (i >= 50) throw e; sleepSync(2); }
+      }
+    }),
   };
 }
 
@@ -105,6 +148,7 @@ export async function summarizeWithChain(
   opts: {
     cap?: number; minIntervalMs?: number; state?: ChainState; cooldownMs?: number; now?: () => number;
     minRelevance?: number; requireRelevance?: boolean;
+    maxAttempts?: number;   // attempts per provider (default 2); the report-card rewrite uses 1
   } = {},
 ): Promise<ChainResult> {
   const now = opts.now ?? Date.now;
@@ -125,8 +169,8 @@ export async function summarizeWithChain(
       continue;
     }
     const cap = opts.cap ?? p.dailyCap ?? aiDailyCap();
-    let retryErrors: string[] | undefined;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    let retryErrors: string[] | undefined = input.retryErrors;   // a caller's errors (report-card rewrite) go into attempt 1
+    for (let attempt = 1; attempt <= (opts.maxAttempts ?? 2); attempt++) {
       if (counter.used(p.name) >= cap) {
         log.push(`${p.name}: daily cap ${cap} reached`);
         break;
@@ -135,7 +179,9 @@ export async function summarizeWithChain(
       counter.add(p.name);
       let draft: SummaryDraft;
       try {
-        draft = await p.summarize({ ...input, retryErrors });
+        // onExtraCall: a provider that sends a second HTTP request for the same draft (retired-model
+        // fallback, json_schema -> json_object retry) counts it against the same daily cap.
+        draft = await p.summarize({ ...input, retryErrors, onExtraCall: () => counter.add(p.name) });
       } catch (e) {
         log.push(`${p.name}: ${(e as Error).name}: ${(e as Error).message}`);
         if ((e as Error).name === 'RateLimitedError') {

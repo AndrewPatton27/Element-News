@@ -108,6 +108,43 @@ test('protocol on: template cards are never scored', async () => {
   assert.ok(t.dry.cards.length > 0);
 });
 
+// ---- the REVISE rewrite runs every draft check (copy limit, numbers in source, shape, detail) -------------
+/** Writer for the Apple 8-K fixture: a valid first draft; the rewrite copies a 15-word run and invents a number. */
+function copyingWriter(log: string[]): Summarizer {
+  return {
+    name: 'gemini', usesAi: true, model: 'fake-writer',
+    async summarize(i) {
+      const money = /\$\d[\d,.]*\d (?:billion|million)/.exec(i.text)?.[0] ?? '$1 billion';
+      if (!i.retryErrors?.length) {
+        log.push('first');
+        return { headline: 'Apple shares its latest quarterly results', body: `Sales came to ${money} for the period. The company told the SEC in a filing.`, category: 'earnings', event_type: 'earnings', tickers: [], everyday_relevance: 4 };
+      }
+      log.push('rewrite');
+      const words = i.text.replace(/\s+/g, ' ').split(' ');
+      const at = words.findIndex((_, k) => k > 20 && words.slice(k, k + 15).every((w) => /^[A-Za-z,]+$/.test(w)));
+      assert.ok(at > 0, 'the fixture has a 15-word run without numbers');
+      const run = words.slice(at, at + 15).join(' ').replace(/,$/, '');             // 15 consecutive source words
+      return { headline: 'Apple shares its latest quarterly results', body: `Sales came to ${money} for the period. ${run}. It added 987654 new users.`, category: 'earnings', event_type: 'earnings', tickers: [], everyday_relevance: 4 };
+    },
+  };
+}
+
+test('protocol on: a REVISE rewrite that copies 15 words from an 8-K and invents a number is not published', async () => {
+  const wlog: string[] = [];
+  const revise = { async generate(prompt: string) {
+    const cards = prompt.slice(prompt.lastIndexOf('CARDS '), prompt.lastIndexOf('RECENT '));
+    const id = /"id":"([^"]+)"/.exec(cards)![1]!;
+    if (/987654/.test(cards)) return JSON.stringify({ scores: [ENTRY(id, {})] });    // the scorer likes the rewrite
+    return JSON.stringify({ scores: [ENTRY(id, { scores: { headline: 1, summary: 0, trust: 2, importance: 2 }, recommendations: ['add why it matters'] })] });
+  } };
+  const t = setup({ providers: [copyingWriter(wlog)], reportCard: { enabled: true, scorer: revise } });
+  const s = await runOnce(t.deps, { only: ['sec'], limit: 3 });
+  assert.ok(wlog.includes('rewrite'), `the rewrite ran: ${t.lines.join('\n')}`);
+  assert.equal(s.published, 0, t.dry.cards.map((c) => c.body).join('\n'));
+  assert.ok(!t.dry.cards.some((c) => /987654/.test(c.body ?? '')), 'the invented number never reaches a card');
+  assert.ok(t.statuses.includes('skipped:report_card_revise_failed'), t.statuses.join(', '));
+});
+
 // ---- --fix-category ------------------------------------------------------------------------------------
 const ID = '3f2b8c1e-5a6d-4e7f-9a0b-1c2d3e4f5a6b';
 test('fixCategory calls set_card_category through the publisher and returns 0 / 1', async () => {
