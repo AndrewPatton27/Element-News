@@ -410,6 +410,7 @@ export default function FeedScreen() {
   return (
     <Shell
       active="feed"
+      notice
       feedTab={{ mode, onChange: setMode }}
       left={
         wide ? (

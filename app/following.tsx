@@ -29,7 +29,6 @@ import { storiesHeader } from '../lib/following/followedStories';
 import { useFollowedStories } from '../lib/following/useFollowedStories';
 import { FollowingFeed } from '../components/following/FollowingFeed';
 import { SourcesSheet } from '../components/card/SourcesSheet';
-import { aiNoticeText, disclaimerText } from '../lib/shared/labels';
 import { rerankFollowing } from '../lib/following/followingRerank';
 
 export default function FollowingScreen() {
@@ -123,7 +122,7 @@ export default function FollowingScreen() {
   );
 
   return (
-    <ScreenShell tab="following" title="Following" meta={wide ? countLine : undefined}>
+    <ScreenShell tab="following" title="Following" meta={wide ? countLine : undefined} notice>
       {!wide && rows.length ? (
         <View style={styles.countRow}>
           <Text style={[styles.countLeft, { color: p.ink }]}>{hdr.left}</Text>
@@ -184,8 +183,6 @@ export default function FollowingScreen() {
         empty={empty}
       />
 
-      <Text style={[styles.footer, { color: p.muted }]}>{aiNoticeText(config)} · {disclaimerText(config)}</Text>
-
       <UndoToast
         message={undo ? cornerToastText('unfollowStory').text : null}
         label={cornerToastText('unfollowStory').label}
@@ -205,7 +202,6 @@ export default function FollowingScreen() {
 }
 
 const styles = StyleSheet.create({
-  footer: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingTop: 4 },
   intro: { fontFamily: fonts.sans, fontSize: font.chip, lineHeight: 20, paddingHorizontal: 4 },
   introWide: { fontSize: font.body, lineHeight: 24, maxWidth: 640, paddingHorizontal: 0 },
   section: { fontFamily: fonts.sansSemi, fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', paddingHorizontal: 4 },
