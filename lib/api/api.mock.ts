@@ -10,6 +10,7 @@ import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
 import { mockFeedStatus } from './mockStatus.ts';
+import { wantsWorstCase, worstCaseCards } from '../shared/mockWorst.ts';
 import { createMockCompanyApi } from '../companies/companyApi.ts';
 import { parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 
@@ -38,7 +39,8 @@ export function allCards(): BlurbCard[] {
 }
 
 export function createMockApi(): Api {
-  const cards = allCards();
+  // ?mock_data=worst: stress-test cards for the layout (lib/shared/mockWorst.ts)
+  const cards = wantsWorstCase() ? worstCaseCards(allCards()) : allCards();
   const trends = SAMPLE_NUMBER_TRENDS.map((t) => ({ ...t, points: [...t.points] }));
   const features = createMockFeatureApi(cards, parseMacroFacts(numbers), trends);
   const companies = createMockCompanyApi(cards);

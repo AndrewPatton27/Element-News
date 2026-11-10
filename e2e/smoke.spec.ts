@@ -30,9 +30,9 @@ async function onScreenIndex(page: Page, selector: string): Promise<number> {
 }
 
 async function currentHeadline(page: Page): Promise<string> {
-  const idx = await onScreenIndex(page, '[role="heading"][aria-level="1"], h1');
+  const idx = await onScreenIndex(page, '[data-testid="card-headline"]');
   expect(idx, 'a card headline is on screen').toBeGreaterThanOrEqual(0);
-  return page.locator('[role="heading"][aria-level="1"], h1').nth(idx).innerText();
+  return page.locator('[data-testid="card-headline"]').nth(idx).innerText();
 }
 
 async function nextCard(page: Page) {

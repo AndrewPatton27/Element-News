@@ -9,7 +9,7 @@
 // to react lives in FeedPager.
 
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type AccessibilityActionEvent } from 'react-native';
 import type { AppConfig, BlurbCard, Category } from '../../contract/types.ts';
 import { categoryName, clampHeadline, eventLabel } from '../../lib/shared/format';
 import { primarySource, shareAlikeCredit } from '../../lib/shared/labels';
@@ -129,14 +129,17 @@ export function Card(props: Props) {
   const tight = !!wide && box.h > 0 && box.h < 660;
   // Tablets in the phone layout (a card over 600 px wide and 900 px tall): newspaper-size
   // type and roomier gaps, so the centred content fills the card instead of floating in it.
-  const tablet = !wide && !compact && box.w >= 600 && box.h >= 700;
+  // Decided from the window (not the card's own size), because on tablets the card hugs its
+  // content and its measured height changes with it.
+  const win = useWindowDimensions();
+  const tablet = !wide && !compact && win.width >= 640 && win.height >= 900;
   const wideSize = tight ? 40 : box.w > 0 && box.w < 600 ? 38 : card.headline.length > 80 ? 42 : 48;
   // Feed-Data / Feed-LinkOut drafts: data and link-out cards get 24 px padding and a
   // 32 px headline on phones. Two-number data cards have a tall panel and the FRED
   // notice to show, so on phones they use the summary-card sizes and the panel tightens.
   const denseData = !wide && card.kind === 'data' && card.macro.length > 1;
   const roomy = !wide && !compact && card.kind !== 'summary' && !denseData;
-  const phoneSize = tablet ? (card.headline.length > 80 ? 44 : 50) : compact || denseData ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
+  const phoneSize = tablet ? (card.headline.length > 80 ? 44 : 50) : compact ? 22 : denseData ? 24 : card.headline.length > 80 ? (roomy ? 28 : 26) : roomy ? 32 : 28;
   const headlineSize = wide ? wideSize : phoneSize;
   const headlineTrack = wide ? 0.025 : roomy ? 0.015 : 0.02;
   const headlineLead = wide ? 1.07 : linkOut ? 1.12 : 1.1;
@@ -201,6 +204,8 @@ export function Card(props: Props) {
         { color: p.ink, fontSize: headlineSize, lineHeight: headlineSize * headlineLead, letterSpacing: -headlineSize * headlineTrack, maxWidth: wide || tablet ? 820 : undefined },
       ]}
       accessibilityRole="header"
+      aria-level={2}
+      testID="card-headline"
     >
       {/* link-out headlines are shown word for word (200-character cap, rule 7) */}
       {linkOut ? card.headline.slice(0, 200) : clampHeadline(card.headline)}
@@ -225,7 +230,7 @@ export function Card(props: Props) {
         {...tip(storyFollowed ? 'Following this story (click to stop)' : 'Follow this story')}
         accessibilityState={{ selected: storyFollowed }}
         aria-pressed={storyFollowed}
-        style={({ pressed }) => [styles.iconBtn, storyFollowed && { backgroundColor: p.accentSoft }, { opacity: pressed ? 0.7 : 1 }]}
+        style={({ pressed }) => [styles.iconBtn, storyFollowed && { backgroundColor: p.accentSoft }, pressed && styles.pressed]}
       >
         <PulseIcon color={storyFollowed ? p.accentInk : p.ink} size={iconSize} />
       </Pressable>
@@ -235,7 +240,7 @@ export function Card(props: Props) {
           accessibilityRole="button"
           accessibilityLabel="Share"
           {...tip('Share this story')}
-          style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
         >
           <ShareIcon color={p.ink} size={iconSize} />
         </Pressable>
@@ -251,14 +256,14 @@ export function Card(props: Props) {
 
   const src = primarySource(card);
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, tablet && styles.wrapTablet]}>
       <View
         onLayout={(e) => {
           const w = Math.round(e.nativeEvent.layout.width);
           const h = Math.round(e.nativeEvent.layout.height);
           setBox((b) => (b.w === w && b.h === h ? b : { w, h }));
         }}
-        style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, (compact || denseData) && styles.cardCompact, roomy && styles.cardRoomy, { backgroundColor: p.surface, borderColor: p.border }]}
+        style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, (compact || denseData) && styles.cardCompact, roomy && styles.cardRoomy, tablet && styles.cardHug, { backgroundColor: p.surface, borderColor: p.border }]}
       >
         <View style={styles.meta}>
           {badge.text ? (
@@ -305,9 +310,9 @@ export function Card(props: Props) {
                 the free space, so tall phones and desktop windows show no empty gap. Tapping
                 it opens the detail sheet, but only when the card has detail. The hint is part
                 of the label because react-native-web drops accessibilityHint. */}
-            <View style={styles.middleScroll}>
+            <View style={[styles.middleScroll, tablet && styles.middleHug]}>
             <ScrollView
-              style={styles.fill}
+              style={tablet ? styles.hugScroll : styles.fill}
               contentContainerStyle={styles.middleContent}
               scrollEnabled={!!compact || overflow}
               onLayout={(e) => { view.current.h = e.nativeEvent.layout.height; checkFit(); }}
@@ -323,7 +328,7 @@ export function Card(props: Props) {
               {/* the group's own height is the content's natural height (the container centres it) */}
               <View
                 onLayout={(e) => { view.current.content = e.nativeEvent.layout.height; checkFit(); }}
-                style={[styles.group, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }]}
+                style={[styles.group, wide && { gap: tight ? 14 : 22 }, compact && { gap: 8 }]}
               >
                 <Pressable
                   onPress={opensDetail ? openDetailFromPress : undefined}
@@ -336,7 +341,7 @@ export function Card(props: Props) {
                   accessibilityLabel={opensDetail ? `${card.headline}. ${OPEN_DETAIL_HINT}` : a11yActions.length > 0 ? card.headline : undefined}
                   accessibilityActions={a11yActions.length > 0 ? a11yActions : undefined}
                   onAccessibilityAction={a11yActions.length > 0 ? onA11yAction : undefined}
-                  style={[styles.middlePressable, wide && { gap: tight ? 14 : 22 }, compact && { gap: 10 }, roomy && { gap: 18 }, tablet && { gap: 30 }]}
+                  style={[styles.middlePressable, wide && { gap: tight ? 14 : 22 }, compact && { gap: 8 }, roomy && { gap: 18 }, tablet && { gap: 30 }]}
                 >
                   {headline}
 
@@ -389,7 +394,7 @@ export function Card(props: Props) {
         </View>
       ) : null}
       {/* the edge of the next card peeking out below, as in the design (phone layout only) */}
-      {wide ? null : <View style={[styles.stack, { backgroundColor: p.surface, borderColor: p.border, opacity: peek ? 1 : 0 }]} />}
+      {wide || compact ? null : <View style={[styles.stack, { backgroundColor: p.surface, borderColor: p.border, opacity: peek ? 1 : 0 }]} />}
     </View>
   );
 }
@@ -410,7 +415,8 @@ function ReactButton({ kind, on, size = 22, onPress }: { kind: Feedback; on: boo
       aria-pressed={on}
       style={({ pressed }) => [
         styles.react,
-        { borderColor: on ? p.accent : 'transparent', backgroundColor: on ? p.accentSoft : 'transparent', opacity: pressed ? 0.7 : 1 },
+        { borderColor: on ? p.accent : 'transparent', backgroundColor: on ? p.accentSoft : 'transparent' },
+        pressed && styles.pressed,
       ]}
     >
       <Icon color={color} size={on ? size - 4 : size} />
@@ -427,7 +433,7 @@ const FADE_STEPS = [0.15, 0.35, 0.55, 0.75, 0.92];
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   card: { flex: 1, borderWidth: 1, borderRadius: radius.card, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 14, gap: 14, overflow: 'hidden' },
-  cardCompact: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 10, gap: 10 }, // short screens: less air so the body still fits
+  cardCompact: { paddingTop: 14, paddingHorizontal: 16, paddingBottom: 8, gap: 8 }, // short screens: less air so the body still fits
   cardRoomy: { paddingTop: 24, paddingHorizontal: 24, paddingBottom: 14, gap: 16 }, // phone data and link-out cards (Feed-Data / Feed-LinkOut)
   cardTight: { paddingTop: 26, paddingHorizontal: 36, paddingBottom: 16, gap: 12 },
   cardWide: { paddingTop: 40, paddingHorizontal: 44, paddingBottom: 22, gap: 20 },
@@ -444,6 +450,12 @@ const styles = StyleSheet.create({
   // Takes the free space and centres the content in it, so no empty gap is left.
   middleScroll: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   middleContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: 8 },
+  // Tablets in the phone layout (ui-polish-m8): the card is as tall as its content (up to the
+  // page) and sits centred on the page, instead of a full-height card with large empty gaps.
+  wrapTablet: { justifyContent: 'center' },
+  cardHug: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', maxHeight: '100%', paddingTop: 32, paddingHorizontal: 36, paddingBottom: 18, gap: 24 },
+  middleHug: { flexGrow: 0, flexBasis: 'auto' },
+  hugScroll: { flexGrow: 0, flexShrink: 1 },
   fill: { flex: 1 },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 28 },
   group: { gap: 16 },
@@ -451,6 +463,8 @@ const styles = StyleSheet.create({
   spacer: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   more: { alignSelf: 'flex-start', minHeight: 44, marginVertical: -10, justifyContent: 'center' },
   moreText: { fontFamily: fonts.sansSemi, fontSize: 14 },
+  // Press feedback: a small scale-down on press-in (web: eased by the global CSS transition).
+  pressed: { opacity: 0.8, transform: [{ scale: 0.94 }] },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   react: { flexDirection: 'row', width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 1 },
   reactCheck: { fontFamily: fonts.sansSemi, fontSize: 12 },

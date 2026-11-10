@@ -150,7 +150,7 @@ export default function FollowingScreen() {
         </View>
       )}
 
-      <Text accessibilityRole="header" style={[styles.section, { color: p.muted }]}>More stories you may like</Text>
+      <Text accessibilityRole="header" aria-level={2} style={[styles.section, { color: p.muted }]}>More stories you may like</Text>
 
       <FollowingManager
         categories={suggestedTopics(categories, hidden)}

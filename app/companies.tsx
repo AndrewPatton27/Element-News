@@ -80,7 +80,7 @@ export default function CompaniesScreen() {
       ) : (
         sections.map((s) => (
           <View key={s.key} style={styles.section}>
-            <Text accessibilityRole="header" style={[styles.label, { color: p.muted }]}>{s.label} · {s.companies.length}</Text>
+            <Text accessibilityRole="header" aria-level={2} style={[styles.label, { color: p.muted }]}>{s.label} · {s.companies.length}</Text>
             <View style={[styles.grid, wide && styles.gridWide]}>
               {s.companies.map((c) => (
                 <View key={c.ticker} style={wide ? styles.cellWide : undefined}>

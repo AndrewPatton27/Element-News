@@ -36,7 +36,7 @@ export function BriefNumbers({
   return (
     <View accessibilityLabel={title} style={[styles.card, wide && styles.cardWide, { backgroundColor: p.surface, borderColor: p.border }]}>
       <View style={styles.cardHead}>
-        <Text accessibilityRole="header" style={[styles.label, { color: p.muted }]}>
+        <Text accessibilityRole="header" aria-level={2} style={[styles.label, { color: p.muted }]}>
           {title}
         </Text>
         {onAll ? (
@@ -92,7 +92,7 @@ export function BriefMovers({ movers, wide }: { movers: NumberTrend[]; wide: boo
     <View accessibilityLabel="Number trends" style={[styles.trends, wide && styles.cardWide, { backgroundColor: p.surface, borderColor: p.border }]}>
       <View style={styles.trendHead}>
         <View style={styles.trendTitle}>
-          <Text accessibilityRole="header" style={[styles.label, { color: p.muted }]}>
+          <Text accessibilityRole="header" aria-level={2} style={[styles.label, { color: p.muted }]}>
             Trends · 12 weeks
           </Text>
           <Text style={[styles.trendName, { color: p.ink }]}>{s.name}</Text>

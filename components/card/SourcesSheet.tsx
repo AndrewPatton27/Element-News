@@ -2,7 +2,8 @@
 // link to the original, how the card was made, and the disclaimer.
 
 import { useRef } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SheetModal } from '../shell/SheetModal';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
 import { disclaimerText, howMadeText, primarySource } from '../../lib/shared/labels';
 import { usePalette } from '../../lib/theme/useTheme';
@@ -21,13 +22,18 @@ export function SourcesSheet({ card: openCard, config, onClose }: { card: BlurbC
   const card = openCard ?? last.current;
   const primary = card ? primarySource(card) : null;
   return (
-    <Modal visible={openCard !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: p.overlay }]} onPress={onClose} accessibilityLabel="Close sources" />
-      <View style={styles.dock} pointerEvents="box-none">
-        <View style={[styles.sheet, { backgroundColor: p.surface }]} accessibilityViewIsModal accessibilityLabel="Sources">
-          <View style={[styles.handle, { backgroundColor: p.handle }]} />
+    <SheetModal
+      open={openCard !== null}
+      onClose={onClose}
+      variant="sheet"
+      label="Sources"
+      backdropLabel="Close sources"
+      dockStyle={styles.dock}
+      surfaceStyle={styles.sheet}
+      handle
+      header={
           <View style={styles.header}>
-            <Text style={[styles.title, { color: p.ink }]} accessibilityRole="header">
+            <Text style={[styles.title, { color: p.ink }]} accessibilityRole="header" aria-level={2}>
               Where this came from
             </Text>
             <Pressable
@@ -39,6 +45,8 @@ export function SourcesSheet({ card: openCard, config, onClose }: { card: BlurbC
               <CloseIcon color={p.ink} />
             </Pressable>
           </View>
+      }
+    >
           <ScrollView contentContainerStyle={styles.list}>
             {card ? <SourceList card={card} config={config} /> : null}
             {card ? (
@@ -58,14 +66,11 @@ export function SourcesSheet({ card: openCard, config, onClose }: { card: BlurbC
             </Pressable>
           ) : null}
           <Disclaimer text={disclaimerText(config)} center />
-        </View>
-      </View>
-    </Modal>
+    </SheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1 },
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, top: '15%', alignItems: 'center', justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '100%',
@@ -78,8 +83,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 16,
   },
-  handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10 },
   title: { fontFamily: fonts.serif, fontSize: 26, letterSpacing: -0.26 },
   close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   list: { gap: 12 },
