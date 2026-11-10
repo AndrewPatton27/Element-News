@@ -44,6 +44,7 @@ declare
     "api.unsubscribe_brief(uuid)": "a",
     "api.update_brief_subscription(uuid,text,integer,text)": "a",
     "api.weekly_brief()": "a",
+    "api.report_blurb(uuid,text)": "a",
     "api.delete_account()": "u",
     "api.delete_my_data()": "u",
     "api.feed_for_you(text,integer)": "u",
