@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 //   (navigation never loses or reorders a rendered card), ArrowUp goes back to them, and after a
 //   reload they are no longer the first cards (seen exclusion) while the feed still has cards.
 
-const H = '[role="heading"][aria-level="1"], h1';
+const H = '[data-testid="card-headline"]';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {

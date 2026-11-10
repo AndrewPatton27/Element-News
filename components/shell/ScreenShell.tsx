@@ -40,7 +40,7 @@ export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBa
   if (wide) {
     const titleRow = (
       <View style={styles.titleRowWide}>
-        <Text accessibilityRole="header" style={[styles.titleWide, { color: p.ink }]}>
+        <Text accessibilityRole="header" aria-level={1} style={[styles.titleWide, { color: p.ink }]}>
           {title}
         </Text>
         {right}
@@ -82,7 +82,7 @@ export function ScreenShell({ tab, title, meta, headerRight, scroll = true, onBa
           {brandTitle ? <Wordmark size={font.headerWordmark} text={title} /> : <Wordmark size={font.headerWordmark} />}
         </View>
         {brandTitle || hideTitle ? null : (
-          <Text accessibilityRole="header" style={[styles.titleNarrow, { color: p.ink }]} numberOfLines={1}>
+          <Text accessibilityRole="header" aria-level={1} style={[styles.titleNarrow, { color: p.ink }]} numberOfLines={1}>
             {title}
           </Text>
         )}

@@ -60,7 +60,7 @@ async function measure(page: Page): Promise<BarCheck | null> {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.top >= 0 && r.bottom <= window.innerHeight + 1 && r.left >= 0 && r.right <= window.innerWidth + 1;
     };
-    const h = Array.from(document.querySelectorAll('[role="heading"][aria-level="1"], h1')).find(inView);
+    const h = Array.from(document.querySelectorAll('[data-testid="card-headline"]')).find(inView);
     if (!h) return null;
     const pick = (sel: string) => Array.from(document.querySelectorAll(sel)).find(inView) as HTMLElement | undefined;
     const items = [

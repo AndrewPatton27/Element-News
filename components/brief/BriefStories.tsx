@@ -22,7 +22,7 @@ export function BriefLabel({ text, right, onRight, rightA11y }: { text: string; 
   const p = usePalette();
   return (
     <View style={styles.labelRow}>
-      <Text accessibilityRole="header" style={[styles.label, { color: p.muted }]}>
+      <Text accessibilityRole="header" aria-level={2} style={[styles.label, { color: p.muted }]}>
         {text}
       </Text>
       {right && onRight ? (
@@ -122,10 +122,11 @@ function RowLabels({ card, config, wide }: { card: BlurbCard; config: AppConfig 
 
 const styles = StyleSheet.create({
   list: { flexDirection: 'column' },
-  labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingBottom: 6 },
+  // More air above a section label than below it, so each label belongs to the list it names.
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 4 },
   label: { fontFamily: fonts.sansSemi, fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase' },
   labelRight: { fontFamily: fonts.sans, fontSize: 13 },
-  seeAll: { minHeight: 32, justifyContent: 'center' },
+  seeAll: { minHeight: 44, justifyContent: 'center' },
   seeAllText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   more: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1 },
   moreText: { fontFamily: fonts.sansSemi, fontSize: 15 },
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
   metaWide: { fontSize: 13 },
   title: { fontFamily: fonts.serif, fontSize: 19, lineHeight: 23 },
   titleWide: { fontSize: 28, lineHeight: 32, letterSpacing: -0.4 },
-  titlePlain: { fontFamily: fonts.serif, fontSize: 18, lineHeight: 22 },
+  titlePlain: { fontFamily: fonts.serif, fontSize: 18, lineHeight: 23 },
   titlePlainWide: { fontSize: 22, lineHeight: 27 },
   line: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
   lineWide: { fontSize: 17, lineHeight: 25, maxWidth: 640 },

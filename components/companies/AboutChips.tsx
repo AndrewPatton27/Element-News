@@ -28,12 +28,16 @@ export function AboutChips({ card, wide }: { card: BlurbCard; wide?: boolean }) 
           }}
           accessibilityRole="link"
           accessibilityLabel={c.a11y}
-          hitSlop={6}
-          style={({ pressed }) => [styles.chip, { borderColor: p.borderStrong, backgroundColor: pressed ? p.surfaceMuted : 'transparent' }]}
+          style={styles.hit}
         >
-          <Text style={[styles.text, wide && styles.textWide, { color: p.inkSoft }]} numberOfLines={1}>
-            {c.label}
-          </Text>
+          {({ pressed }) => (
+            // 44 px tap target around a 32 px pill (react-native-web ignores hitSlop)
+            <View style={[styles.chip, { borderColor: p.borderStrong, backgroundColor: pressed ? p.surfaceMuted : 'transparent' }]}>
+              <Text style={[styles.text, wide && styles.textWide, { color: p.inkSoft }]} numberOfLines={1}>
+                {c.label}
+              </Text>
+            </View>
+          )}
         </Pressable>
       ))}
     </View>
@@ -41,7 +45,8 @@ export function AboutChips({ card, wide }: { card: BlurbCard; wide?: boolean }) 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, marginVertical: -6 },
+  hit: { minHeight: 44, justifyContent: 'center', maxWidth: 260 },
   chip: { minHeight: 32, justifyContent: 'center', borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, maxWidth: 260 },
   text: { fontFamily: fonts.sansMedium, fontSize: 13 },
   textWide: { fontSize: 14 },

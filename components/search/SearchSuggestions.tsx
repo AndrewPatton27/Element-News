@@ -23,7 +23,7 @@ export function SearchSuggestions({ items, categories, onOpen, onPickTopic }: Se
   if (items.length === 0) return null;
   return (
     <View style={styles.section} accessibilityLabel="Suggested for you" testID="search-suggestions">
-      <Text style={[styles.label, { color: p.muted }]} accessibilityRole="header">
+      <Text style={[styles.label, { color: p.muted }]} accessibilityRole="header" aria-level={2}>
         Suggested for you
       </Text>
       <View style={[styles.list, { borderColor: p.border, backgroundColor: p.surface }]} accessibilityRole="list">
