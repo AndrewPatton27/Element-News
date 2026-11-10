@@ -12,7 +12,7 @@ import { fonts } from '../../lib/theme/theme';
 import { CloseIcon } from '../shell/Icons';
 import { SourceList } from './SourceList';
 import { Disclaimer } from './Labels';
-import { openUrl } from './SourceChip';
+import { linkProps } from './SourceChip';
 
 export function SourcesSheet({ card: openCard, config, onClose }: { card: BlurbCard | null; config: AppConfig | null; onClose: () => void }) {
   const p = usePalette();
@@ -58,7 +58,7 @@ export function SourcesSheet({ card: openCard, config, onClose }: { card: BlurbC
           </ScrollView>
           {primary ? (
             <Pressable
-              onPress={() => openUrl(primary.url, card?.id)}
+              {...linkProps(primary.url, card?.id)}
               accessibilityRole="link"
               style={({ pressed }) => [styles.primary, { backgroundColor: p.accent, opacity: pressed ? 0.85 : 1 }]}
             >

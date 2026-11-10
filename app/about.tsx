@@ -16,7 +16,7 @@ import { useAccount } from '../lib/account/accountContext';
 import { userMessage } from '../lib/api/errors';
 import { usePalette, useWide } from '../lib/theme/useTheme';
 import { fonts, font } from '../lib/theme/theme';
-import { openUrl } from '../components/card/SourceChip';
+import { linkProps } from '../components/card/SourceChip';
 import { SectionLabel } from '../components/account/FormParts';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { AccountPrompt, DeviceData, QuickLinks } from '../components/account/AccountEntry';
@@ -48,7 +48,7 @@ function Bullets({ items }: { items: string[] }) {
 function Link({ label, url }: { label: string; url: string }) {
   const p = usePalette();
   return (
-    <Text style={[styles.link, { color: p.accentInk }]} onPress={() => openUrl(url)} accessibilityRole="link">
+    <Text style={[styles.link, { color: p.accentInk }]} {...linkProps(url)} accessibilityRole="link">
       {label} ↗
     </Text>
   );
@@ -124,7 +124,7 @@ export default function AboutScreen() {
             <Text
               key={n.key}
               style={[styles.small, { color: p.muted }]}
-              onPress={n.url ? () => openUrl(n.url as string) : undefined}
+              {...(n.url ? linkProps(n.url) : {})}
               accessibilityRole={n.url ? 'link' : 'text'}
             >
               {n.text}

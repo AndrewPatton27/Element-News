@@ -14,7 +14,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import { userMessage } from '../../lib/api/errors';
 import { fonts } from '../../lib/theme/theme';
 import { changeColor } from '../card/DataCard';
-import { openUrl } from '../card/SourceChip';
+import { linkProps } from '../card/SourceChip';
 import { EmptyState, ErrorState, LoadingState } from '../shell/States';
 
 export function useNumbers(api: Api) {
@@ -58,7 +58,7 @@ export function NumbersPanel({ api, config, variant }: Props) {
     <Text
       key={n.key}
       style={[styles.notice, { color: p.muted }]}
-      onPress={n.url ? () => openUrl(n.url as string) : undefined}
+      {...(n.url ? linkProps(n.url) : {})}
       accessibilityRole={n.url ? 'link' : 'text'}
     >
       {n.text}
@@ -71,7 +71,7 @@ export function NumbersPanel({ api, config, variant }: Props) {
         {facts.map((f) => (
           <Pressable
             key={f.series_id}
-            onPress={() => openUrl(f.source_url)}
+            {...linkProps(f.source_url)}
             accessibilityRole="link"
             accessibilityLabel={withToneLabel(factA11yLabel(f), f.series_id, f.direction)}
             style={({ pressed }) => [styles.cRow, { borderTopColor: p.rowDivider, opacity: pressed ? 0.75 : 1 }]}
@@ -100,7 +100,7 @@ export function NumbersPanel({ api, config, variant }: Props) {
         return (
           <Pressable
             key={f.series_id}
-            onPress={() => openUrl(f.source_url)}
+            {...linkProps(f.source_url)}
             accessibilityRole="link"
             accessibilityLabel={withToneLabel(factA11yLabel(f), f.series_id, f.direction)}
             style={({ pressed }) => [styles.fRow, { backgroundColor: p.surface, borderColor: p.border, opacity: pressed ? 0.8 : 1 }]}

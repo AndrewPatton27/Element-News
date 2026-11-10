@@ -8,7 +8,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { LinkIcon } from '../shell/Icons';
 
-export { openUrl } from '../../lib/shared/openUrl';
+export { linkProps, openUrl } from '../../lib/shared/openUrl';
 
 export function SourceRow({ card, onShowAll, wide }: { card: BlurbCard; onShowAll: () => void; wide?: boolean }) {
   const p = usePalette();

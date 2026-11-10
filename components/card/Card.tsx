@@ -15,7 +15,7 @@ import { categoryName, clampHeadline, eventLabel } from '../../lib/shared/format
 import { primarySource, shareAlikeCredit } from '../../lib/shared/labels';
 import { cardTakeaways } from '../../lib/shared/cardBody';
 import { OPEN_DETAIL_HINT, cardDetail } from '../../lib/shared/detail';
-import { openUrl } from '../../lib/shared/openUrl';
+import { linkProps } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts, radius } from '../../lib/theme/theme';
@@ -290,7 +290,7 @@ export function Card(props: Props) {
             <View style={styles.spacer} />
             {src ? (
               <Pressable
-                onPress={() => openUrl(src.url, card.id)}
+                {...linkProps(src.url, card.id)}
                 accessibilityRole="link"
                 accessibilityLabel={`Read on the publisher's site, ${src.name}. Opens the original.`}
                 style={({ pressed }) => [styles.readBtn, { backgroundColor: p.accent, opacity: pressed ? 0.85 : 1 }]}

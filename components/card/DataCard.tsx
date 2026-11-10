@@ -13,7 +13,7 @@ import { changeToneColor, withToneLabel } from '../../lib/numbers/numberTone';
 import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts } from '../../lib/theme/theme';
-import { openUrl } from './SourceChip';
+import { linkProps } from './SourceChip';
 
 // Green = generally good for households, red = generally bad, gray = no change
 // or neither (see lib/numberTone.ts). The glyph and word carry the direction.
@@ -87,7 +87,7 @@ export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; c
         <Text
           key={n.key}
           style={[styles.notice, (compact || dense) && styles.noticeSmall, { color: p.muted }]}
-          onPress={n.url ? () => openUrl(n.url as string) : undefined}
+          {...(n.url ? linkProps(n.url) : {})}
           accessibilityRole={n.url ? 'link' : 'text'}
         >
           {n.text}
