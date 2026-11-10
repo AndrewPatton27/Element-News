@@ -6,7 +6,7 @@ import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './errors.ts';
 import { clampLimit } from '../feed/feedLogic.ts';
-import { takeEarlyFeed, type EarlyFeed } from '../feed/earlyFeed.ts';
+import { takeEarly, type EarlyHolder } from '../feed/earlyFeed.ts';
 import { createSupabaseCompanyApi } from '../companies/companyApi.ts';
 import { isBlurbCard, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
@@ -88,6 +88,15 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
   const doFetch = opts.fetchFn ?? ((input, init) => fetch(input, init));
 
   async function call(plan: PlannedRequest): Promise<unknown> {
+    // A request the inline script in index.html already has in flight (lib/feed/earlyFeed.ts): same
+    // path and body, anonymous. Falls back to a normal request when it failed or does not match.
+    if (!opts.fetchFn && plan.url.startsWith(opts.url)) {
+      const early = takeEarly(globalThis as EarlyHolder, `${plan.url.slice(opts.url.length)}|${plan.init.body ?? ''}`, !!plan.init.headers.Authorization);
+      if (early) {
+        const json = await early;
+        if (json != null) return json;
+      }
+    }
     let res: Response;
     try {
       res = await doFetch(plan.url, plan.init);
@@ -173,14 +182,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const token = opts.getToken ? await opts.getToken() : null;
       try {
         const plan = planRequest(opts.url, opts.key, 'feed', req, token);
-        // First page: the inline script in index.html may already have it in flight (lib/earlyFeed.ts).
-        const early = opts.fetchFn ? null : takeEarlyFeed(globalThis as { __elementEarly?: EarlyFeed }, plan.init.body, !!token);
-        if (early) {
-          const json = await early;
-          if (json) {
-            try { return parseFeedPage(json); } catch { /* fall through to a normal request */ }
-          }
-        }
+        // First pages may already be in flight from index.html: `call` picks them up (lib/feed/earlyFeed.ts).
         return parseFeedPage(await call(plan));
       } catch (e) {
         // api.feed is the same for everyone: if the user's token is rejected, read it as a guest.
