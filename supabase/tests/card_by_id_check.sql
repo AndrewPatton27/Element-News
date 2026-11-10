@@ -1,4 +1,4 @@
--- Checks for 20261121000000_card_by_id.sql. All rows roll back at the deliberate final error.
+-- Checks for 20261120000500_card_by_id.sql. All rows roll back at the deliberate final error.
 do $$
 declare
   pub uuid; hid uuid; r jsonb;

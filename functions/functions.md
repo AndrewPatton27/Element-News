@@ -14,7 +14,7 @@ All logic is in `lib/share/shareFunction.ts` (the file here only wires the Pages
 1. GET or HEAD only, and the id must be a UUID; otherwise the normal static answer (`context.next()`).
 2. Loads `index.html` through `env.ASSETS`.
 3. Asks Supabase for the card: `POST <SUPABASE_URL>/rest/v1/rpc/card_by_id` with `{ p_id }`, the publishable key
-   only (never a secret or service-role key, rule 10), 1.5 s timeout. Migration `supabase/migrations/20261121000000_card_by_id.sql`
+   only (never a secret or service-role key, rule 10), 1.5 s timeout. Migration `supabase/migrations/20261120000500_card_by_id.sql`
    must be applied first; until then every request falls back.
 4. Puts the tags into `<head>`: `<title>`, `og:title` / `twitter:title` = the card headline as written (capped at
    200 characters), `og:description` / `twitter:description` / `description` = first sentence of the blurb,
