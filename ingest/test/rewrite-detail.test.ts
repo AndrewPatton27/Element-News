@@ -204,8 +204,8 @@ test('prompt sum-v7 asks for the detail; Gemini and Groq schemas require it', ()
   const p = buildPrompt({ item: it, text: 'T' });
   assert.match(p, /"detail": for readers who tap the card/);
   assert.match(p, /2 to 4 short paragraphs, at most 180 words in total/);
-  assert.match(p, /3 to 5 full sentences of at most 15 words/);
-  assert.match(p, /why it matters only when the source states it/);
+  assert.match(p, /3 to 5 short sentences of at most 15 words each/);
+  assert.match(p, /Cover what happened, the supporting facts and the context the SOURCE gives/);
   assert.ok(RESPONSE_SCHEMA.required.includes('detail'));
   assert.ok(GROQ_JSON_SCHEMA.schema.required.includes('detail'));
   assert.deepEqual(GROQ_JSON_SCHEMA.schema.properties.detail.required, ['paragraphs', 'key_points']);

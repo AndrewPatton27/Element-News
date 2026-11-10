@@ -276,8 +276,8 @@ test('product codes: validator rejects model number / SKU / UPC / lot number in 
 test('prompt: no model numbers/SKUs/UPCs/lot numbers in headline or body; key points only', () => {
   const it = { source: 'cpsc', source_name: 'CPSC', doc_label: 'Recall', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'safety', event_type: 'recall' } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /Leave model numbers, SKUs, UPCs, lot numbers, docket, item, section or form numbers/);
-  assert.match(p, /belong only in "detail"\.key_points/);
+  assert.match(p, /Keep model numbers, SKUs, UPCs, lot numbers, docket, item or form numbers/);
+  assert.match(p, /out of the headline and body \("detail"\.key_points only\)|OUT of the headline and body \("detail"\.key_points only\)/);
 });
 
 test('CPSC template card: generic wording, no title, model numbers, SKUs or digits', () => {
@@ -325,7 +325,7 @@ test('prompt: sentence-case headline rule', () => {
   const it = { source: 'fed_rss', source_name: 'Fed', doc_label: 'Press release', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'policy', event_type: null } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
   assert.match(p, /sentence case in the headline \(capitalise only the first word and proper nouns\)/);
-  assert.match(p, /"Nasa", "Fcc", "mars" and "united states" are errors/);
+  assert.match(p, /"Nasa" and "mars" are errors/);
 });
 
 test('prompt: earnings cards must state figures; retry hint names no_figures; other cards do not get the block', () => {

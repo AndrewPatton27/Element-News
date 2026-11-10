@@ -148,7 +148,7 @@ test('prompt (shared by Gemini and Groq): flow rules, bad/good example, retry hi
   assert.match(prompt, /NEVER restate the headline's event or repeat its number/);
   assert.match(prompt, /Every sentence adds something new/);
   assert.match(prompt, /No filler/);
-  assert.match(prompt, /key_points": 3 to 5 full sentences of at most 15 words that add facts and do not reword the headline or body/);
+  assert.match(prompt, /key_points": 3 to 5 short sentences of at most 15 words each that add facts and do not reword the headline or body/);
   const retry = buildPrompt({ item: gopro, text: 'x', retryErrors: ['repetition: the first summary sentence repeats the headline'] });
   assert.match(retry, /each add a NEW fact instead of restating the headline/);
   assert.equal(config.promptVersion, 'sum-v7');

@@ -235,7 +235,7 @@ test('prompt: everyday finance readers (16-50), 8th-grade plain language, define
   assert.doesNotMatch(p, /college/i);
   assert.match(p, /About an 8th-grade reading level/);
   assert.match(p, /Short sentences, active voice/);
-  assert.match(p, /Define any other technical term in brackets the first time/);
+  assert.match(p, /Define any other technical term in parentheses the first time/);
   assert.match(p, /Body sentence 1 picks up where the headline stops/);   // sentence 1 continues the headline
   assert.match(p, /ONLY when the source gives the reason/);
   assert.match(p, /aim for about 60/);

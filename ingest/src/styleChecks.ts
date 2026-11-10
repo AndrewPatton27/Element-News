@@ -24,7 +24,7 @@ const SPELLED_MONTH_DATE = new RegExp(`\\b(?:${MONTHS})\\s+(?:${NUMBER_WORDS})(?
 // "From:", "Published:", "Title:" and so on at the start of the text, a line or a sentence; "Filed with the SEC on" starting a sentence.
 const FIELD_LABEL = /(?:^|\n|\.\s)(?:From|Published|Title|Company|Main topic):|(?:^|\n|\.\s)Filed with the SEC on\b/;
 // "fell 18% down to", "rose 5% up by": one direction word is enough.
-const DOUBLED_DIRECTION = /\b(?:fell|dropped|declined|decreased|slid|sank|rose|increased|climbed|grew|jumped|surged)\s+(?:\S+\s+){0,2}?(?:down|up)\s+(?:to|by)\b/i;
+const DOUBLED_DIRECTION = /\b(?:fell|falls?|dropped|drops?|declined?|declines|decreased?|decreases|slid|slides?|sank|sinks?|rose|rises?|increased?|increases|climbed|climbs?|grew|grows?|jumped|jumps?|surged?|surges)\s+(?:\S+\s+){0,2}?(?:down|up)\s+(?:to|by)\b/i;
 const BARE_VERB_HEADLINE = /^(?:Reports|Posts|Announces|Files|Says|Adopts)\b/;
 const KEY_POINT_LABEL = /^([A-Z][A-Za-z]*(?: [A-Za-z]+){0,2}):\s/;
 const ATTRIBUTION_VERB = /\b(?:said|says|stated|states|added|noted|wrote|according)\b/i;

@@ -151,9 +151,9 @@ test('prompt: plain headline and body rules (lead with what happened; no over-sp
   assert.match(p, /Start with the subject \(the company, agency or product\), then an active verb and the key fact/);
   // no over-specific details in headline AND body
   assert.match(p, /OUT of the headline and body/);
-  assert.match(p, /docket, item, section or form numbers, exact clock times, coordinates and long official titles/i);
+  assert.match(p, /docket, item or form numbers, exact clock times, coordinates and long official titles/i);
   // precise details only in detail.key_points
-  assert.match(p, /belong only in "detail"\.key_points/);
+  assert.match(p, /OUT of the headline and body \("detail"\.key_points only\)/);
   // about 60 characters target still present
   assert.match(p, /aim for about 60/);
 });
@@ -176,7 +176,7 @@ test('a non-safety prompt does not add the recall instruction block', () => {
 test('detail prompt asks for paraphrase, source-only numbers and under the copy limit', () => {
   const p = buildPrompt({ item: gopro, text: 'T' });
   // paraphrase in the model's own words, not copy
-  assert.match(p, /Define any other technical term in brackets/i);
+  assert.match(p, /Define any other technical term in parentheses/i);
   assert.match(p, /Never copy more than 8 words in a row/i);
   // numbers only from the source
   assert.match(p, /use ONLY numbers that appear in the source/i);

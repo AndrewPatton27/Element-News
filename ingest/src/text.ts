@@ -120,7 +120,7 @@ export function fixProperNouns(text: string): string {
   for (const f of FIXERS) s = s.replace(f.re, f.to);
   s = s.replace(/(?<![A-Za-z0-9])(mars|moon)(?![A-Za-z0-9])/g, (m, _w, offset: number, whole: string) => {
     if (NOT_THE_PLANET.test(whole.slice(Math.max(0, offset - 12), offset))) return m;
-    return nearSpaceWord(whole, offset, m.length) ? titleCaseOf(m) : m;
+    return nearSpaceWord(whole, offset, m.length) ? m[0].toUpperCase() + m.slice(1) : m;
   });
   return s;
 }

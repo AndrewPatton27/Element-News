@@ -130,7 +130,7 @@ export function missingNumbers(text: string, sourceText: string): string[] {
   for (const m of cleaned.matchAll(NUMBER)) {
     const n = Number(m[0].replace(/,/g, '').replace(/\.$/, ''));
     if (!Number.isFinite(n) || src.has(String(n))) continue;
-    if (config.numberScaleTolerance && /^\s*(?:million|billion|trillion|thousand)/i.test(cleaned.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 14))) {
+    if (config.numberScaleTolerance && /^\s*(?:million|billion|trillion|thousand)\b/i.test(cleaned.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 14))) {
       const up = String(Number((n * 1000).toPrecision(12)));
       const down = String(Number((n / 1000).toPrecision(12)));
       if (src.has(up) || src.has(down)) continue;
@@ -176,6 +176,16 @@ export function longestCopiedRun(draft: string, source: string, ignorePhrases: r
   return best;
 }
 
+/** True when a market word sits within 60 characters of any occurrence of `phrase` (a brief can hold NASA and stock news side by side). */
+function nearMarketWord(text: string, phrase: string, ctx: RegExp): boolean {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  for (const m of text.matchAll(new RegExp(escaped, 'gi'))) {
+    const at = m.index ?? 0;
+    if (ctx.test(text.slice(Math.max(0, at - 60), at + m[0].length + 60))) return true;
+  }
+  return false;
+}
+
 /**
  * Advice phrases found in `text`. For category 'safety' (CPSC recalls) the phrases in
  * config.safetyAdviceAllowlist (e.g. "should") are permitted, so a plain safety instruction
@@ -194,7 +204,7 @@ export function findAdvice(
   for (const phrase of blocklist) {
     if (allowed.has(phrase.toLowerCase())) continue;
     const ctx = config.adviceMarketContext[phrase.toLowerCase()];
-    if (ctx && !ctx.test(text)) continue;                     // e.g. "missions to the Moon": blocked only in market talk
+    if (ctx && !nearMarketWord(text, phrase, ctx)) continue;  // e.g. "missions to the Moon": blocked only in market talk
     const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
     if (new RegExp(`(^|[^a-z])${escaped}($|[^a-z])`, 'i').test(text)) hits.push(phrase);
   }
@@ -423,7 +433,7 @@ export function checkDetailRepetition(headline: string, detail: { paragraphs: st
       errors.push(`detail repetition: ${label} starts with the headline; begin with the most useful fact not yet on the card`);
     } else if (hWords.size >= c.minHeadlineWords) {
       const share = shareIn(hWords, contentWords(text));
-      if (share >= c.headlineOverlapMax) errors.push(`detail repetition: ${label} repeats the headline (${pct(share)} of its key words, limit ${pct(c.headlineOverlapMax)})`);
+      if (share >= c.detailHeadlineOverlapMax) errors.push(`detail repetition: ${label} repeats the headline (${pct(share)} of its key words, limit ${pct(c.detailHeadlineOverlapMax)})`);
     }
   }
   const mainNumber = extractNumbers(headline)[0];

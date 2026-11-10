@@ -1,9 +1,9 @@
-// Brief summary: a 3-5 sentence plain-language summary of a whole daily or weekly brief, written by
+// Brief summary: a 200-290 word, 3-4 paragraph plain-language summary of a whole daily or weekly brief, written by
 // the AI ONCE per brief per day/week (never per request or per subscriber) and stored with
 // api.put_brief_summary. Written ONLY from the cards and numbers inside the brief JSON.
 // Chain: Gemini -> Groq -> template (same keys, models and daily caps as the card pipeline).
 // Each AI draft is validated (sentence count, length, no advice words, every number in the brief,
-// copy limit, no repeated sentences) and retried once with the errors; a template summary built
+// copy limit, no repeated sentences, sum-v7 style / speculation / relative-time rules) and retried once with the errors; a template summary built
 // from the headlines is the last resort and never calls an AI.
 // Inputs: the brief JSON (public RPCs api.daily_brief / api.weekly_brief), AI keys, a usage counter.
 // Outputs: summary text + model name; with the service-role RPC, one row per (kind, for_date).
@@ -14,6 +14,8 @@ import { summaryDate, summaryIsCurrent } from './briefTime.ts';
 import { isDailyQuota, modelFallback, ProviderError, RateLimitedError } from './summarizer/gemini.ts';
 import type { UsageCounter } from './summarizer/chain.ts';
 import { checkRepetition, countWords, extractNumbers, findAdvice, longestCopiedRun, splitSentences } from './validate.ts';
+import { checkRelativeTime, checkSpeculation, checkStyle } from './styleChecks.ts';
+import { fixProperNouns } from './text.ts';
 import type { Brief, BlurbCard, MacroFact } from '../../contract/types.ts';
 
 export type BriefKind = 'daily' | 'weekly';
@@ -96,7 +98,9 @@ export function briefSourceText(brief: BriefInput): string {
   const top = brief.headline_cards ?? [];
   if (top.length) lines.push('TOP STORIES:', ...top.map(card));
   if (brief.markets?.cards?.length) lines.push('MARKETS:', ...brief.markets.cards.map(card));
+  const skip = config.mail.summarySkipSectionCategories;
   for (const s of brief.sections ?? []) {
+    if (skip.includes(s.category)) continue;                   // recalls and space news: only as TOP STORIES (sum-v7)
     if (s.cards?.length) lines.push(`TOPIC ${oneLine(s.label)}:`, ...s.cards.map(card));
   }
   const nums = allBriefNumbers(brief);
@@ -119,15 +123,19 @@ export function briefIsEmpty(brief: BriefInput): boolean {
 /** The prompt for one brief. `retryErrors` are the validator errors of the previous draft. */
 export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: string[]): string {
   const c = config.mail;
-  const span = kind === 'daily' ? 'today' : 'this week';
+  // The daily window is 24, 48 or 72 hours depending on supply (api.daily_brief), so the prompt never says "today".
+  const span = kind === 'daily' ? 'the period this brief covers' : 'this week';
   const lines = [
-    `You write the short summary at the top of Element's ${kind} news brief for college students and busy young adults.`,
-    `Write about ${c.summaryTargetWords} words (between ${c.summaryMinWords} and ${c.summaryMaxWords}) in ${c.summaryParagraphs[0]} to ${c.summaryParagraphs[1]} short paragraphs, separated by one blank line, that tell a reader what mattered ${span}.`,
+    `You write the short summary at the top of Element's ${kind} news brief for busy everyday people interested in business, finance, stocks and investing (about 16 to 50). They know the basics but want plain words.`,
+    `Write about ${c.summaryTargetWords} words (between ${c.summaryMinWords} and ${c.summaryMaxWords}) in ${c.summaryParagraphs[0]} to ${c.summaryParagraphs[1]} short paragraphs, separated by one blank line, that tell a reader what mattered in ${span}.`,
     'Use ONLY facts stated in the BRIEF below. Do not add anything from memory.',
-    'STYLE: plain words at about an 8th-grade reading level, short sentences, no jargon. Calm, neutral tone. No hype.',
-    '- Cover the BREADTH of the brief: mention several different topics, not only the first one.',
-    '- Paragraph 1: the single most important story and why it matters. Paragraph 2: the other important topics, one or two sentences each. Then a paragraph on markets (stories and numbers) when the BRIEF has them. Last paragraph: what to keep an eye on, ONLY if the BRIEF supports it.',
-    '- The last sentence may say why it matters to a regular person, ONLY if that follows directly from the brief.',
+    'STYLE: clear and direct, like a good markets newsletter: about an 8th-grade reading level, short sentences, calm neutral tone, no hype. Give any term outside everyday finance words a plain definition of a few words in parentheses (never square brackets).',
+    '- ORDER (most important first): paragraph 1 = Federal Reserve decisions and the most important economic data in the BRIEF (inflation, jobs, GDP, rates), with their numbers. Paragraph 2 = market-moving news about large listed companies, one or two sentences each. Then a short paragraph on the other topics. Do NOT mention a product recall, space or science item unless it is listed under TOP STORIES; if it is, put it last.',
+    '- Always mention the biggest economic numbers in NUMBERS that changed (for example GDP, payrolls, CPI, the unemployment rate) before any single company.',
+    '- Cover the BREADTH of the brief: several different topics, not only the first one. Do not join unrelated items with "Meanwhile" or "In other news"; start a new sentence about the new topic.',
+    '- Why it matters: only when the BRIEF states the reason or a comparison. No could, may, likely or expected to unless the BRIEF says it, and then attribute it. Name scheduled next steps only when the BRIEF gives a date.',
+    '- One direction word per change ("fell 18% to"), "percentage points" not "pts", acronyms in capitals (NASA, FOMC, SEC, FCC, CPI, GDP, U.S.), proper nouns capitalised (Mars, Moon, United States), dates as numerals ("Nov 5").',
+    '- Attribute claims and forecasts to who made them. No relative time words other than the brief\'s own span.',
     'HARD RULES (a summary that breaks one is rejected):',
     '- Every number you write must appear in the BRIEF exactly as written. Do not calculate new numbers. Do not write dates or times unless they are in the BRIEF.',
     '- Never give investment advice, opinions or predictions. Do not use words like buy, sell, should, recommend, price target.',
@@ -141,12 +149,12 @@ export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: 
   return lines.join('\n');
 }
 
-/** Cleans model output: trims, removes wrapping quotes, code fences and a leading label. */
+/** Cleans model output: trims, removes wrapping quotes, code fences and a leading label, fixes proper-noun casing (fixProperNouns). */
 export function cleanSummaryText(raw: string): string {
   let t = String(raw ?? '').trim().replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim();
   t = t.replace(/^(?:summary|brief summary)\s*:\s*/i, '');
   if (/^["“].*["”]$/s.test(t)) t = t.slice(1, -1).trim();
-  return t.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n');
+  return fixProperNouns(t.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n'));   // sum-v7: Nasa -> NASA
 }
 
 /** Validation errors for a summary against the brief text it was written from ([] = ok). */
@@ -171,6 +179,10 @@ export function validateBriefSummary(text: string, source: string): string[] {
   const run = longestCopiedRun(text, source);
   if (run > c.summaryCopyLimitWords) errors.push(`copies ${run} consecutive words from the brief (limit ${c.summaryCopyLimitWords})`);
   errors.push(...checkRepetition('', text));
+  // sum-v7: style, no speculation, no relative time except the brief's own span words, no "Meanwhile" stitching
+  errors.push(...checkStyle({ paragraphs: text.split(/\n\s*\n/) }));
+  errors.push(...checkSpeculation(text, source), ...checkRelativeTime(text, source, ['today', 'this week']));
+  if (/\b(?:Meanwhile|In other news)\b/i.test(text)) errors.push('style: do not join unrelated items with "Meanwhile" or "In other news"');
   return errors;
 }
 
