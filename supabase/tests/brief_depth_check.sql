@@ -36,7 +36,7 @@ begin
 
   -- ---- daily: 8 sections, depth by importance, total/rank/slug, ordering ----
   r := api.daily_brief();
-  if (r->>'window_hours')::int <> 24 then raise exception 'FAIL: daily window should be 24 with 40+ fresh cards, got %', r->>'window_hours'; end if;
+  if (r->>'window_hours')::int <> core.brief_window_hours(now()) then raise exception 'FAIL: daily window should be 24 (72 on Monday) with 40+ fresh cards, got %', r->>'window_hours'; end if;
   if jsonb_array_length(r->'sections') <> 8 then raise exception 'FAIL: daily should have 8 sections, got %', jsonb_array_length(r->'sections'); end if;
   for i in 1..8 loop
     s := r->'sections'->(i-1);
@@ -79,29 +79,29 @@ begin
     raise exception 'FAIL: topic importance is the best card first (got %)', r->'sections'->0->>'category'; end if;
   update core.blurbs set rank_score = 1000000 - 10*100 - 1 where dedupe_key = 'depth:10:01';
 
-  -- ---- window widening (other cards pushed out of the way first) ----
+  -- ---- window: no widening on thin supply (honest 24 h / Monday 72 h); empty window falls back to the last good cards ----
   update core.blurbs set sort_at = now() - interval '400 days' where dedupe_key not like 'depth:%';
-  -- 5 cards at 1 h, 6 at 30 h, 3 at 60 h, the rest 400 days old: 24 h has 5 (<12), 48 h has 11 (<12) -> 72 h
-  update core.blurbs b set sort_at = now() - case when q.rn <= 5 then interval '1 hour' when q.rn <= 11 then interval '30 hours' when q.rn <= 14 then interval '60 hours' else interval '400 days' end
+  -- 3 cards at 1 h, the rest 400 days old: still the plain window, not widened
+  update core.blurbs b set sort_at = now() - case when q.rn <= 3 then interval '1 hour' else interval '400 days' end
     from (select id, row_number() over (order by dedupe_key) rn from core.blurbs where dedupe_key like 'depth:%') q where q.id = b.id;
   r := api.daily_brief();
-  if (r->>'window_hours')::int <> 72 then raise exception 'FAIL: thin supply should widen to 72 h, got %', r->>'window_hours'; end if;
-  -- 3 at 1 h, 12 at 30 h: 24 h has 3 (<12), 48 h has 15 -> 48 h
-  update core.blurbs b set sort_at = now() - case when q.rn <= 3 then interval '1 hour' when q.rn <= 15 then interval '30 hours' else interval '400 days' end
+  if (r->>'window_hours')::int <> core.brief_window_hours(now()) or (r->>'fallback')::boolean then raise exception 'FAIL: thin supply must not widen, got %', r->>'window_hours'; end if;
+  if (core.brief_window_hours(now()) = 72) <> ((r->>'window_kind') = 'since_friday') then raise exception 'FAIL: window_kind %', r->>'window_kind'; end if;
+  -- newest card 100 h old (beyond 24 and 72 h): fallback widens to reach it and says so
+  update core.blurbs b set sort_at = now() - case when q.rn <= 3 then interval '100 hours' else interval '400 days' end
     from (select id, row_number() over (order by dedupe_key) rn from core.blurbs where dedupe_key like 'depth:%') q where q.id = b.id;
   r := api.daily_brief();
-  if (r->>'window_hours')::int <> 48 then raise exception 'FAIL: should widen to 48 h, got %', r->>'window_hours'; end if;
-  -- 12 at 1 h: stays 24 h; weekly always 168
+  if not (r->>'fallback')::boolean or (r->>'window_hours')::int < 100 or r->>'as_of' is null or jsonb_array_length(r->'headline_cards') < 1 then raise exception 'FAIL: empty window must fall back to the last good cards, got %', r->>'window_hours'; end if;
   update core.blurbs b set sort_at = now() - case when q.rn <= 12 then interval '1 hour' else interval '400 days' end
     from (select id, row_number() over (order by dedupe_key) rn from core.blurbs where dedupe_key like 'depth:%') q where q.id = b.id;
   r := api.daily_brief();
-  if (r->>'window_hours')::int <> 24 then raise exception 'FAIL: 12 cards in 24 h must not widen, got %', r->>'window_hours'; end if;
+  if (r->>'window_hours')::int <> core.brief_window_hours(now()) or (r->>'fallback')::boolean then raise exception 'FAIL: fresh cards must not fall back, got %', r->>'window_hours'; end if;
   if (api.weekly_brief()->>'window_hours')::int <> 168 then raise exception 'FAIL: weekly window'; end if;
 
   -- ---- empty window: no sections, no error ----
   update core.blurbs set sort_at = now() - interval '400 days';
   r := api.daily_brief();
-  if jsonb_array_length(r->'sections') <> 0 or jsonb_array_length(r->'headline_cards') <> 0 or (r->>'window_hours')::int <> 72 then raise exception 'FAIL: empty brief shape'; end if;
+  if jsonb_array_length(r->'sections') <> 0 or jsonb_array_length(r->'headline_cards') <> 0 or (r->>'window_hours')::int <> core.brief_window_hours(now()) or (r->>'fallback')::boolean then raise exception 'FAIL: empty brief shape'; end if;
 
   -- ---- grants: public RPCs only; internal helpers are private ----
   if has_function_privilege('anon','api.daily_brief()','execute') is not true or has_function_privilege('anon','api.weekly_brief()','execute') is not true then raise exception 'FAIL: brief RPC grants'; end if;

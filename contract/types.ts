@@ -190,13 +190,25 @@ export interface Brief {
   summary?: BriefSummary | null;
   /** Market news cards (markets, earnings, deals) + market numbers. Empty cards = hide the section. */
   markets?: BriefMarkets;
+  /** Which span window_hours is: '24h', 'since_friday' (Monday, 72 h) or 'week'. Missing on older servers. */
+  window_kind?: BriefWindowKind;
+  /** The New York calendar date the brief is for (YYYY-MM-DD). Missing on older servers. */
+  brief_date?: string;
+  /** true when no card fell inside the window and the brief shows the last good cards (see as_of). */
+  fallback?: boolean;
+  /** Time of the newest card in the brief (ISO); null/missing = unknown or no cards. */
+  as_of?: string | null;
 }
+
+export type BriefWindowKind = '24h' | 'since_friday' | 'week';
 
 /** Row of core.brief_summaries as returned inside the brief. Show with the AI label. */
 export interface BriefSummary {
   text: string;
   generated_at: string;                 // ISO
   model: string;
+  /** The day (daily) or Monday (weekly) the summary was written for (YYYY-MM-DD); an older date = last good summary. */
+  for_date?: string;
 }
 
 /** "Markets" section of a brief. Never stock prices (rule 9). */
