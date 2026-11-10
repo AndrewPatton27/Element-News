@@ -1,13 +1,18 @@
 // "More detail": opened by tapping a card. Bottom sheet on phones, centered panel
-// on wide screens. Headline, key points, the in-depth paragraphs (or the card's
+// on wide screens. Topic, headline, the source line (same as the feed card's bar: agency
+// and time, opening the original), key points, the in-depth paragraphs (or the card's
 // summary with a note when there is none), the sources, the Wikipedia credit,
-// the AI label and the disclaimer. The Modal traps focus; Escape / back closes.
+// the AI label and the disclaimer (a standalone view, so it keeps both texts itself, D-80).
+// The Modal traps focus; Escape / back closes.
 
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard, Category } from '../../contract/types.ts';
 import { NO_DETAIL_MESSAGE, cardDetail, detailParagraphs } from '../../lib/shared/detail';
-import { cardTime, categoryName, clampHeadline } from '../../lib/shared/format';
-import { cardLabels, shareAlikeCredit } from '../../lib/shared/labels';
+import { categoryName, clampHeadline } from '../../lib/shared/format';
+import { cardLabels, primarySource, shareAlikeCredit } from '../../lib/shared/labels';
+import { openUrl } from '../../lib/shared/openUrl';
+import { isHttpUrl } from '../../lib/shared/types';
+import { BarSource } from './CardBar';
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { CloseIcon } from '../shell/Icons';
@@ -32,6 +37,8 @@ export function DetailSheet({ card, config, categories, onClose }: Props) {
   const { paragraphs, fallback } = detailParagraphs(card);
   const labels = cardLabels(card, config);
   const credit = shareAlikeCredit(card, config);
+  const primary = primarySource(card);
+  const original = primary && isHttpUrl(primary.url) ? primary.url : null;
 
   return (
     <Modal visible transparent animationType={wide ? 'fade' : 'slide'} onRequestClose={onClose}>
@@ -44,8 +51,8 @@ export function DetailSheet({ card, config, categories, onClose }: Props) {
         >
           {wide ? null : <View style={[styles.handle, { backgroundColor: p.handle }]} />}
           <View style={styles.header}>
-            <Text style={[styles.meta, { color: p.muted }]}>
-              {categoryName(card.category, categories)} · {cardTime(card)}
+            <Text style={[styles.meta, { color: p.accentInk }]} numberOfLines={1}>
+              {categoryName(card.category, categories)}
             </Text>
             <Pressable
               onPress={onClose}
@@ -60,6 +67,11 @@ export function DetailSheet({ card, config, categories, onClose }: Props) {
             <Text style={[styles.headline, { color: p.ink }]} accessibilityRole="header">
               {clampHeadline(card.headline)}
             </Text>
+            {original ? (
+              <View style={[styles.sourceLine, { borderColor: p.divider }]}>
+                <BarSource card={card} link onPress={() => openUrl(original, card.id)} size={wide ? 'wide' : 'phone'} />
+              </View>
+            ) : null}
 
             {detail && detail.key_points.length ? (
               <View style={[styles.points, { backgroundColor: p.surfaceMuted }]}>
@@ -122,7 +134,8 @@ const styles = StyleSheet.create({
   panel: { maxHeight: '90%', width: '100%', maxWidth: 680, borderRadius: 24, paddingTop: 20, paddingHorizontal: 32, paddingBottom: 8 },
   handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 8, marginRight: -4 },
-  meta: { fontFamily: fonts.sans, fontSize: 14, flexShrink: 1 },
+  meta: { fontFamily: fonts.sansSemi, fontSize: 14, letterSpacing: 0.2, flexShrink: 1 },
+  sourceLine: { flexDirection: 'row', marginTop: -10, borderBottomWidth: 1, paddingBottom: 2 },
   close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   body: { gap: 18, paddingTop: 4, paddingBottom: 28 },
   headline: { fontFamily: fonts.serif, fontSize: 28, lineHeight: 31, letterSpacing: -0.56 },
