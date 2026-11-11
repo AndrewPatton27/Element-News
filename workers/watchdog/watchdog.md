@@ -55,7 +55,7 @@ Healthchecks.io check would also email when the Worker stops (not enabled).
 |---|---|---|
 | `SUPABASE_URL`, `ALERT_REPO` | var in `wrangler.toml` | project URL; `owner/element-ops` |
 | `SUPABASE_PUBLISHABLE_KEY` | secret | the project's publishable (anon) key |
-| `WATCHDOG_TOKEN` | secret | same value as the Vault secret `element_watchdog_token` |
+| `WATCHDOG_TOKEN` | secret | same value as the Vault secret `element_watchdog_token` (at least 32 characters; ops_status refuses shorter) |
 | `CRON_SECRET` | secret | same value as the Edge Function secret `CRON_SECRET` (24+ characters) |
 | `GITHUB_TOKEN` | secret | fine-grained token, Issues read and write, only the `element-ops` repo |
 | `HEALTHCHECK_URL` | optional secret | not used; leave unset and the ping is skipped |

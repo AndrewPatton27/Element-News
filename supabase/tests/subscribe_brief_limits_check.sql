@@ -38,9 +38,32 @@ begin
   if (select send_hour from core.brief_subscriptions where email = 'valid.user@example.com') <> 9 then
     raise exception 'FAIL: repeat after the window was not processed';
   end if;
+  -- live pending row: the repeat keeps confirmation_sent_at (no second confirmation mail)
+  if (select confirmation_sent_at from core.brief_subscriptions where email = 'valid.user@example.com') is null then
+    raise exception 'FAIL: a repeat on a live pending row reset confirmation_sent_at';
+  end if;
+  -- per-address cap: 3 stored attempts per day (2 so far); the 3rd passes, the 4th is silent and stores nothing
+  update core.subscribe_attempts set created_at = created_at - interval '11 minutes';
+  perform api.subscribe_brief('valid.user@example.com', 'daily', 10, 'UTC');
+  update core.subscribe_attempts set created_at = created_at - interval '11 minutes';
+  select count(*) into n from core.subscribe_attempts;
+  r := api.subscribe_brief('valid.user@example.com', 'daily', 11, 'UTC');
+  if r <> '{"ok": true, "status": "pending"}'::jsonb or (select count(*) from core.subscribe_attempts) <> n
+     or (select send_hour from core.brief_subscriptions where email = 'valid.user@example.com') <> 10 then
+    raise exception 'FAIL: per-address daily cap did not hold';
+  end if;
+
+  -- x-forwarded-for is never trusted: six addresses behind a spoofed header must not trip the per-client limit
+  perform set_config('request.headers', '{"x-forwarded-for": "203.0.113.50"}', true);
+  delete from core.subscribe_attempts;
+  for i in 1..6 loop perform api.subscribe_brief('spoof' || i || '@example.com', 'daily', 7, 'UTC'); end loop;
+  if exists (select 1 from core.subscribe_attempts where client_key <> 'none') then
+    raise exception 'FAIL: x-forwarded-for was used as a client key';
+  end if;
+  perform set_config('request.headers', '', true);
 
   -- per-client limit: 5 per hour per client key (this client already has 2), the 6th new address trips PT429
-  perform set_config('request.headers', '{"x-forwarded-for": "203.0.113.7, 10.0.0.1"}', true);
+  perform set_config('request.headers', '{"cf-connecting-ip": "203.0.113.7, 10.0.0.1"}', true);
   delete from core.subscribe_attempts;
   for i in 1..5 loop perform api.subscribe_brief('client' || i || '@example.com', 'daily', 7, 'UTC'); end loop;
   ok := false;
@@ -54,11 +77,11 @@ begin
     raise exception 'FAIL: raw client IP stored';
   end if;
   -- a different client is unaffected
-  perform set_config('request.headers', '{"x-forwarded-for": "198.51.100.9"}', true);
+  perform set_config('request.headers', '{"cf-connecting-ip": "198.51.100.9"}', true);
   r := api.subscribe_brief('client6@example.com', 'daily', 7, 'UTC');
   if r->>'status' <> 'pending' then raise exception 'FAIL: other client blocked: %', r; end if;
   -- a repeat by the limited client for an address already asked about is still silent success, not 429
-  perform set_config('request.headers', '{"x-forwarded-for": "203.0.113.7"}', true);
+  perform set_config('request.headers', '{"cf-connecting-ip": "203.0.113.7"}', true);
   r := api.subscribe_brief('client1@example.com', 'daily', 7, 'UTC');
   if r->>'status' <> 'pending' then raise exception 'FAIL: silent repeat answered %', r; end if;
 
@@ -66,7 +89,7 @@ begin
   delete from core.subscribe_attempts;
   insert into core.subscribe_attempts (email_hash, client_key, created_at)
     select md5(g::text) || md5(g::text || 'x'), 'k' || g, now() from generate_series(1, 80) g;
-  perform set_config('request.headers', '{"x-forwarded-for": "192.0.2.55"}', true);
+  perform set_config('request.headers', '{"cf-connecting-ip": "192.0.2.55"}', true);
   ok := false;
   begin perform api.subscribe_brief('global-cap@example.com', 'daily', 7, 'UTC');
   exception when sqlstate 'PT429' then ok := true; end;

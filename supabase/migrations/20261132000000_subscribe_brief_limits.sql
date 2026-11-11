@@ -12,12 +12,18 @@
 -- Limits (same signature and jsonb return shape; no new email flow):
 --   * per normalized address: 1 attempt per 10 minutes. A repeat returns the normal {ok:true,status:'pending'}
 --     and stores nothing, so the answer never shows whether the address is subscribed or was just asked about.
---   * per client key: 5 attempts per hour (client IP from cf-connecting-ip / x-forwarded-for, hashed with the daily
---     salt; signed-in readers without an IP header fall back to their user id; no header at all shares key 'anon').
+--   * per normalized address: at most 3 stored attempts per UTC day (the address hash is salted with the date), so a
+--     third party cannot be mailed more than a few times a day even across the 10-minute windows.
+--   * per client key: 5 attempts per hour. The client IP comes from cf-connecting-ip ONLY (set by Cloudflare, not
+--     client-rotatable; x-forwarded-for is client-controlled and is never read). Signed-in readers without that header
+--     fall back to their user id. With neither, the key is 'none' and the per-client check is skipped (one shared
+--     bucket would lock everyone out); the per-address caps and the global cap still apply.
 --   * global: 80 new attempts per UTC day (under Resend's 100 per day; the rest is headroom for the daily and weekly
 --     briefs). Over a per-client or global limit: raise rate_limited, errcode PT429 (HTTP 429), as api.report_blurb does.
 --   * format: trimmed, lower-cased, at most 254 characters and the same address pattern as before; else
 --     {ok:false,status:'invalid'} as before.
+-- Pending rows: a repeat while a pending row is under 24 h old keeps its token, created_at and confirmation_sent_at, so
+-- no further confirmation mail is queued for it.
 -- Privacy: core.subscribe_attempts stores only sha256(secret pepper || UTC date || address) (never the address) and the
 -- hashed client key. The pepper is a random value in a private one-row table. Hashes rotate daily, so they cannot be
 -- joined across days even by someone holding the table. Retention 2 days (core.prune_subscribe_attempts, daily).
@@ -61,18 +67,22 @@ begin
  select pepper into v_pepper from core.subscribe_salt where id;
  v_ehash:=encode(sha256(convert_to(v_pepper||':e:'||v_day||':'||e,'utf8')),'hex');
  begin v_hdr:=nullif(current_setting('request.headers',true),'')::json; exception when others then v_hdr:=null; end;
- v_ip:=btrim(split_part(coalesce(v_hdr->>'cf-connecting-ip',v_hdr->>'x-forwarded-for',''),',',1));
+ v_ip:=btrim(split_part(coalesce(v_hdr->>'cf-connecting-ip',''),',',1));
  v_key:=case when v_ip<>'' then 'i:'||encode(sha256(convert_to(v_pepper||':i:'||v_day||':'||left(v_ip,64),'utf8')),'hex')
              when v_uid is not null then 'u:'||v_uid::text
-             else 'anon' end;
+             else 'none' end;
 
  -- same address inside 10 minutes: the normal answer, nothing stored, nothing queued (no oracle, no second email)
  if exists(select 1 from core.subscribe_attempts where email_hash=v_ehash and created_at>now_at-interval '10 minutes') then
    return jsonb_build_object('ok',true,'status','pending');
  end if;
- select count(*) into v_n from (select 1 from core.subscribe_attempts
-    where client_key=v_key and created_at>now_at-interval '1 hour' limit 6) s;
- if v_n>=5 then raise exception 'rate_limited' using errcode='PT429'; end if;
+ select count(*) into v_n from (select 1 from core.subscribe_attempts where email_hash=v_ehash limit 4) s;
+ if v_n>=3 then return jsonb_build_object('ok',true,'status','pending'); end if;   -- per-address daily cap: silent, no oracle
+ if v_key<>'none' then
+   select count(*) into v_n from (select 1 from core.subscribe_attempts
+      where client_key=v_key and created_at>now_at-interval '1 hour' limit 6) s;
+   if v_n>=5 then raise exception 'rate_limited' using errcode='PT429'; end if;
+ end if;
  select count(*) into v_n from (select 1 from core.subscribe_attempts
     where created_at>=date_trunc('day',now_at at time zone 'utc') at time zone 'utc' limit 81) s;
  if v_n>=80 then raise exception 'rate_limited' using errcode='PT429'; end if;
@@ -82,7 +92,12 @@ begin
  -- suppression is lifted only when the new token is confirmed (api.confirm_brief).
  insert into core.brief_subscriptions(email,kind,send_hour,tz,status,token,created_at,confirmed_at,confirmation_sent_at,last_daily_sent_on,last_weekly_sent_on)
  values(e,p_kind,p_hour,p_tz,'pending',gen_random_uuid(),now_at,null,null,null,null)
- on conflict(email,kind) do update set send_hour=excluded.send_hour,tz=excluded.tz,status='pending',token=gen_random_uuid(),created_at=now_at,confirmed_at=null,confirmation_sent_at=null,last_daily_sent_on=null,last_weekly_sent_on=null
+ on conflict(email,kind) do update set send_hour=excluded.send_hour,tz=excluded.tz,status='pending',
+   -- a live pending row (under 24 h) keeps token, created_at and confirmation_sent_at: no second confirmation mail
+   token=case when core.brief_subscriptions.status='pending' and core.brief_subscriptions.created_at>now_at-interval '24 hours' then core.brief_subscriptions.token else gen_random_uuid() end,
+   created_at=case when core.brief_subscriptions.status='pending' and core.brief_subscriptions.created_at>now_at-interval '24 hours' then core.brief_subscriptions.created_at else now_at end,
+   confirmation_sent_at=case when core.brief_subscriptions.status='pending' and core.brief_subscriptions.created_at>now_at-interval '24 hours' then core.brief_subscriptions.confirmation_sent_at else null end,
+   confirmed_at=null,last_daily_sent_on=null,last_weekly_sent_on=null
  where core.brief_subscriptions.status<>'active';
  return jsonb_build_object('ok',true,'status','pending');
 end $$;

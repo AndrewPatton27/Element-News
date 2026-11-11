@@ -38,7 +38,9 @@ begin
   if to_regclass('vault.decrypted_secrets') is not null then
     execute 'select decrypted_secret from vault.decrypted_secrets where name = $1' into v_secret using 'element_watchdog_token';
   end if;
-  if v_secret is null or p_token is null or length(p_token) < 16 or p_token <> v_secret then
+  -- plain text compare is not constant-time and SQL cannot do better; so the stored secret must be at least 32 chars
+  -- (a short or default secret is refused outright). Use a random 40+ char token for element_watchdog_token.
+  if v_secret is null or p_token is null or length(p_token) < 32 or length(v_secret) < 32 or p_token <> v_secret then
     raise exception 'ops_status: not allowed';
   end if;
   if to_regclass('cron.job') is not null then

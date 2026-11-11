@@ -49,8 +49,9 @@ begin
       v_hdr := nullif(current_setting('request.headers', true), '')::json;
     exception when others then v_hdr := null;
     end;
-    v_ip := btrim(split_part(coalesce(v_hdr ->> 'cf-connecting-ip', v_hdr ->> 'x-forwarded-for', ''), ',', 1));
-    v_key := case when v_ip = '' then 'anon'
+    -- cf-connecting-ip only: x-forwarded-for is client-controlled and would let one client rotate keys.
+    v_ip := btrim(split_part(coalesce(v_hdr ->> 'cf-connecting-ip', ''), ',', 1));
+    v_key := case when v_ip = '' then 'none'
                   else 'i:' || encode(sha256(convert_to(left(v_ip, 64) || ':' || current_date::text, 'utf8')), 'hex') end;
   end if;
 
@@ -60,9 +61,12 @@ begin
                 and blurb_id = p_id and reason = p_reason) then
     return;
   end if;
-  select count(*) into v_n from (select 1 from core.blurb_reports
-     where reporter_key = v_key and created_at > now() - interval '1 hour' limit 21) s;
-  if v_n >= 20 then raise exception 'rate_limited' using errcode = 'PT429'; end if;
+  -- no trusted IP ('none'): skip the per-key cap (one shared bucket would block everyone); the global cap still applies
+  if v_key <> 'none' then
+    select count(*) into v_n from (select 1 from core.blurb_reports
+       where reporter_key = v_key and created_at > now() - interval '1 hour' limit 21) s;
+    if v_n >= 20 then raise exception 'rate_limited' using errcode = 'PT429'; end if;
+  end if;
   select count(*) into v_n from (select 1 from core.blurb_reports
      where created_at > now() - interval '1 hour' limit 2001) s;
   if v_n >= 2000 then raise exception 'rate_limited' using errcode = 'PT429'; end if;
