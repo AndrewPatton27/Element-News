@@ -121,10 +121,20 @@ export default function SignalsScreen() {
               {LANE_TOPICS.map((t, i) => {
                 const on = signals.optIn.includes(t);
                 return (
-                  <View key={t} style={row(i === 0)}>
+                  <Pressable
+                    key={t}
+                    onPress={() => update((x) => toggleOptIn(x, t))}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={`${FINE_NAMES[t]}: ${on ? 'on' : 'off'}`}
+                    style={[row(i === 0), { minHeight: 56 }]}
+                  >
                     <Text style={[styles.rowTitle, styles.rowMain, { color: p.ink }]}>{FINE_NAMES[t]}</Text>
-                    <Switch value={on} onValueChange={() => update((x) => toggleOptIn(x, t))} trackColor={{ false: p.borderStrong, true: p.accent }} accessibilityLabel={`${FINE_NAMES[t]}: ${on ? 'on' : 'off'}`} />
-                  </View>
+                    {/* The whole row is the switch (R-402): the 40x20 track alone was a too-small tap target. */}
+                    <View pointerEvents="none" aria-hidden importantForAccessibility="no-hide-descendants">
+                      <Switch value={on} trackColor={{ false: p.borderStrong, true: p.accent }} />
+                    </View>
+                  </Pressable>
                 );
               })}
             </View>

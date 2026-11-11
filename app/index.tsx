@@ -492,7 +492,7 @@ export default function FeedScreen() {
   // For you: the chips don't apply; show what it is built from instead.
   const forYouLine = forYou ? (
     <View style={[styles.forYouLine, !wide && styles.promptNarrow, wide && styles.forYouWide]}>
-      <Text style={[styles.forYouText, wide && { flex: 0 }, { color: p.muted }]} numberOfLines={wide ? 6 : 2}>
+      <Text style={[styles.forYouText, { color: p.muted }]} numberOfLines={wide ? 6 : 3}>
         {!signedIn
           ? followed.length || Object.keys(acct.reactions).length
             ? 'Ranked on this device from your topics and likes.'
@@ -503,14 +503,18 @@ export default function FeedScreen() {
               ? `Tailored to ${followed.map((s) => categoryName(s, categories)).join(', ')} and your likes.`
               : 'Tailored to your likes.'}
       </Text>
-      <Pressable onPress={() => router.navigate('/account' as never)} accessibilityRole="link" hitSlop={8}>
-        <Text style={[styles.forYouEdit, { color: p.accentInk }]}>{followed.length ? 'Edit topics' : 'Pick topics'}</Text>
-      </Pressable>
-      {!signedIn ? (
-        <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" hitSlop={8}>
-          <Text style={[styles.forYouSync, { color: p.muted }]}>Sign in to sync across devices</Text>
+      {/* Own row with 44 px tall links (R-402): on a 360 px phone the old one-line version cut the hint to
+          "Like cards o..." and left two 16-18 px tap targets. */}
+      <View style={styles.forYouLinks}>
+        <Pressable onPress={() => router.navigate('/account' as never)} accessibilityRole="link" style={styles.forYouLink}>
+          <Text style={[styles.forYouEdit, { color: p.accentInk }]}>{followed.length ? 'Edit topics' : 'Pick topics'}</Text>
         </Pressable>
-      ) : null}
+        {!signedIn ? (
+          <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" style={styles.forYouLink}>
+            <Text style={[styles.forYouSync, { color: p.muted }]}>Sign in to sync across devices</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   ) : null;
 
@@ -628,9 +632,11 @@ const styles = StyleSheet.create({
   promptMain: { flex: 1, minHeight: 44, justifyContent: 'center' },
   promptText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   promptClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  forYouLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
+  forYouLine: { flexDirection: 'column', alignItems: 'flex-start', gap: 0, minHeight: 36 },
+  forYouLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, alignItems: 'center' },
+  forYouLink: { minHeight: 44, justifyContent: 'center' },
   forYouWide: { flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12 },
-  forYouText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
+  forYouText: { alignSelf: 'stretch', fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
   forYouEdit: { fontFamily: fonts.sansSemi, fontSize: 14 },
   sincePillText: { flex: 1, paddingVertical: 10 },
   forYouSync: { fontFamily: fonts.sans, fontSize: 13, textDecorationLine: 'underline' },

@@ -26,9 +26,9 @@ export function BriefLead({ cards, onOpen, wide }: { cards: BlurbCard[]; onOpen:
 }
 
 const styles = StyleSheet.create({
-  box: { borderRadius: 20, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 18, gap: 6 },
-  title: { fontFamily: fonts.sansSemi, fontSize: 13, letterSpacing: 0.4, textTransform: 'uppercase' },
-  row: { flexDirection: 'row', gap: 10, minHeight: 36, paddingVertical: 4, alignItems: 'flex-start' },
+  box: { borderRadius: 20, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 18, gap: 0 },
+  title: { fontFamily: fonts.sansSemi, fontSize: 13, letterSpacing: 0.4, textTransform: 'uppercase', paddingTop: 4 },
+  row: { flexDirection: 'row', gap: 10, minHeight: 44, paddingVertical: 10, alignItems: 'flex-start' }, // 44 px tap target (R-402)
   dot: { fontFamily: fonts.sansSemi, fontSize: 16, lineHeight: 22 },
   text: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, lineHeight: 22 },
   textWide: { fontSize: 16, lineHeight: 24 },

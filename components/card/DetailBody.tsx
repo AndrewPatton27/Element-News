@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
-import { NO_DETAIL_MESSAGE, cardDetail, detailParagraphs } from '../../lib/shared/detail';
+import { NO_DETAIL_MESSAGE, detailKeyPoints, detailParagraphs } from '../../lib/shared/detail';
 import { clampHeadline } from '../../lib/shared/format';
 import { aiNoticeText, cardLabels, primarySource, shareAlikeCredit } from '../../lib/shared/labels';
 import { openUrl } from '../../lib/shared/openUrl';
@@ -36,7 +36,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
   // D-02: with the `glossary` flag on, jargon in the key points and paragraphs is tap-to-define.
   const gloss = flagOn('glossary');
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
-  const detail = cardDetail(card);
+  const keyPoints = detailKeyPoints(card);
   const { paragraphs, fallback } = detailParagraphs(card);
   const labels = cardLabels(card, config);
   const aiLabel = labels.aiLabel ?? (alwaysAiNotice ? aiNoticeText(config) : null);
@@ -55,12 +55,12 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
         </View>
       ) : null}
 
-      {detail && detail.key_points.length ? (
+      {keyPoints.length ? (
         <View style={[styles.points, { backgroundColor: p.surfaceMuted }]}>
           <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>
             Key points
           </Text>
-          {detail.key_points.map((k, i) => (
+          {keyPoints.map((k, i) => (
             <View key={i} style={styles.point}>
               <Text style={[styles.bullet, { color: p.inkSoft }]}>•</Text>
               {gloss ? <GlossText text={k} style={[styles.pointText, { color: p.inkSoft }]} onTerm={setTerm} /> : <Text style={[styles.pointText, { color: p.inkSoft }]}>{k}</Text>}

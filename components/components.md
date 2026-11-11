@@ -111,3 +111,13 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 - `card/GlossText.tsx` (D-02): `GlossText` draws text with its glossary terms underlined (dotted); tapping calls `onTerm`. `DefineSheet` is the small panel with the plain meaning (`SheetModal`, panel variant). `DetailBody` uses both when the `glossary` flag is on (key points and paragraphs); the feed card front is not underlined so a tap there still opens More detail.
 - `card/CardMenu.tsx`: with the `signals` flag the menu also offers Save for later (or Remove from saved), Mute <company> (first ticker) and Mute <topic> (first macro fine topic). The prop is absent otherwise and the menu is unchanged.
 - `card/Card.tsx`: with `signals` on and depth Short, a card shows one key point.
+
+## M9c design polish (D-210 to D-216, R-400 to R-404)
+
+- `States.tsx`: `BriefSkeleton` (a lead card plus two story tiles, still, same radius as the real Brief) replaces the spinner while the Brief loads.
+- `SortToggle.tsx`: under 380 px wide the three tabs use 10 px side padding (14 px elsewhere) so the header no longer runs past the screen edge on a 360 px phone.
+- `CardBar.tsx`: the time label (`As of Nov 11`, `Added 50 min`) now truncates before the agency name (flexShrink 4 against 1, name keeps at least 30 px; phone bars drop the "Added " prefix); before, a short name like "Fed" was squeezed to "F".
+- `BriefLead.tsx`: rows are 44 px tall (were 36).
+- `SearchSuggestions.tsx`: headlines get 3 lines on phones (the topic button is 112 px max) instead of cutting at 2.
+- `DetailBody.tsx` uses `detailKeyPoints` (`lib/shared/detail.ts`): no "Source: ..." bullet (the source line and Sources list say it) and, on a data card, no bullet that repeats a number from the numbers panel.
+
