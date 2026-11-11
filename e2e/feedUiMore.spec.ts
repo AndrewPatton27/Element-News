@@ -127,6 +127,7 @@ test('360 x 560 phone: "More detail" can be tapped on every card, also when the 
   await cardsOnScreen(page);
   await page.waitForTimeout(1500);
   for (let i = 0; i < 4; i++) {
+    await page.waitForTimeout(1200); // let the card settle after the key press
     const r = await page.evaluate(() => {
       const heads = Array.from(document.querySelectorAll('[data-testid="card-headline"]')) as HTMLElement[];
       const cur = heads.find((el) => { const b = el.getBoundingClientRect(); return b.width > 0 && b.top >= 0 && b.bottom <= window.innerHeight; });
