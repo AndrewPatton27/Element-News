@@ -29,7 +29,7 @@ export interface FunctionEnv {
   eiaApiKey: string | null;
   censusApiKey: string | null;
   newsdataApiKey: string | null;   // NEWSDATA_API_KEY: link-out source; none = it does nothing
-  newsdataEnabled: boolean;        // NEWSDATA_ENABLED=1 switches the link-out source on (the DB flag app_config.linkout_cards must also be true)
+  newsdataEnabled: boolean | null; // NEWSDATA_ENABLED: '1' on, '0' off, unset = null = the code default (config.newsdata.enabled, ON; still needs the key and the DB flag app_config.linkout_cards)
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -56,7 +56,7 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     eiaApiKey: clean(get('EIA_API_KEY')),
     censusApiKey: clean(get('CENSUS_API_KEY')),
     newsdataApiKey: clean(get('NEWSDATA_API_KEY')),
-    newsdataEnabled: (get('NEWSDATA_ENABLED') ?? '').trim() === '1',
+    newsdataEnabled: ((v) => (v === '1' ? true : v === '0' ? false : null))((get('NEWSDATA_ENABLED') ?? '').trim()),
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };

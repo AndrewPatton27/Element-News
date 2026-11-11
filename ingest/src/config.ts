@@ -641,18 +641,21 @@ export const config = {
     clientName: 'Element/0.1',
     library: 'node-fetch',
   },
-  // NewsData.io link-out source (D-05, M9 supply). OFF: `enabled` is the code constant; the env switch NEWSDATA_ENABLED=1 turns it on
-  // for a run, and the card only publishes when the database flag core.app_config.linkout_cards is also true. No key = the source no-ops.
+  // NewsData.io link-out source (D-05, M9 supply, cadence backbone). `enabled` is the code default: ON (cadence, D-270). Three locks
+  // still apply: no NEWSDATA_API_KEY secret = the source makes no call and logs "skipping"; the Edge Function secret NEWSDATA_ENABLED=0
+  // switches it off (=1 on, unset = this default); and a card only publishes when the database flag core.app_config.linkout_cards is true.
   // Terms (read 2026-11-11, context/data-sources.md): free plan = 200 credits/day, 12 h delay, 1 credit per call, up to 10 articles per call,
   // no full content. Link-out only: verbatim headline, publisher URL, "via NewsData.io", "Delayed 12 h". No description, image or content.
   newsdata: {
-    enabled: false as boolean,
+    enabled: true as boolean,
     baseUrl: 'https://newsdata.io/api/1',
     sourceName: 'NewsData.io',
     attribution: 'via NewsData.io',
     delayedHours: 12,
     headlineMaxChars: 200,                      // rule 7 safety cap
-    dailyCreditCap: 144,                        // /market every 15 min (96) + /latest every 30 min (48); the free plan allows 200
+    dailyCreditCap: 144,                        // a weekday uses 104 (hourly baseline 48 + market-hours /market every 15 min 42 + /latest every 30 min 14); the free plan allows 200
+    latestStopFraction: 0.8,                    // at 80% of the cap /latest calls stop (the /market backbone keeps its credits); the cap itself stops everything
+    minScore: 2,                                // relevance gate (newsdata.ts relevanceScore): headlines below this are skipped as not_finance
     pageSize: 10,                               // free-plan maximum articles per call (1 credit)
     maxPerRun: 10,                              // new cards per run
     maxAgeHours: 72,                            // older articles are skipped
@@ -662,6 +665,15 @@ export const config = {
     eventType: null as string | null,
     // Standing content rule: business / macro / markets / investing only. Whole-word, case-insensitive.
     financePattern: /\b(stocks?|shares?|equit(?:y|ies)|markets?|wall street|s&p|nasdaq|dow|russell|fed|federal reserve|fomc|rates?|inflation|cpi|ppi|gdp|jobs|payrolls?|unemployment|treasur(?:y|ies)|bonds?|yields?|dollar|oil|crude|opec|gold|bitcoin|economy|economic|recession|tariffs?|trade|earnings|revenue|profits?|guidance|ipo|merger|acquisition|acquires?|buyback|dividends?|bank(?:s|ing)?|etf|funds?|investors?|investing|ceo|sec|antitrust|layoffs?|supply chain|housing|mortgage|retail sales)\b/i,
+    // Relevance score, no AI (newsdata.ts relevanceScore). Tiers add up (each tier counts once): macro 3, markets 2, corporate 2,
+    // generic finance words (financePattern) 1; a trusted outlet +1, a ticker symbol or watch-list company +1/+2, a promotional or
+    // listicle outlet -2, "how to / best / top 10 / things to" style -3. Standing rule: macro first.
+    macroPattern: /\b(fed|federal reserve|fomc|powell|cpi|ppi|pce|inflation|gdp|jobs report|nonfarm|payrolls?|unemployment|jobless claims|treasury (?:yields?|secretary|department)|rate (?:cut|cuts|hike|hikes|decision)|interest rates?|recession|tariffs?|opec|crude|oil prices?|retail sales|housing starts|mortgage rates?|debt ceiling|trade deficit|central bank|ecb|bank of japan|bank of england|stimulus|government shutdown)\b/i,
+    marketPattern: /\b(stocks?|equit(?:y|ies)|wall street|s&p(?: 500)?|nasdaq|dow(?: jones)?|russell 2000|bond market|yields?|dollar|gold prices?|bitcoin|futures|rally|selloff|sell-off|volatility|vix|etfs?|ipo)\b/i,
+    corporatePattern: /\b(earnings|guidance|revenue|profits?|merger|acquisitions?|acquires?|takeover|buyback|dividends?|layoffs?|antitrust|bankruptcy|chapter 11|sec charges|stock split)\b/i,
+    trustedDomains: ['reuters.com', 'bloomberg.com', 'wsj.com', 'ft.com', 'cnbc.com', 'apnews.com', 'barrons.com', 'marketwatch.com', 'economist.com', 'axios.com', 'nytimes.com', 'fortune.com', 'finance.yahoo.com', 'businessinsider.com', 'forbes.com'],
+    lowValueDomains: ['fool.com', 'benzinga.com', 'investorplace.com', 'zerohedge.com', 'seekingalpha.com', 'thestreet.com', 'investorsobserver.com', 'tipranks.com'],
+    softPattern: /\b(how to|best ways?|top \d+|\d+ (?:stocks?|things|ways|reasons)|things to (?:know|watch)|should you|here'?s why|worth (?:buying|it)|what to know|explained|opinion:|sponsored)\b/i,
     // Recalls and micro-cap noise: skipped unless a watch-list company (config.cpsc.watchNames) is named.
     microPattern: /\b(recalls?|recalled|penny stocks?|micro-?caps?|otc|pink sheets|nano-?caps?|shell company|press release:|sponsored|giveaway)\b/i,
     // Never sports, celebrity or gossip.

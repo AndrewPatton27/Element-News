@@ -13,7 +13,7 @@ import { beaItemToItem } from './sources/bea.ts';
 import { cpscToItem, cpscUrl, parseCpscJson, selectRecalls } from './sources/cpsc.ts';
 import { nasaFeedUrl, nasaToItem, parseNasaRss, selectNasaReleases } from './sources/nasa.ts';
 import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
-import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, type NewsdataEndpoint } from './sources/newsdata.ts';
+import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataEndpoint } from './sources/newsdata.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
@@ -53,7 +53,7 @@ export interface Deps {
   eiaApiKey?: string | null;
   censusApiKey?: string | null;
   /** NewsData.io link-out source (all optional): the key (NEWSDATA_API_KEY), the env switch (NEWSDATA_ENABLED=1) and the credit counter. No key or switch off = the source skips. */
-  newsdata?: { apiKey?: string | null; enabled?: boolean; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
+  newsdata?: { apiKey?: string | null; enabled?: boolean | null; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -348,9 +348,13 @@ async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: Newsd
   const nd = deps.newsdata;
   const c = config.newsdata;
   const tag = `newsdata ${endpoint}`;
-  if (!(c.enabled || nd?.enabled)) { deps.log(`${tag}: switched off, skipping`); return; }
+  if (!(nd?.enabled ?? c.enabled)) { deps.log(`${tag}: switched off, skipping`); return; }
   const key = nd?.apiKey?.trim();
   if (!key) { deps.log(`${tag}: NEWSDATA_API_KEY not set, skipping`); return; }
+  // Degrade gracefully: near the daily cap the /latest calls stop first so the /market backbone keeps its credits.
+  if (endpoint === 'latest' && deps.counter.used('newsdata') >= Math.floor(c.dailyCreditCap * c.latestStopFraction)) {
+    deps.log(`${tag}: ${Math.round(c.latestStopFraction * 100)}% of the daily credits used, /latest paused`); return;
+  }
   const take = nd?.takeCredit ?? (async () => {
     if (deps.counter.used('newsdata') >= c.dailyCreditCap) return false;
     deps.counter.add('newsdata');
@@ -363,7 +367,9 @@ async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: Newsd
     let recent: string[] | null = null;              // headlines of live cards, loaded once and only if a candidate gets that far
     let fresh = 0;
     let skipped = 0;
-    for (const a of articles.sort((x, y) => y.pubDate.localeCompare(x.pubDate))) {
+    // best relevance first, then newest: with a per-run cap and the release queue, the important headlines go first
+    const scored = articles.map((a) => ({ a, s: relevanceScore(a) })).sort((x, y) => y.s - x.s || y.a.pubDate.localeCompare(x.a.pubDate));
+    for (const { a } of scored) {
       if (fresh >= c.maxPerRun) break;
       const r = newsdataToItem(a, deps.now);
       if (!('item' in r)) { skipped++; continue; }

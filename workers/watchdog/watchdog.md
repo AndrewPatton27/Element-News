@@ -20,7 +20,7 @@ No public surface (HTTP requests get 404). Cloudflare Free allows 5 cron trigger
 |---|---|
 | `stale` | no error-free run (brief-summary excluded) and no card in 3 h |
 | `quiet` | no card in 24 h (48 h from Saturday 00:00 to Monday 12:00 UTC). Alert only: news can be quiet |
-| `jobs` | the number of `element-%` pg_cron jobs is not `EXPECTED_JOBS` (30) |
+| `jobs` | the number of `element-%` pg_cron jobs is not `EXPECTED_JOBS` (38: the 30 before cadence + 5 `element-fast-*` sources, 2 `element-fast-newsdata-*`, `element-release-queue`) |
 | `cron` | failed cron runs or non-2xx function replies in the last 24 h |
 | `hung` | a run open for over 10 minutes, or a run marked `killed` in the last 24 h |
 | `model` | a run used the fallback model (`stats.model_missing`) |
@@ -65,7 +65,7 @@ Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 30 cron jobs: 15 before M
 
 ## Supply floor
 
-Kind `supply` (label `wd:supply`): fewer cards published in the last 24 hours than `supply_floor_cards_24h` (default 10, twice the 30-day median of 5 a day). An optional per-hour floor, `supply_floor_cards_market_hour` (default 0 = off), is checked only Monday to Friday 10:00-16:59 ET. Both counts (`cards_24h`, `cards_1h`) come from the same `api.ops_status` call as every other check (migration `20261129000000_supply_ops.sql`), so the Worker still makes two Supabase requests an hour and the database makes one pass over the `published_at` index. If the database does not have the migration yet the counts are missing and the check is skipped. Override the floors with the Worker vars `SUPPLY_FLOOR_CARDS_24H` and `SUPPLY_FLOOR_CARDS_MARKET_HOUR` (whole numbers; 0 turns a check off). The alert text points to `node scripts/supply-readout.mjs`. `EXPECTED_JOBS` and the cron schedule are unchanged. The `wd:supply` label must exist in the alert repo like the others.
+Kind `supply` (label `wd:supply`): one alert that merges every supply check that fails. **Gap check (cadence, goal: a new card every 15 minutes):** no card published for `supply_gap_minutes` (default 60, Worker var `SUPPLY_GAP_MINUTES`, 0 = off) during market hours (Mon-Fri 10:00-16:59 ET); it uses only `feed_status.last_published_at`, so no extra request. The Worker runs hourly, so it sees the gap once an hour. The alert text points to the `slot_coverage_14d` and `queued_cards` readout queries. **Floors:** fewer cards published in the last 24 hours than `supply_floor_cards_24h` (default 10, twice the 30-day median of 5 a day). An optional per-hour floor, `supply_floor_cards_market_hour` (default 0 = off), is checked only Monday to Friday 10:00-16:59 ET. Both counts (`cards_24h`, `cards_1h`) come from the same `api.ops_status` call as every other check (migration `20261129000000_supply_ops.sql`), so the Worker still makes two Supabase requests an hour and the database makes one pass over the `published_at` index. If the database does not have the migration yet the counts are missing and the check is skipped. Override the floors with the Worker vars `SUPPLY_FLOOR_CARDS_24H` and `SUPPLY_FLOOR_CARDS_MARKET_HOUR` (whole numbers; 0 turns a check off). The alert text points to `node scripts/supply-readout.mjs`. `EXPECTED_JOBS` and the cron schedule are unchanged. The `wd:supply` label must exist in the alert repo like the others.
 
 ## Commands
 

@@ -1,7 +1,7 @@
 -- Supply readout (M9 workstream 1). READ-ONLY: select statements only. Run it with
 --   node scripts/supply-readout.mjs                 (runs each query below through `supabase db query --remote --read-only`)
 -- or paste one query at a time into the Supabase SQL editor. The script splits this file on the "-- name:" lines.
--- Days are US Eastern (America/New_York); market hours are Mon-Fri 09:00-15:59 ET.
+-- Days are US Eastern (America/New_York); market hours are Mon-Fri 09:00-15:59 ET (older queries); the cadence goal queries use the drip window, Mon-Fri 06:00-19:59 ET.
 -- "Live" = status 'published' and not superseded. Checked offline on the migrated schema by
 -- the readout step of supabase/tests/run-pglite.mjs (npm run test:sql, PGlite), so every query parses and runs.
 --
@@ -140,3 +140,56 @@ select i.source, count(*)::int as items, min(i.published_at)::date as oldest_pub
  where i.status = 'new' and i.fetched_at > now() - interval '3 days' and i.published_at < now() - interval '2 days'
  group by 1
  order by items desc;
+
+-- name: slot_coverage_14d
+-- THE GOAL MEASURE (cadence, D-270): share of 15-minute slots in the drip window (Mon-Fri 06:00-19:59 ET, 56 a day) with at
+-- least one card that went live (published_at; a released queued card counts at its release time). Per ET day and ALL.
+-- Target: 100 (a new card every 15 minutes). Today (R-520) it is a few percent.
+with slots as (
+  select s as slot_et
+    from generate_series(date_trunc('day', (now() at time zone 'America/New_York') - interval '14 days') + interval '6 hours',
+                         (now() at time zone 'America/New_York') - interval '15 minutes', interval '15 minutes') s
+   where extract(isodow from s) between 1 and 5 and extract(hour from s) between 6 and 19
+), hit as (
+  select distinct date_trunc('hour', b.published_at at time zone 'America/New_York')
+         + floor(extract(minute from b.published_at at time zone 'America/New_York') / 15) * interval '15 minutes' as slot_et
+    from core.blurbs b
+   where b.status = 'published' and b.published_at > now() - interval '15 days'
+)
+select coalesce(to_char(s.slot_et, 'YYYY-MM-DD'), 'ALL') as day_et,
+       count(*)::int as slots,
+       count(h.slot_et)::int as slots_with_a_card,
+       round(100.0 * count(h.slot_et) / nullif(count(*), 0), 1) as pct_covered
+  from slots s left join hit h on h.slot_et = s.slot_et
+ group by rollup (to_char(s.slot_et, 'YYYY-MM-DD'))
+ order by 1 desc;
+
+-- name: longest_gap_per_day_14d
+-- Longest time between two consecutive live cards, per ET day of the later card: over the whole day, and only for gaps that end
+-- inside the drip window (Mon-Fri 06:00-19:59 ET). gaps_over_60 counts those window gaps longer than 60 minutes.
+with c as (
+  select b.published_at, lag(b.published_at) over (order by b.published_at) as prev
+    from core.blurbs b where b.status = 'published' and b.published_at > now() - interval '15 days'
+), g as (
+  select (published_at at time zone 'America/New_York')::date as day_et,
+         extract(epoch from (published_at - prev)) / 60 as gap_min,
+         extract(isodow from published_at at time zone 'America/New_York') between 1 and 5
+           and extract(hour from published_at at time zone 'America/New_York') between 6 and 19 as in_window
+    from c where prev is not null and published_at > now() - interval '14 days'
+)
+select to_char(day_et, 'YYYY-MM-DD') as day_et, count(*)::int as cards,
+       round(max(gap_min))::int as longest_gap_min,
+       round(max(gap_min) filter (where in_window))::int as longest_window_gap_min,
+       count(*) filter (where in_window and gap_min > 60)::int as gaps_over_60
+  from g group by day_et order by day_et desc;
+
+-- name: queued_cards
+-- The release queue (core.drip_config): cards held for the next 15-minute slot. Oldest first.
+select b.kind, count(*)::int as queued, min(b.queued_at) as oldest_queued_at, max(b.importance) as top_importance
+  from core.blurbs b where b.status = 'queued' group by b.kind order by 1;
+
+-- name: cards_by_kind_14d
+-- Where the live cards come from: link_out (NewsData.io), data (agency numbers) and summary (AI or template from filings).
+select b.kind, (b.published_at at time zone 'America/New_York')::date as day_et, count(*)::int as cards
+  from core.blurbs b where b.status = 'published' and b.published_at > now() - interval '14 days'
+ group by 1, 2 order by 2 desc, 1;

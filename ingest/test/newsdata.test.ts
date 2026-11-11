@@ -9,7 +9,7 @@ import { assertAllowed, AllowlistError } from '../src/allowlist.ts';
 import { config } from '../src/config.ts';
 import { runOnce, SOURCE_NAMES, type Deps } from '../src/pipeline.ts';
 import { createDryRunPublisher } from '../src/publish.ts';
-import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey } from '../src/sources/newsdata.ts';
+import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataArticle } from '../src/sources/newsdata.ts';
 import { memoryCounter } from '../src/summarizer/chain.ts';
 import type { RawItem } from '../src/types.ts';
 import { checkLinkOut, SUMMARIZABLE, validatePublish } from '../src/validate.ts';
@@ -28,8 +28,8 @@ const ok = (text = body) => async () => text;
 const on = { newsdata: { apiKey: KEY, enabled: true } };
 const firstItem = () => (newsdataToItem(parseNewsdata(body)[0], NOW) as { item: RawItem }).item;
 
-test('the flag constant is OFF in the shipped config, and the sources are registered', () => {
-  assert.equal(config.newsdata.enabled, false);
+test('the flag constant is ON in the shipped config (cadence), and the sources are registered', () => {
+  assert.equal(config.newsdata.enabled, true);
   assert.ok((SOURCE_NAMES as readonly string[]).includes('newsdata_market'));
   assert.ok((SOURCE_NAMES as readonly string[]).includes('newsdata_latest'));
   assert.equal(config.newsdata.attribution, 'via NewsData.io');
@@ -215,4 +215,55 @@ test('database flag off: the publisher refuses link_out; the item stays retryabl
   await runOnce(f.deps, { only: ['newsdata_market'] });
   assert.deepEqual(statuses, []);
   assert.ok(f.lines.some((l) => /link_out cards are disabled/.test(l)));
+});
+
+// ---- cadence (D-270): relevance score without AI, credit pacing, default on ----
+const art = (title: string, link = 'https://example.com/x', symbols: string[] = []): NewsdataArticle => ({ article_id: 'a', title, link, pubDate: '2026-11-10 20:00:00', source_name: 'E', symbols });
+
+test('relevance score: macro first, then markets and corporate; listicles, promo outlets and generic words sink', () => {
+  assert.ok(relevanceScore(art('Fed signals rate cut as inflation cools')) >= 3);
+  assert.ok(relevanceScore(art('Fed signals rate cut', 'https://www.reuters.com/a')) > relevanceScore(art('Fed signals rate cut')), 'trusted outlet +1');
+  assert.ok(relevanceScore(art('Fed signals rate cut', 'https://www.fool.com/a')) < relevanceScore(art('Fed signals rate cut')), 'promo outlet -2');
+  assert.ok(relevanceScore(art('Nvidia earnings beat estimates; stocks jump')) >= 4);
+  assert.ok(relevanceScore(art('Company CEO speaks at conference')) < config.newsdata.minScore, 'generic word only');
+  assert.ok(relevanceScore(art('5 stocks to watch as the Fed meets')) < relevanceScore(art('Stocks to watch as the Fed meets')), 'listicle -3');
+  assert.ok(relevanceScore(art('Quarterly revenue up', 'https://example.com/y', ['ACME'])) > relevanceScore(art('Quarterly revenue up')), 'ticker +1');
+  assert.equal(relevanceScore(art('Cute puppy video goes viral')), 0);
+});
+
+test('a generic-only headline is skipped as not_finance; a macro headline passes', () => {
+  const sk = (t: string) => (newsdataToItem(art(t), NOW) as { skip?: string }).skip;
+  assert.equal(sk('Local bank CEO named to charity board'), 'not_finance');
+  assert.equal(sk('Treasury yields climb after strong jobs report'), undefined);
+});
+
+test('within a run the most relevant headlines are processed first', async () => {
+  const mk = (id: string, title: string, h: number) => ({ article_id: id, title, link: `https://example.com/${id}`, pubDate: `2026-11-10 ${String(h).padStart(2, '0')}:00:00`, source_name: 'E' });
+  const json = JSON.stringify({ status: 'success', results: [mk('1', 'Banks name new CEO as shares inch up', 22), mk('2', 'Fed holds rates as inflation cools; stocks rally', 10)] });
+  const f = fakeDeps(async () => json, on);
+  await runOnce(f.deps, { only: ['newsdata_market'] });
+  assert.equal(f.dry.cards[0]?.headline, 'Fed holds rates as inflation cools; stocks rally');
+});
+
+test('credit pacing: at 80% of the daily cap /latest pauses (no request, no credit), /market keeps going', async () => {
+  const counter = memoryCounter();
+  const stop = Math.floor(config.newsdata.dailyCreditCap * config.newsdata.latestStopFraction);
+  for (let i = 0; i < stop; i++) counter.add('newsdata');
+  let calls = 0;
+  const f = fakeDeps(async () => { calls++; return body; }, { ...on, counter });
+  await runOnce(f.deps, { only: ['newsdata_latest'] });
+  assert.equal(calls, 0);
+  assert.equal(counter.used('newsdata'), stop);
+  assert.ok(f.lines.some((l) => /\/latest paused/.test(l)));
+  await runOnce(f.deps, { only: ['newsdata_market'] });
+  assert.equal(calls, 1);
+});
+
+test('default on: deps.newsdata.enabled unset follows the code default, but no key still means no request', async () => {
+  const f = fakeDeps(async () => body, { newsdata: { apiKey: KEY } });
+  await runOnce(f.deps, { only: ['newsdata_market'] });
+  assert.ok(f.dry.cards.length >= 1, 'default on + key = cards');
+  const g = fakeDeps(async () => { throw new Error('must not fetch'); }, { newsdata: { apiKey: null } });
+  await runOnce(g.deps, { only: ['newsdata_market'] });
+  assert.ok(g.lines.some((l) => /NEWSDATA_API_KEY not set/.test(l)));
 });
