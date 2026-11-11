@@ -8,7 +8,7 @@
 --   Total 144 credits/day (free plan: 200). The code counts each call (core.ai_usage, provider 'newsdata', cap 144) and stops
 --   at the cap. The minutes (4, 7, 19, 34, 37, 49) avoid the other element-ingest-* jobs (3, 9, 15, 18, 21, 24, 27, 39, 45, 51, 57).
 --   work_cap 10 = at most 10 new link-out cards per call.
--- The watchdog Worker counts cron jobs: EXPECTED_JOBS in workers/watchdog/src/logic.ts goes up by 2 when this file is applied.
+-- The watchdog Worker counts cron jobs: EXPECTED_JOBS in workers/watchdog/src/logic.ts (30) already counts these 2.
 -- Check:  select jobname, schedule from cron.job where jobname like 'element-ingest-newsdata-%';
 -- Remove: select cron.unschedule('element-ingest-newsdata-market'); select cron.unschedule('element-ingest-newsdata-latest');
 

@@ -6,6 +6,7 @@
 import type { CardDetail, CategorySlug, MacroFact } from '../../../contract/types.ts';
 import { config } from '../config.ts';
 import type { MacroObservation, PublishPayload } from '../types.ts';
+import { MONTHS, MONTHS_LONG } from './agencyData.ts';
 import { AGENCY_SERIES } from './agencySeries.ts';
 import { MORE_SERIES, MORE_WHY } from './moreSeries.ts';
 
@@ -166,8 +167,6 @@ export function parseTreasuryCsv(csv: string, column: string): Point[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const ym = (date: string) => date.slice(0, 7);
 function minusMonths(date: string, n: number): string {
   const [y, m] = date.split('-').map(Number);

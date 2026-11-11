@@ -23,6 +23,8 @@ The `/b/<id>` route is the app's own page (`app/b/[id].tsx`). The production Pag
 
 ui-polish-m8: the specs find the card headline on screen with `[data-testid="card-headline"]` (card headlines became level-2 headings under one page-level heading). `uiPolish.spec.ts` checks the pass: on wide web About is a top-bar link and no floating About button covers content; on a 360 x 640 phone the first data card shows its change and agency citation inside the card without scrolling and the bar stays one line; the ticker is a single keyboard stop; arrow-key moves glide (scroll animation restored in M9); a dragged More detail sheet springs back on a short pull and closes on a long one.
 
+`m8Together.spec.ts` (mock data, guest): search shows suggestions when empty and company rows above the results; the About page states the For you ranker notice; seen cards stay put while reading, can be revisited and drop out of the next visit.
+
 `csp.spec.ts` (needs a build, skips without one): serves `dist-pages/` with its generated `_headers` and fails on any Content Security Policy violation (console message or `securitypolicyviolation` event) while the feed loads. Build first with `EXPO_PUBLIC_API_MODE=mock npm run export:web`.
 
 `briefNeverEmpty.spec.ts` (M9, D-119, mock data): the Brief shows a 3-bullet lead and an honest span line ("Last 24 hours" / "Since Friday" / "Updated <date>"), never "not ready"; with the mock-only flag `__ELEMENT_MOCK_EMPTY_BRIEF__` (simulates a back end with no brief) the saved last good brief shows with "Updated <date> · saved copy", and with nothing saved the empty state says "No stories in your daily brief yet". Run: `npx playwright test e2e/briefNeverEmpty.spec.ts --workers=1`.

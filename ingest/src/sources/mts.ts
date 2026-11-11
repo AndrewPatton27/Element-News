@@ -7,7 +7,7 @@
 
 import { config } from '../config.ts';
 import type { PublishPayload } from '../types.ts';
-import { buildAgencyDataCard, fmt, toNum } from './agencyData.ts';
+import { buildAgencyDataCard, fmt, MONTHS_LONG, toNum } from './agencyData.ts';
 
 export interface MtsMonth {
   recordDate: string; monthName: string; fiscalYear: number;
@@ -16,7 +16,6 @@ export interface MtsMonth {
 }
 
 const AGENCY = 'U.S. Department of the Treasury, Fiscal Service';
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function mtsUrl(now: Date): string {
   const m = config.agency.mts;
@@ -31,7 +30,7 @@ export function parseMts(json: string): MtsMonth | null {
   const recordDate = rows.map((r) => r.record_date).sort().at(-1)!;
   const sections = rows.filter((r) => r.record_date === recordDate).sort((a, b) => Number(a.print_order_nbr) - Number(b.print_order_nbr));
   const mm = Number(recordDate.slice(5, 7)), cy = Number(recordDate.slice(0, 4));
-  const monthName = MONTH_NAMES[mm - 1];
+  const monthName = MONTHS_LONG[mm - 1];
   const months = sections.filter((r) => r.classification_desc === monthName);
   const ytd = sections.filter((r) => r.classification_desc === 'Year-to-Date');
   const cur = months.at(-1);

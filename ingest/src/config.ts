@@ -808,21 +808,6 @@ export function groqDailyCap(g: {
   return cap;
 }
 
-/**
- * Groq daily cap from a MEASURED tokens-per-call figure (prompt + source text + output, reasoning tokens included, from
- * Groq's usage field or the console). For when no cap has been set, or after a prompt change (sum-v7) moves the cost per call:
- *   cap = min(freeRpd, floor(freeTpd x safety / measuredTokensPerCall))   (the code cap is NOT applied: this is the budget)
- * The 0.9 safety factor keeps room for retries and the Brief. Returns 0 for a missing or non-positive measurement
- * (callers keep the existing cap then). Not wired into groqDailyCap(): it is a calculator, the cap itself is set elsewhere.
- * Example: 200,000 TPD / 2,700 tokens = 74 (the current cap, no safety); 200,000 x 0.9 / 3,200 = 56.
- */
-export function groqCapFromMeasuredTokens(measuredTokensPerCall: number | null | undefined, g: { freeRpd: number | null; freeTpd: number | null } = config.groq, safety = 0.9): number {
-  if (!measuredTokensPerCall || !Number.isFinite(measuredTokensPerCall) || measuredTokensPerCall <= 0) return 0;
-  let cap = g.freeTpd != null ? Math.floor((g.freeTpd * safety) / measuredTokensPerCall) : Number.POSITIVE_INFINITY;
-  if (g.freeRpd != null) cap = Math.min(cap, g.freeRpd);
-  return Number.isFinite(cap) ? Math.max(0, cap) : 0;
-}
-
 /** Groq pacing in ms: the largest of the RPM gap, the TPM gap for one estimated call, and the floor. */
 export function groqMinIntervalMs(g: {
   freeRpm: number | null; freeTpm: number | null; estimatedTokensPerCall: number; minIntervalMsFloor: number;

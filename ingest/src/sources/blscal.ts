@@ -7,13 +7,12 @@
 
 import { config } from '../config.ts';
 import type { PublishPayload } from '../types.ts';
-import { buildAgencyDataCard } from './agencyData.ts';
+import { buildAgencyDataCard, MONTHS } from './agencyData.ts';
 
 export interface ScheduledRelease { name: string; date: string; time: string }   // date YYYY-MM-DD, time HH:MM (Eastern, 24 h)
 
 const AGENCY = 'U.S. Bureau of Labor Statistics';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export interface MajorRelease { match: string; slug: string; title: string; what: string; url: string }
 /** Releases that move markets or that everyday readers hear about. Everything else on the calendar is ignored. */

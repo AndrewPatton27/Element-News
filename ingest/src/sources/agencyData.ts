@@ -7,6 +7,7 @@ import { config } from '../config.ts';
 import type { PublishPayload } from '../types.ts';
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** 'YYYY-MM-DD' -> 'Nov 6'. */
 export function shortDate(d: string): string {

@@ -8,7 +8,7 @@ Data access, rules and helpers for the app. The pure files have no React imports
 | ------ | ----- |
 | `account/` | Sign-in session, account state and account labels |
 | `api/` | The `Api` interface, mock and Supabase implementations, error types and app config |
-| `brief/` | Daily and weekly brief logic |
+| `brief/` | Daily and weekly brief logic; `briefWindow.ts` holds the window rule (24 h, 72 h on a New York Monday, 168 h weekly) and the span text, matching `core.brief_window_hours` |
 | `companies/` | Company directory answers, sector grouping, "About: Apple" chips, the company API (Supabase and sample) and batched card tag lookups |
 | `feed/` | Feed ordering, paging, ranking (For you, local), swipe and early-request logic (index.html starts the first feed pages, app_config, categories, numbers and feed status before the bundle runs; `earlyFeed.ts` hands them to the api) |
 | `following/` | Followed topics and stories, following re-rank |
@@ -162,7 +162,7 @@ The rules now:
 - Undo goes back to the reacted card (one card back right after a like) and never moves forward.
 - Where the list comes to rest (`restingIndex` of the scroll offset, 120 ms after the last scroll event) only moves the reader when it is not a leftover of our own animated move. While a move is pending (`SETTLE_GRACE_MS` 900 ms), reports for other rows are ignored; after that the report wins (the user interrupted).
 
-Tests: `__tests__/feedNav.test.ts` (422 cases: unit cases, 400 seeded fuzz sequences of key presses, auto-repeat, like/dislike/undo, swipes, user and stale scroll reports, refetch reshuffles, inserted cards, reranks and head swaps, plus Drew's case of a held ArrowRight during background refetches), and `e2e/feedNav.spec.ts`.
+Tests: `__tests__/feedNav.test.ts` (422 cases: unit cases, 400 seeded fuzz sequences of key presses, auto-repeat, like/dislike/undo, swipes, user and stale scroll reports, refetch reshuffles, inserted cards, reranks and head swaps, plus the case of a held ArrowRight during background refetches), and `e2e/feedNav.spec.ts`.
 
 `feed/toastPlacement.ts` holds the corner Undo toast's position and sizes (phones: bottom 28, over the left end of the card's bottom bar, since cards have no small print any more). `CORNER_TOAST.bottom` (phone 64 px, wide 40 px from the bottom of the area the toast is drawn in) is the single value that sets how high it sits. The pill is 36 px tall and the Undo target is 44 px. `cornerToastText` gives the short visible word and the full spoken sentence. Tests: `__tests__/toastPlacement.test.ts`; the placement itself is checked in `e2e/feedNav.spec.ts`.
 

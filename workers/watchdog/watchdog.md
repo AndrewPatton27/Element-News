@@ -12,7 +12,7 @@ No public surface (HTTP requests get 404). Cloudflare Free allows 5 cron trigger
    of a 6-hour block (UTC hours 0, 6, 12, 18), it POSTs `ingest-source` for 4 sources one after another (a window
    that rotates through macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa), with `CRON_SECRET` as the bearer
    token. No stored state is needed.
-3. **Alert** through GitHub issues. (An optional Healthchecks.io ping runs only if `HEALTHCHECK_URL` is set; Drew chose not to use it.)
+3. **Alert** through GitHub issues. (An optional Healthchecks.io ping runs only if `HEALTHCHECK_URL` is set; it is not used.)
 
 ## Problems it reports (label `wd:<kind>`)
 
@@ -20,7 +20,7 @@ No public surface (HTTP requests get 404). Cloudflare Free allows 5 cron trigger
 |---|---|
 | `stale` | no error-free run (brief-summary excluded) and no card in 3 h |
 | `quiet` | no card in 24 h (48 h from Saturday 00:00 to Monday 12:00 UTC). Alert only: news can be quiet |
-| `jobs` | the number of `element-%` pg_cron jobs is not 10 |
+| `jobs` | the number of `element-%` pg_cron jobs is not `EXPECTED_JOBS` (30) |
 | `cron` | failed cron runs or non-2xx function replies in the last 24 h |
 | `hung` | a run open for over 10 minutes, or a run marked `killed` in the last 24 h |
 | `model` | a run used the fallback model (`stats.model_missing`) |
@@ -61,7 +61,7 @@ Healthchecks.io check would also email when the Worker stops (not enabled).
 | `HEALTHCHECK_URL` | optional secret | not used; leave unset and the ping is skipped |
 
 Set each secret with `npx wrangler secret put <NAME>` in this folder (type the value there; never put it in a file).
-Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 30 jobs (M9c3 adds beige, trade, regpress and annual on top of the count below; the older text said 24: 15 before M9 plus bls, beadata, eia, auctions, fomc, blscal, mts and the two purge jobs; the original 15 were: 10 ingest and brief jobs plus fedspeech, secpress, treasury and the two ranking checks; change it whenever a cron job is added or removed) are constants at the top of `src/logic.ts`.
+Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 30 cron jobs: 15 before M9 (10 ingest and brief jobs, fedspeech, secpress, treasury, two ranking checks), bls, beadata, eia, auctions, fomc, the two purge jobs, blscal, mts, two NewsData jobs, and beige, trade, regpress, annual; change it whenever a cron job is added or removed are constants at the top of `src/logic.ts`.
 
 ## Supply floor
 

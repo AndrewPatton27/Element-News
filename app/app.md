@@ -67,7 +67,7 @@ Every control works without an account; choices stay on the device (`lib/storage
 
 **Design delta (2026-10-18):** About has a back arrow (to Me) and a "How a card is made" section; sign-in and create account have a close X (and a back arrow after the first screen), and create account needs the "I am 18 or older" checkbox; Me (signed in or not) has a "Replay the quick tour" row to `/tutorial`; Following ends with the AI + disclaimer footer line.
 
-**Account entry points (2026-10-18, Drew):** the web top bar has no Me icon. /account (Me) now shows, signed out, a Sign in + Create account card with the one-line benefit, the device-saved favorite/hidden topics, followed companies and sources (editable, local only), links to Numbers to know, About Element and Replay the quick tour, a \
+**Account entry points (2026-10-18):** the web top bar has no Me icon. /account (Me) now shows, signed out, a Sign in + Create account card with the one-line benefit, the device-saved favorite/hidden topics, followed companies and sources (editable, local only), links to Numbers to know, About Element and Replay the quick tour, a \
 
 - Feed pager reveals cards in five-card windows and reports its current queue position; useFeed prefetches the next API cursor in the background. Existing like/dislike buttons and swipe behavior remain on the shared card renderer.
 

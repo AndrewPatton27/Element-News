@@ -8,11 +8,10 @@
 
 import { config } from '../config.ts';
 import type { PublishPayload } from '../types.ts';
-import { buildAgencyDataCard } from './agencyData.ts';
+import { buildAgencyDataCard, MONTHS_LONG } from './agencyData.ts';
 
 const DAY = 86_400_000;
 const AGENCY = 'Federal Reserve Board';
-const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const day = (d: string): number => new Date(`${d}T00:00:00Z`).getTime();
 const today = (now: Date): number => day(now.toISOString().slice(0, 10));
 const longDate = (d: string): string => { const [, m, dd] = d.split('-').map(Number); return `${MONTHS_LONG[m - 1]} ${dd}`; };
