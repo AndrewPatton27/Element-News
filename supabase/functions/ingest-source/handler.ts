@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc),
+// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, newsdata_market, newsdata_latest),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
@@ -104,6 +104,12 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       keys: { bls: env.blsApiKey, bea: env.beaApiKey, beaDataEnabled: env.beaDataEnabled },
       eiaApiKey: env.eiaApiKey,
       censusApiKey: env.censusApiKey,
+      // NewsData.io credits: one atomic database take per request (core.ai_usage, provider 'newsdata'), cap = the daily credit budget
+      newsdata: {
+        apiKey: env.newsdataApiKey,
+        enabled: env.newsdataEnabled,
+        takeCredit: async () => { try { await tracker.take('newsdata', config.newsdata.dailyCreditCap); return true; } catch { return false; } },
+      },
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
       reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed, scorerMaxPerRun: config.reportCard.scorerMaxPerRun } : undefined,
@@ -130,7 +136,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
   }
   const run = buildRunSummary({
     source: opts.source, startedAt, finishedAt: now(), stats, guard: guarded.counts,
-    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
+    aiCalls: tracker.totalTaken() - (tracker.taken.newsdata ?? 0), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
   });
   if (!opts.noRunLog) {
     try { await rpc('log_run', { p: runLogPayload(run, runId) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }

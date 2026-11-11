@@ -22,6 +22,8 @@ export interface Publisher {
   refreshTrending?(): Promise<unknown>;
   /** End of a run: purge old ML shadow-log rows and apply the storage stop rule (api.ml_purge). */
   mlPurge?(): Promise<unknown>;
+  /** Headlines of the newest live cards (one api.feed page), for the near-duplicate check of link-out headlines. */
+  recentHeadlines?(): Promise<string[]>;
   auditCards?(): Promise<RevisableCard[]>;
   setAuditStatus?(id: string, status: string): Promise<void>;
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
@@ -74,6 +76,11 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
     reviseBlurb: (p) => rpc('revise_blurb', { p }),
     refreshTrending: () => rpc('refresh_trending', {}),
     mlPurge: () => rpc('ml_purge', {}),
+    async recentHeadlines() {
+      const page: any = await rpc<any>('feed', { p_mode: 'latest', p_cursor: null, p_limit: 100, p_category: null });
+      const items = Array.isArray(page) ? page : page?.items;
+      return Array.isArray(items) ? items.map((c: { headline?: unknown }) => String(c.headline ?? '')).filter(Boolean) : [];
+    },
     async auditCards() {
       const rows: RevisableCard[] = [];
       // api.feed(mode,cursor,limit,category) is the deployed anon RPC. Follow cursors
@@ -146,7 +153,7 @@ function itemPayload(item: RawItem) {
     body_text: null,                 // page text is not stored; it is re-fetched (cached) when needed
     published_at: item.published_at,
     license_class: item.license_class,
-    use_level: 'full_summarize',
+    use_level: item.license_class === 'link_out' ? 'headline_link_only' : 'full_summarize',
     tickers: item.tickers.map((t) => t.symbol),
     event_type: item.event_type,
   };

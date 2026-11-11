@@ -231,7 +231,9 @@ export const config = {
     'api.eia.gov', 'api.census.gov',
     // Broad topics (feed/API text only, never pages): Wikipedia REST featured feed, CPSC recalls API,
     // USGS earthquake GeoJSON, NASA news-release RSS.
-    'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov'],
+    'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov',
+    // NewsData.io /latest and /market (JSON headlines only, never article pages). Key from env NEWSDATA_API_KEY. OFF by default (newsdata.enabled).
+    'newsdata.io'],
   maxRequestsPerSecond: 5,                     // SEC allows 10/s; we stay at half
   maxRedirects: 3,
   fetchTimeoutMs: 20_000,
@@ -510,6 +512,32 @@ export const config = {
     // from SEC_USER_AGENT at run time; it is never hard-coded.
     clientName: 'Element/0.1',
     library: 'node-fetch',
+  },
+  // NewsData.io link-out source (D-05, M9 supply). OFF: `enabled` is the code constant; the env switch NEWSDATA_ENABLED=1 turns it on
+  // for a run, and the card only publishes when the database flag core.app_config.linkout_cards is also true. No key = the source no-ops.
+  // Terms (read 2026-11-11, context/data-sources.md): free plan = 200 credits/day, 12 h delay, 1 credit per call, up to 10 articles per call,
+  // no full content. Link-out only: verbatim headline, publisher URL, "via NewsData.io", "Delayed 12 h". No description, image or content.
+  newsdata: {
+    enabled: false as boolean,
+    baseUrl: 'https://newsdata.io/api/1',
+    sourceName: 'NewsData.io',
+    attribution: 'via NewsData.io',
+    delayedHours: 12,
+    headlineMaxChars: 200,                      // rule 7 safety cap
+    dailyCreditCap: 144,                        // /market every 15 min (96) + /latest every 30 min (48); the free plan allows 200
+    pageSize: 10,                               // free-plan maximum articles per call (1 credit)
+    maxPerRun: 10,                              // new cards per run
+    maxAgeHours: 72,                            // older articles are skipped
+    language: 'en',
+    country: 'us',
+    category: 'markets',
+    eventType: null as string | null,
+    // Standing content rule: business / macro / markets / investing only. Whole-word, case-insensitive.
+    financePattern: /\b(stocks?|shares?|equit(?:y|ies)|markets?|wall street|s&p|nasdaq|dow|russell|fed|federal reserve|fomc|rates?|inflation|cpi|ppi|gdp|jobs|payrolls?|unemployment|treasur(?:y|ies)|bonds?|yields?|dollar|oil|crude|opec|gold|bitcoin|economy|economic|recession|tariffs?|trade|earnings|revenue|profits?|guidance|ipo|merger|acquisition|acquires?|buyback|dividends?|bank(?:s|ing)?|etf|funds?|investors?|investing|ceo|sec|antitrust|layoffs?|supply chain|housing|mortgage|retail sales)\b/i,
+    // Recalls and micro-cap noise: skipped unless a watch-list company (config.cpsc.watchNames) is named.
+    microPattern: /\b(recalls?|recalled|penny stocks?|micro-?caps?|otc|pink sheets|nano-?caps?|shell company|press release:|sponsored|giveaway)\b/i,
+    // Never sports, celebrity or gossip.
+    offTopicPattern: /\b(celebrity|actor|actress|singer|nfl|nba|mlb|nhl|touchdown|playoffs?|horoscope|royal family|kardashian)\b/i,
   },
   // CPSC recalls -> safety / recall. JSON API, no key. License PARTLY verified (17 U.S.C. 105;
   // the CPSC policy page could not be read). AI text = Title + Description + Hazards + Remedies.

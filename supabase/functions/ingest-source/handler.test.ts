@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { handleIngestSource, parseIngestOptions, DEFAULT_WORK_CAP } from './handler.ts';
 import { createTimeBudget } from '../_shared/budget.ts';
 import { memoryUsageStore } from '../_shared/usage.ts';
-import { readFunctionEnv } from '../_shared/env.ts';
+import { describeFunctionEnv, readFunctionEnv } from '../_shared/env.ts';
+import { readFileSync } from 'node:fs';
 import { createDryRunPublisher, templateSummarizer, type Summarizer } from '../_shared/ingest.ts';
 import { DRY_NOW, fixtureFetcher } from '../../../ingest/src/main.ts';
 
@@ -117,4 +118,57 @@ test('candidate selection stays off in the cloud, so the deadline guard sees eve
   const run = await handleIngestSource(s.deps, parseIngestOptions({ source: 'bea', work_cap: 20 }));
   assert.ok(!run.log_tail.some((l) => l.startsWith('selection:')), 'no selection log lines');
   assert.equal(run.stopped_by, 'time');
+});
+
+// ---- NewsData.io link-out source (OFF by default; needs NEWSDATA_API_KEY and NEWSDATA_ENABLED=1) -------------------
+
+test('options: newsdata_market and newsdata_latest are known sources', () => {
+  for (const s of ['newsdata_market', 'newsdata_latest']) assert.equal(parseIngestOptions({ source: s, work_cap: 10 }).source, s);
+});
+
+test('newsdata: no key or switch off = no request, no credit used, no card; the run still logs', async () => {
+  for (const e of [env, { ...env, newsdataApiKey: 'pub_k', newsdataEnabled: false }, { ...env, newsdataApiKey: null, newsdataEnabled: true }]) {
+    const s = setup();
+    let fetched = 0;
+    const run = await handleIngestSource({ ...s.deps, env: e, fetchText: async () => { fetched++; return '{}'; } }, parseIngestOptions({ source: 'newsdata_market', work_cap: 10 }));
+    assert.equal(run.ok, true, run.error ?? '');
+    assert.equal(fetched, 0);
+    assert.equal(s.dry.cards.length, 0);
+    assert.equal(s.store.counts.newsdata ?? 0, 0);
+    assert.equal(s.logged.length, 1);
+  }
+});
+
+test('newsdata on: one database credit per call, link_out cards published, credits are not counted as AI calls, key never in the log', async () => {
+  const body = readFileSync(new URL('../../../ingest/test/fixtures/newsdata-market.json', import.meta.url), 'utf8');
+  const e = { ...env, newsdataApiKey: 'pub_SECRETKEY123456', newsdataEnabled: true };
+  const s = setup();
+  const run = await handleIngestSource({ ...s.deps, env: e, fetchText: async () => body, clock: () => new Date('2026-11-11T08:00:00Z') }, parseIngestOptions({ source: 'newsdata_market', work_cap: 10 }));
+  assert.equal(run.ok, true, run.error ?? '');
+  assert.equal(s.store.counts.newsdata, 1);
+  assert.equal(run.ai_calls, 0);
+  assert.ok(s.dry.cards.length >= 1 && s.dry.cards.every((c) => c.kind === 'link_out' && c.body === null && c.attribution === 'via NewsData.io'));
+  assert.ok(!JSON.stringify([s.logged, run, s.dry.cards]).includes('SECRETKEY'));
+});
+
+test('newsdata credit cap 144: at the cap the database refuses, so no request is made', async () => {
+  const e = { ...env, newsdataApiKey: 'pub_SECRETKEY123456', newsdataEnabled: true };
+  const s = setup({ usage: { newsdata: 144 } });
+  s.store.counts.newsdata = 144;
+  const caps = { newsdata: { cap: 144, reserve: 0 } };
+  const store = memoryUsageStore({ newsdata: 144 }, caps);
+  let fetched = 0;
+  await handleIngestSource({ ...s.deps, env: e, usageStore: store, fetchText: async () => { fetched++; return '{}'; } }, parseIngestOptions({ source: 'newsdata_latest' }));
+  assert.equal(fetched, 0);
+  assert.equal(store.counts.newsdata, 144);
+});
+
+test('env: NEWSDATA_API_KEY and NEWSDATA_ENABLED are read; default is off and keys never print', () => {
+  const base = (k: string) => ({ SUPABASE_URL: 'https://mzfpelilxpbpcgskppxu.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'eyJ-test-service-role-key', NEWSDATA_API_KEY: 'pub_SECRETKEY123456', NEWSDATA_ENABLED: '1' } as Record<string, string>)[k];
+  const on = readFunctionEnv(base);
+  assert.equal(on.newsdataApiKey, 'pub_SECRETKEY123456');
+  assert.equal(on.newsdataEnabled, true);
+  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? undefined : base(k))).newsdataEnabled, false);
+  assert.equal(env.newsdataApiKey, null);
+  assert.ok(!describeFunctionEnv(on).includes('SECRETKEY'));
 });

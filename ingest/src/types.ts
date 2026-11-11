@@ -4,11 +4,11 @@
 
 import type { CardDetail, CategorySlug, Exchange, MacroFact, SourceKind } from '../../contract/types.ts';
 
-export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa';
+export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa' | 'link_out';
 
 /** One collected item, ready for summarizing. */
 export interface RawItem {
-  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
+  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa' | 'newsdata';
   external_id: string;
   url: string;                       // the page we cite (and may fetch: allowlisted hosts only)
   title: string;
@@ -78,7 +78,9 @@ export interface Summarizer {
 export interface PublishPayload {
   dedupe_key: string;
   item_id?: string;
-  kind: 'summary' | 'data';
+  kind: 'summary' | 'data' | 'link_out';
+  /** The ingest source that built this card (link_out cards are only valid from 'newsdata'). Not stored. */
+  origin?: string;
   headline: string;
   body: string | null;
   category: string;
