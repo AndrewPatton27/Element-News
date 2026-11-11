@@ -166,7 +166,7 @@ test('screenshots at 360, 390, 820 and 1280', async ({ browser }) => {
     await page.waitForTimeout(1500);
     await page.locator('[aria-label="Follow this story"]').first().click();
     await page.waitForTimeout(600);
-    await (z.phone ? page.getByRole('tab', { name: 'Following', exact: true }) : page.getByRole('link', { name: 'Following', exact: true })).first().click();
+    await (z.n < 1024 ? page.getByRole('tab', { name: 'Following', exact: true }) : page.getByRole('link', { name: 'Following', exact: true })).first().click();
     await page.waitForTimeout(3000);
     await page.screenshot({ path: `test-results/m9b-shots/following-${z.n}.png` });
     await page.context().close();
