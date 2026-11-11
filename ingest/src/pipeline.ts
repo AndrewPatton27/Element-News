@@ -20,7 +20,7 @@ import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
 import { runMacro, runTreasury } from './macroRun.ts';
 import { runBeaData, runBls } from './agencyRun.ts';
-import { runAuctions, runCensus, runEia, runFomc } from './agencyRunData.ts';
+import { runAuctions, runBlsCal, runCensus, runEia, runFomc, runMts } from './agencyRunData.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -35,9 +35,9 @@ import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
-  | 'eia' | 'census' | 'auctions' | 'fomc';
+  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata',
-  'eia', 'census', 'auctions', 'fomc'];
+  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -160,6 +160,8 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('census')) await runCensus(deps, stats);
   if (only.has('auctions')) await runAuctions(deps, stats);
   if (only.has('fomc')) await runFomc(deps, stats);
+  if (only.has('blscal')) await runBlsCal(deps, stats);
+  if (only.has('mts')) await runMts(deps, stats);
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;

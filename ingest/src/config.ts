@@ -271,7 +271,10 @@ export const config = {
     // Finance and rates (2026-11-08): all Federal Reserve Board H.15 series. SPREAD_10Y2Y is not fetched: it is
     // computed from DGS10 and DGS2 (FRED's own T10Y2Y and SOFR pages carry a copyright flag, so they stay out).
     // Check each series' notes on its FRED page for a "Copyright" line before enabling in production.
-    'DGS3MO', 'DGS5', 'DGS30', 'EFFR'],
+    'DGS3MO', 'DGS5', 'DGS30', 'EFFR',
+    // M9c (2026-11-11): 16 more public-domain series (sources/moreSeries.ts). FRED notes checked: no Copyright line.
+    'CCSA', 'CIVPART', 'U6RATE', 'CPILFESL', 'PPIFIS', 'PCEPI', 'PCEPILFE', 'PSAVERT',
+    'INDPRO', 'TCU', 'TOTALSL', 'WALCL', 'M2SL', 'PERMIT', 'HSN1F', 'DGORDER'],
   // Derived series: id -> [minuend, subtrahend] (both must be fetched in the same run).
   derivedSeries: { SPREAD_10Y2Y: ['DGS10', 'DGS2'] } as Record<string, [string, string]>,
   // FRED series that must never be fetched or shown (not public domain). MORTGAGE30US: Freddie Mac copyright.
@@ -295,6 +298,8 @@ export const config = {
     DFEDTARL: 99,        // lower limit moves together with the upper one: numbers only
     SPREAD_10Y2Y: 99,    // numbers only
     TREAS_DEBT: 1e9,     // grows every day: numbers only
+    CCSA: 3.0,           // percent, weekly (M9c)
+    WALCL: 0.2,          // percent, weekly (M9c)
   } as Record<string, number>,
   // One daily Treasury yield-curve card (2, 5, 10, 30-year + 10y-2y gap, moves in bp). Published when the largest
   // move of the four is at least minMovePoints (percentage points; 0 = every day with a new reading, about 250/year,
@@ -361,12 +366,15 @@ export const config = {
     eia: {
       enabled: true,
       base: 'https://api.eia.gov/v2',
-      maxCardsPerRun: 3,
+      maxCardsPerRun: 4,
       attribution: 'Source: U.S. Energy Information Administration',
       // Weekly petroleum status: commercial crude, motor gasoline and distillate stocks, one card for the report.
       petroleum: { route: '/petroleum/stoc/wstk/data/', series: { crude: 'WCESTUS1', gasoline: 'WGTSTUS1', distillate: 'WDISTUS1' }, enabled: true },
       // Weekly natural gas storage, Lower 48 working gas in Bcf.
       gasStorage: { route: '/natural-gas/stor/wkly/data/', series: 'NW2_EPG0_SWO_R48_BCF', enabled: true },
+      // Weekly refinery utilization + crude production, imports and product supplied (M9c): 2 requests, one card.
+      supply: { routeSupply: '/petroleum/sum/sndw/data/', routeUtil: '/petroleum/pnp/wiup/data/', enabled: true,
+        series: { utilization: 'WPULEUS3', production: 'WCRFPUS2', imports: 'WCRIMUS2', productSupplied: 'WRPUPUS2' } },
       // Weekly retail regular gasoline. OFF by default: FRED GASREGW (the same EIA number) already makes a gas card.
       gasoline: { route: '/petroleum/pri/gnd/data/', series: 'EMM_EPMR_PTE_NUS_DPG', enabled: false },
     },
@@ -390,6 +398,24 @@ export const config = {
       lookbackDays: 5,
       maxCardsPerRun: 2,
       securityTypes: ['Note', 'Bond'] as string[],
+      attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    },
+    // BLS release calendar (M9c): ICS from www.bls.gov (public domain). One template card per major release, published
+    // up to leadDays before it (Eastern days), at most maxCardsPerRun new cards per run.
+    blscal: {
+      enabled: true,
+      url: 'https://www.bls.gov/schedule/news_release/bls.ics',
+      leadDays: 3 as number,
+      maxCardsPerRun: 3,
+      attribution: 'Source: U.S. Bureau of Labor Statistics',
+    },
+    // Treasury Monthly Treasury Statement (M9c): budget deficit or surplus, one card a month (FiscalData, no key).
+    mts: {
+      enabled: true,
+      path: '/v1/accounting/mts/mts_table_1',
+      pageSize: 40,
+      lookbackDays: 75,
+      maxCardsPerRun: 1,
       attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
     },
     // FOMC calendar: dates copied from federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-11-10 (2027 tentative).

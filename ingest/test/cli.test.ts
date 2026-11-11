@@ -58,7 +58,7 @@ test('dry run end to end: 4 template cards (1 Fed, 2 BEA, 1 USGS: narrow-source 
   ]);
   // every request went to an allowlisted government host (data.sec.gov: per-company filing lists)
   for (const u of requested) {
-    assert.match(new URL(u).hostname, /^(www\.sec\.gov|data\.sec\.gov|www\.federalreserve\.gov|api\.stlouisfed\.org|apps\.bea\.gov|www\.federalregister\.gov|en\.wikipedia\.org|www\.saferproducts\.gov|earthquake\.usgs\.gov|www\.nasa\.gov|api\.fiscaldata\.treasury\.gov|api\.bls\.gov)$/, u);
+    assert.match(new URL(u).hostname, /^(www\.sec\.gov|data\.sec\.gov|www\.federalreserve\.gov|api\.stlouisfed\.org|apps\.bea\.gov|www\.federalregister\.gov|en\.wikipedia\.org|www\.saferproducts\.gov|earthquake\.usgs\.gov|www\.nasa\.gov|api\.fiscaldata\.treasury\.gov|api.bls.gov|www.bls.gov)$/, u);
   }
   assert.ok(lines.some((l) => l.includes('DGS10 5.09%')));
 });

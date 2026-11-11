@@ -36,7 +36,7 @@ test('new series are configured, cite the agency "via FRED", and match the migra
     assert.deepEqual([row[1], row[2], row[3], row[4], Number(row[5])],
       [s.label, s.source_name, s.source_short, `https://fred.stlouisfed.org/series/${id}`, s.sort_order], id);
   }
-  assert.equal(Object.values(SERIES).filter((s) => s.provider !== 'bls' && s.provider !== 'bea').length, 23, "12 original + 7 finance (FRED and derived) + 4 Treasury");
+  assert.equal(Object.values(SERIES).filter((s) => s.provider !== 'bls' && s.provider !== 'bea').length, 39, "12 original + 7 finance (FRED and derived) + 4 Treasury + 16 M9c FRED series");
 });
 
 test('MORTGAGE30US (Freddie Mac copyright) is absent everywhere and refused', () => {

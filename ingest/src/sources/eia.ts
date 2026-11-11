@@ -64,7 +64,7 @@ export function petroleumCard(rows: EiaRow[]): PublishPayload | null {
     if (g && g[1] && g[0].period === now.period) extra.push(`${label} inventories: ${fmt(mb(g[0].value), 1)} million barrels (${signed(mb(g[0].value - g[1].value), 1)} million from the prior week)`);
   }
   return buildAgencyDataCard({
-    dedupeKey: `eia:petroleum:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
+    dedupeKey: `EIA_PETROLEUM:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
     agencyName: AGENCY, agencyUrl: 'https://www.eia.gov/petroleum/supply/weekly/', docLabel: 'Weekly Petroleum Status Report',
     attribution: config.agency.eia.attribution,
     paragraphs: [
@@ -89,7 +89,7 @@ export function gasStorageCard(rows: EiaRow[]): PublishPayload | null {
   const body = `Natural gas held in underground storage in the Lower 48 states was ${fmt(now.value)} billion cubic feet (Bcf) in the week ending ${week}, `
     + (change === 0 ? 'unchanged from' : `${change > 0 ? 'up' : 'down'} ${fmt(Math.abs(change))} Bcf from`) + ' the prior week, the U.S. Energy Information Administration reported.';
   return buildAgencyDataCard({
-    dedupeKey: `eia:gas-storage:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
+    dedupeKey: `EIA_GAS_STORAGE:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
     agencyName: AGENCY, agencyUrl: 'https://www.eia.gov/naturalgas/weekly/', docLabel: 'Weekly Natural Gas Storage Report',
     attribution: config.agency.eia.attribution,
     paragraphs: [
@@ -113,10 +113,48 @@ export function gasolineCard(rows: EiaRow[]): PublishPayload | null {
   const body = `The average U.S. retail price of regular gasoline was $${fmt(now.value, 2)} a gallon in the week of ${week}, `
     + (change === 0 ? 'unchanged from' : `${change > 0 ? 'up' : 'down'} ${fmt(Math.abs(change) * 100, 0)} cents from`) + ' the prior week, the U.S. Energy Information Administration reported.';
   return buildAgencyDataCard({
-    dedupeKey: `eia:gasoline:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
+    dedupeKey: `EIA_GASOLINE:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
     agencyName: AGENCY, agencyUrl: 'https://www.eia.gov/petroleum/gasdiesel/', docLabel: 'Gasoline and Diesel Fuel Update',
     attribution: config.agency.eia.attribution,
     paragraphs: [body, 'What this number measures: what drivers pay per gallon across the U.S.', 'The numbers come from the U.S. Energy Information Administration.'],
     keyPoints: [`Regular gasoline: $${fmt(now.value, 2)} a gallon`, `Change: ${signed(change, 2)} dollars from the prior week`, `Week of: ${week}`, `Source: ${AGENCY}`],
+  });
+}
+
+/**
+ * Weekly refinery use and crude supply (EIA Weekly Petroleum Status Report, supply side): refinery utilization is the
+ * headline; crude production, crude imports and total product supplied (a measure of demand) go in the detail.
+ * `rows` holds the rows of both requests (weekly supply estimates + weekly inputs and utilization).
+ */
+export function supplyCard(rows: EiaRow[]): PublishPayload | null {
+  const s = config.agency.eia.supply.series;
+  const util = latestTwo(rows, s.utilization);
+  if (!util || !util[1]) return null;
+  const [now, prev] = util;
+  const change = now.value - prev!.value;
+  const week = shortDate(now.period);
+  const headline = change === 0
+    ? `U.S. refineries hold at ${fmt(now.value, 1)}% of capacity in the week ending ${week}`
+    : `U.S. refineries run at ${fmt(now.value, 1)}% of capacity in the week ending ${week}, ${change > 0 ? 'up' : 'down'} from ${fmt(prev!.value, 1)}%`;
+  const bpd = (v: number) => `${fmt(v / 1000, 1)} million barrels a day`;
+  const same = (id: string) => { const r = latestTwo(rows, id); return r && r[0].period === now.period ? r : null; };
+  const prod = same(s.production), imp = same(s.imports), sup = same(s.productSupplied);
+  const lines: string[] = [];
+  if (prod) lines.push(`U.S. crude oil production: ${bpd(prod[0].value)}`);
+  if (imp) lines.push(`Crude oil imports: ${bpd(imp[0].value)}`);
+  if (sup) lines.push(`Total petroleum products supplied (a measure of demand): ${bpd(sup[0].value)}`);
+  const body = `U.S. refineries ran at ${fmt(now.value, 1)}% of their operable capacity in the week ending ${week}, `
+    + (change === 0 ? 'unchanged from' : `${change > 0 ? 'up' : 'down'} ${fmt(Math.abs(change), 1)} points from`) + ' the prior week, the U.S. Energy Information Administration reported.'
+    + (prod ? ` Crude oil production was ${bpd(prod[0].value)}.` : '');
+  return buildAgencyDataCard({
+    dedupeKey: `EIA_SUPPLY:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
+    agencyName: AGENCY, agencyUrl: 'https://www.eia.gov/petroleum/supply/weekly/', docLabel: 'Weekly Petroleum Status Report',
+    attribution: config.agency.eia.attribution,
+    paragraphs: [
+      body,
+      'What this number measures: how much of the refineries\' processing capacity is in use. A high rate means refiners are running close to flat out turning crude oil into gasoline, diesel and other fuels.',
+      'The numbers come from the U.S. Energy Information Administration.',
+    ],
+    keyPoints: [`Refinery utilization: ${fmt(now.value, 1)}%`, `Change: ${signed(change, 1)} points from the prior week`, ...lines, `Week ending: ${week}`, `Source: ${AGENCY}`],
   });
 }

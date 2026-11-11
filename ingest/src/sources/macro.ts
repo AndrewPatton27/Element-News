@@ -7,6 +7,7 @@ import type { CardDetail, CategorySlug, MacroFact } from '../../../contract/type
 import { config } from '../config.ts';
 import type { MacroObservation, PublishPayload } from '../types.ts';
 import { AGENCY_SERIES } from './agencySeries.ts';
+import { MORE_SERIES, MORE_WHY } from './moreSeries.ts';
 
 // percent: level in %, change in points.  yoy: index level -> 12-month % change.
 // usd: dollar level (scaled), change in %.  number: a count (scaled), change as a count.
@@ -87,6 +88,7 @@ export const SERIES: Record<string, SeriesInfo> = {
   TREAS_DEBT: { label: 'National debt', noun: 'Total U.S. national debt', about: 'everything the federal government owes', unit: 'usd', decimals: 2, frequency: 'daily', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 23,
     agency: { name: TREASURY, url: 'https://fiscaldata.treasury.gov/datasets/debt-to-the-penny/', doc_label: 'Debt to the Penny' } },
   ...AGENCY_SERIES,
+  ...MORE_SERIES,
 };
 
 /**
@@ -95,6 +97,7 @@ export const SERIES: Record<string, SeriesInfo> = {
  * what a reading will cause. Shown in the card body and in the detail sheet.
  */
 export const WHY: Record<string, string> = {
+  ...MORE_WHY,
   BLS_AHE: 'Wages are the biggest cost for most employers and the main income for most households, so this feeds into both prices and spending.',
   BLS_ECI: 'It counts wages and benefits together and adjusts for shifts in the mix of jobs, so it is a cleaner read on labor costs than average pay.',
   BLS_JOLTS: 'Job openings show how many positions employers want to fill, which is one way to see how tight the job market is.',

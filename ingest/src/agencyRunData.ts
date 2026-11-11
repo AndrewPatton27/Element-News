@@ -10,7 +10,9 @@ import type { Deps, RunStats } from './pipeline.ts';
 import type { PublishPayload } from './types.ts';
 import { validatePublish } from './validate.ts';
 import { censusCard, censusUrl, parseCensus, type CensusSeries } from './sources/census.ts';
-import { eiaUrl, gasolineCard, gasStorageCard, parseEia, petroleumCard } from './sources/eia.ts';
+import { eiaUrl, gasolineCard, gasStorageCard, parseEia, petroleumCard, supplyCard } from './sources/eia.ts';
+import { blsCalendarCard, parseBlsCalendar, upcomingReleases } from './sources/blscal.ts';
+import { mtsCard, mtsUrl, parseMts } from './sources/mts.ts';
 import { fomcCard, upcomingMeetings } from './sources/fomc.ts';
 import { auctionCard, auctionsUrl, parseAuctions } from './sources/treasuryauctions.ts';
 
@@ -50,6 +52,13 @@ export async function runEia(deps: Deps, stats: RunStats): Promise<void> {
     try { cards.push(gasStorageCard(await fetchRows(c.gasStorage.route, [c.gasStorage.series]))); }
     catch (e) { deps.log(`eia: gas storage failed: ${(e as Error).message}`); }
   }
+  if (c.supply.enabled) {
+    try {
+      const rows = [...await fetchRows(c.supply.routeSupply, [c.supply.series.production, c.supply.series.imports, c.supply.series.productSupplied]),
+        ...await fetchRows(c.supply.routeUtil, [c.supply.series.utilization])];
+      cards.push(supplyCard(rows));
+    } catch (e) { deps.log(`eia: supply failed: ${(e as Error).message}`); }
+  }
   if (c.gasoline.enabled) {
     try { cards.push(gasolineCard(await fetchRows(c.gasoline.route, [c.gasoline.series]))); }
     catch (e) { deps.log(`eia: gasoline failed: ${(e as Error).message}`); }
@@ -87,4 +96,30 @@ export async function runFomc(deps: Deps, stats: RunStats): Promise<void> {
   if (!config.agency.fomc.enabled) { deps.log('fomc: disabled in config'); return; }
   const meetings = upcomingMeetings(deps.now);
   await publishCards(deps, stats, 'fomc', meetings.map((m) => fomcCard(m, deps.now)), 1);
+}
+
+/** BLS release calendar (ICS from www.bls.gov): one card per major release due in the next few days. */
+export async function runBlsCal(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.blscal;
+  if (!c.enabled) { deps.log('blscal: disabled in config'); return; }
+  try {
+    const due = upcomingReleases(parseBlsCalendar(await deps.fetchText(c.url, 'page', config.feedCacheTtlMinutes)), deps.now);
+    deps.log(`blscal: ${due.length} major releases in the next ${c.leadDays} days`);
+    await publishCards(deps, stats, 'blscal', due.map((r) => blsCalendarCard(r, deps.now)), c.maxCardsPerRun);
+  } catch (e) {
+    deps.log(`blscal: failed: ${(e as Error).message}`);
+  }
+}
+
+/** Treasury Monthly Treasury Statement: the newest month budget deficit or surplus (FiscalData, no key). */
+export async function runMts(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.mts;
+  if (!c.enabled) { deps.log('mts: disabled in config'); return; }
+  try {
+    const month = parseMts(await deps.fetchText(mtsUrl(deps.now), 'api', 0));
+    if (!month) { deps.log('mts: no complete month in the table yet'); return; }
+    await publishCards(deps, stats, 'mts', [mtsCard(month)], c.maxCardsPerRun);
+  } catch (e) {
+    deps.log(`mts: failed: ${(e as Error).message}`);
+  }
 }
