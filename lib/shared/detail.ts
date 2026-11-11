@@ -31,3 +31,16 @@ export function detailParagraphs(card: Pick<BlurbCard, 'detail' | 'body'>): { pa
   if (d && d.paragraphs.length) return { paragraphs: d.paragraphs, fallback: false };
   return { paragraphs: card.body ? [card.body] : [], fallback: !d };
 }
+
+// Key points for the "More detail" sheet without the lines the sheet already shows elsewhere (D-212): a "Source: ..."
+// bullet repeats the source line and the Sources list, and on a data card a bullet that restates a number from the
+// numbers panel repeats the panel. Never returns an empty list when the card had points (the originals minus
+// "Source:" lines are the fallback), so the sheet keeps its Key points box.
+export function detailKeyPoints(card: Pick<BlurbCard, 'detail' | 'kind' | 'macro'>): string[] {
+  const all = cardDetail(card)?.key_points ?? [];
+  const noSource = all.filter((k) => !/^sources?\s*:/i.test(k));
+  const values = card.kind === 'data' ? (card.macro ?? []).map((f) => f.value).filter((v) => v.length >= 3) : [];
+  if (!values.length) return noSource;
+  const fresh = noSource.filter((k) => !values.some((v) => k.includes(v)));
+  return fresh.length ? fresh : noSource;
+}

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cardDetail, detailParagraphs } from '../shared/detail.ts';
+import { cardDetail, detailKeyPoints, detailParagraphs } from '../shared/detail.ts';
 import { cardLabels } from '../shared/labels.ts';
 import { isBlurbCard } from '../shared/types.ts';
 import { card } from './helpers.ts';
@@ -45,4 +45,18 @@ test('sample fixtures: details follow the contract limits', () => {
     assert.ok(words <= 180, `${c.id} has ${words} words`);
     assert.ok(d.key_points.length <= 5, `${c.id} key points`);
   }
+});
+
+test('detailKeyPoints drops "Source:" bullets and data-card bullets that restate the numbers panel', () => {
+  const c = card({
+    kind: 'data',
+    macro: [{ series_id: 'DGS10', label: '10-yr', value: '4.02%' }] as never,
+    detail: { paragraphs: [], key_points: ['10-year yield: 4.02% on Oct 16', 'Many loan rates follow this rate', 'Source: Federal Reserve Board via FRED'] } as never,
+  });
+  assert.deepEqual(detailKeyPoints(c), ['Many loan rates follow this rate']);
+  // nothing left after the number filter: keep the non-source points
+  const only = card({ kind: 'data', macro: [{ series_id: 'x', label: 'x', value: '4.02%' }] as never, detail: { paragraphs: [], key_points: ['Yield 4.02%', 'Source: Fed'] } as never });
+  assert.deepEqual(detailKeyPoints(only), ['Yield 4.02%']);
+  // a plain card keeps all points except "Source:" lines
+  assert.deepEqual(detailKeyPoints(withDetail({ paragraphs: [], key_points: ['A', 'Source: X'] })), ['A']);
 });

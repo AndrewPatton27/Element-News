@@ -61,6 +61,32 @@ export function ListSkeleton({ label = 'Loading…', rows = 3 }: { label?: strin
   );
 }
 
+// The Brief while it loads: a lead card with three bullet lines, then two story tiles, in the radius and spacing of the
+// real Brief so nothing jumps when the data lands. Still (no shimmer), label read by screen readers.
+export function BriefSkeleton({ label = 'Loading your brief…' }: { label?: string }) {
+  const p = usePalette();
+  const bar = (w: `${number}%`, h: number) => <View style={{ width: w, height: h, borderRadius: h / 2, backgroundColor: p.surfaceMuted }} />;
+  return (
+    <View style={styles.listSkel} accessibilityLiveRegion="polite" accessibilityLabel={label} testID="brief-skeleton">
+      <View style={[styles.listSkelRow, { backgroundColor: p.surface, borderColor: p.border, gap: 14 }]}>
+        {bar('30%', 14)}
+        {bar('94%', 16)}
+        {bar('82%', 16)}
+        {bar('90%', 16)}
+        {bar('58%', 16)}
+      </View>
+      {[0, 1].map((i) => (
+        <View key={i} style={[styles.listSkelRow, { backgroundColor: p.surface, borderColor: p.border }]}>
+          {bar('24%', 12)}
+          {bar('88%', 18)}
+          {bar('62%', 18)}
+        </View>
+      ))}
+      <Text style={[styles.skelText, { color: p.muted }]}>{label}</Text>
+    </View>
+  );
+}
+
 // Empty: a short serif title saying what happened, one plain line on what to do, and the way out.
 export function EmptyState({ title, message, actionLabel, onAction }: { title?: string; message: string; actionLabel?: string; onAction?: () => void }) {
   const p = usePalette();
