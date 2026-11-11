@@ -5,7 +5,7 @@
 export const STALE_HOURS = 3;
 export const QUIET_HOURS = 24;
 export const QUIET_HOURS_WEEKEND = 48;
-export const EXPECTED_JOBS = 24;                   // 15 before M9 + bls, beadata, eia, auctions, fomc + element-prune-reports + element-prune-subscribe-attempts + blscal, mts (M9c)
+export const EXPECTED_JOBS = 26;                   // 15 before M9 + bls, beadata, eia, auctions, fomc + element-prune-reports + element-prune-subscribe-attempts + blscal, mts, newsdata_market, newsdata_latest (M9c)
 export const AI_WARN_FRACTION = 0.8;
 export const DB_WARN_MB = 400;
 /** Supply floors (setting `supply_floor_cards_24h`, `supply_floor_cards_market_hour`; the Worker vars SUPPLY_FLOOR_CARDS_24H / SUPPLY_FLOOR_CARDS_MARKET_HOUR override them). 0 = check off. */
