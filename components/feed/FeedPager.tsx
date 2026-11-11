@@ -78,6 +78,7 @@ import {
   markCardSwiped,
 } from '../../lib/feed/swipeLogic';
 import { defaultStore } from '../../lib/storage/storage';
+import { isDimmedInLatest } from '../../lib/feed/dimmed';
 import { Card } from '../card/Card';
 import { CardErrorBoundary } from '../shell/ErrorBoundary';
 import type { Feedback } from '../../lib/account/accountLogic';
@@ -499,6 +500,7 @@ export function FeedPager({
                   peek={!last}
                   reaction={reactions?.[item.id]}
                   onReact={react}
+                  dimmed={isDimmedInLatest(timeLabel === 'added', reactions?.[item.id])}
                 />
               </SwipeCard>
             </CardErrorBoundary>

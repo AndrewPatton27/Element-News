@@ -5,6 +5,7 @@ import type { FeedState } from '../../lib/feed/feedLogic';
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { SearchResultCard } from '../search/SearchResultCard';
+import { ListSkeleton } from '../shell/States';
 
 // The Following feed: the same tiles as Search (headline, takeaways, "Because you follow"
 // line, one-line bottom bar), two columns on wide web. The AI notice and the disclaimer
@@ -16,7 +17,7 @@ export function FollowingFeed({ items, state, config, categories, reasonFor, onO
 }) {
   const p=usePalette(), wide=useWide();
   if (!items.length && state.error) return <View style={s.state} accessibilityRole="alert"><Text style={[s.head,{color:p.ink}]}>Could not load stories</Text><Text style={{color:p.muted}}>{state.error}</Text><Pressable onPress={onRetry} style={[s.action,{backgroundColor:p.accent}]}><Text style={{color:p.onAccent}}>Try again</Text></Pressable></View>;
-  if (!items.length && (state.loading || !state.done)) return <View style={s.state} accessibilityLiveRegion="polite"><ActivityIndicator color={p.accent}/><Text style={{color:p.muted}}>Loading stories…</Text></View>;
+  if (!items.length && (state.loading || !state.done)) return <ListSkeleton label="Loading stories…" />;
   if (!items.length) return <>{empty}</>;
   return <View style={{gap:14}}><View style={[s.grid,wide&&s.gridWide]}>{items.map(c=>{
     const related = c.story_link?.related_headline ? `${c.story_link.kind==='update'?'Update to:':'Related to:'} ${c.story_link.related_headline}` : null;

@@ -60,7 +60,7 @@ test('parsers drop bad rows and keep only the public fields', () => {
 test('wording: counts, the search row and the company link', () => {
   assert.equal(cardCountText({ card_count: 12, days: 30 }), '12 cards in 30 days');
   assert.equal(cardCountText({ card_count: 1, days: 1 }), '1 card in 1 day');
-  assert.equal(cardCountText({ card_count: 0, days: 30 }), 'No cards in 30 days');
+  assert.equal(cardCountText({ card_count: 0, days: 30 }), 'No cards in the last 30 days');
   assert.equal(companyResultLine(co({ card_count: 12 })), 'Apple Inc. · AAPL · 12 cards');
   assert.equal(companyResultLine(co({ card_count: 0 })), 'Apple Inc. · AAPL · No recent cards');
   assert.equal(companyHref('BRK-B'), '/company/BRK-B');

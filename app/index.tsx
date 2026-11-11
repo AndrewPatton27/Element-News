@@ -330,8 +330,8 @@ export default function FeedScreen() {
   else if (first) {
     body = (
       <EmptyState
-        title={forYou ? 'Your topics are quiet' : category ? 'Nothing here yet' : 'No stories yet'}
-        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
+        title={forYou ? 'Your topics are quiet' : category ? `No ${categoryName(category, categories)} stories right now` : 'No stories yet'}
+        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'Nothing new in this topic lately. Try All, or another topic.' : 'No cards yet. Check back soon.'}
         actionLabel={forYou ? 'Show Trending' : category ? 'Show all categories' : undefined}
         onAction={forYou ? () => setMode('top') : category ? () => setCategory(null) : undefined}
       />

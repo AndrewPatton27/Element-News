@@ -13,6 +13,7 @@ import { useAccount } from '../lib/account/accountContext';
 import { withoutHidden } from '../lib/account/accountLogic';
 import { withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { followReasonText, followsKey, hasFollows } from '../lib/following/followingLogic';
+import { withoutGovernmentMisfits } from '../lib/following/followingMisfits';
 import { suggestedTopics } from '../lib/search/searchLogic';
 import { useFollows } from '../lib/following/useFollows';
 import { usePagedCards } from '../lib/feed/usePagedCards';
@@ -62,8 +63,8 @@ export default function FollowingScreen() {
   const hidden = acct.viewPrefs?.hidden ?? [];
   const hiddenSources = acct.viewPrefs?.hiddenSources ?? [];
   const visible = useCallback(
-    (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
-    [hidden, hiddenSources],
+    (cards: BlurbCard[]) => withoutGovernmentMisfits(withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources), follows),
+    [hidden, hiddenSources, follows],
   );
 
   // Wait for the account's topics before asking, so the list does not flash the top

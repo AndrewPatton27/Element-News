@@ -13,6 +13,7 @@ import { clearStoryUpdatesCache, loadStoryUpdates, sortStories, storyBadge, upda
 import { usePalette, useWide } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { PulseIcon } from '../shell/Icons';
+import { ListSkeleton } from '../shell/States';
 import { CardActionRow } from '../card/CardActionRow';
 import { CardBar } from '../card/CardBar';
 import { openUrl } from '../../lib/shared/openUrl';
@@ -67,7 +68,7 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
 }) {
   const p = usePalette();
   const wide = useWide();
-  if (loading && !rows.length) return <Text style={{ color: p.muted, fontFamily: fonts.sans }} accessibilityLiveRegion="polite">Loading your stories…</Text>;
+  if (loading && !rows.length) return <ListSkeleton label="Loading your stories…" rows={2} />;
   return (
     <View style={[styles.grid, wide && styles.gridWide]}>
       {rows.map(({ story, updates }) => {
@@ -104,7 +105,7 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                   </View>
                   <View style={styles.liText}>
                     <Text style={[styles.upText, wide && { fontSize: 16 }, { color: p.ink, fontFamily: fresh ? fonts.sansSemi : fonts.sansMedium }]}>{c.headline}</Text>
-                    <Text style={[styles.upMeta, wide && { fontSize: 13 }, { color: p.muted }]}>{updateMeta(c)}</Text>
+                    <Text style={[styles.upMeta, wide && { fontSize: 14 }, { color: p.muted }]}>{updateMeta(c)}</Text>
                   </View>
                 </Pressable>
               ))}
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
   line: { flex: 1, width: 2, marginTop: 2 },
   liText: { flex: 1, gap: 1, paddingBottom: 10 },
   upText: { fontSize: 15, lineHeight: 20 },
-  upMeta: { fontFamily: fonts.sans, fontSize: 12 },
+  upMeta: { fontFamily: fonts.sans, fontSize: 13 },
   foot: { borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: -8, paddingTop: 4 },
   open: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
   toggle: { minHeight: 44, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
