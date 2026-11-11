@@ -12,6 +12,7 @@
 -- Limits (same signature and jsonb return shape; no new email flow):
 --   * per normalized address: 1 attempt per 10 minutes. A repeat returns the normal {ok:true,status:'pending'}
 --     and stores nothing, so the answer never shows whether the address is subscribed or was just asked about.
+--   * per normalized address: also at most 3 processed attempts per UTC day (silent, same answer; review m9c).
 --   * per client key: 5 attempts per hour (client IP from cf-connecting-ip / x-forwarded-for, hashed with the daily
 --     salt; signed-in readers without an IP header fall back to their user id; no header at all shares key 'anon').
 --   * global: 80 new attempts per UTC day (under Resend's 100 per day; the rest is headroom for the daily and weekly
@@ -70,6 +71,10 @@ begin
  if exists(select 1 from core.subscribe_attempts where email_hash=v_ehash and created_at>now_at-interval '10 minutes') then
    return jsonb_build_object('ok',true,'status','pending');
  end if;
+ -- same address, 3 processed attempts per UTC day (the hash is keyed by day): a pending address can no longer be
+ -- re-queued a confirmation email every 10 minutes by a stranger (the old limit was 5 per address per 24 h)
+ select count(*) into v_n from (select 1 from core.subscribe_attempts where email_hash=v_ehash limit 4) s;
+ if v_n>=3 then return jsonb_build_object('ok',true,'status','pending'); end if;
  select count(*) into v_n from (select 1 from core.subscribe_attempts
     where client_key=v_key and created_at>now_at-interval '1 hour' limit 6) s;
  if v_n>=5 then raise exception 'rate_limited' using errcode='PT429'; end if;
