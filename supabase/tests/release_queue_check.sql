@@ -113,3 +113,25 @@ begin
   if v_rel <> 3 then raise exception 'FAIL: deep queue (48) should release ceil(48/16)=3 per run, released %', v_rel; end if;
   delete from core.blurbs where headline like 'queued %';
 end $$;
+
+-- M9c: pause (20261144000000): while paused_until is in the future the drip is off; after it passes it resumes
+do $$
+declare v_id uuid := gen_random_uuid(); v_st text;
+begin
+  update core.drip_config set enabled = true, window_start_hour_et = 0, window_end_hour_et = 24, weekdays_only = false,
+         paused_until = now() + interval '1 day';
+  delete from core.blurbs where status = 'queued';
+  insert into core.blurbs (id, kind, status, headline, body, category, published_at, sort_at, importance)
+    values (gen_random_uuid(), 'summary', 'published', 'pause first', 'b', 'Business', now(), now(), 1);
+  insert into core.blurbs (id, kind, status, headline, body, category, published_at, sort_at, importance)
+    values (v_id, 'summary', 'published', 'pause second', 'b', 'Business', now(), now(), 1);
+  select status into v_st from core.blurbs where id = v_id;
+  if v_st <> 'published' then raise exception 'FAIL: a card was held while the drip was paused (%)', v_st; end if;
+  update core.drip_config set paused_until = now() - interval '1 minute';
+  insert into core.blurbs (id, kind, status, headline, body, category, published_at, sort_at, importance)
+    values (v_id := gen_random_uuid(), 'summary', 'published', 'pause third', 'b', 'Business', now(), now(), 1);
+  select status into v_st from core.blurbs where id = v_id;
+  if v_st <> 'queued' then raise exception 'FAIL: the drip did not resume after paused_until (%)', v_st; end if;
+  delete from core.blurbs where headline like 'pause %';
+  update core.drip_config set paused_until = null;
+end $$;
