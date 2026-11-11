@@ -26,6 +26,8 @@ export interface FunctionEnv {
   beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
   eiaApiKey: string | null;
   censusApiKey: string | null;
+  newsdataApiKey: string | null;   // NEWSDATA_API_KEY: link-out source; none = it does nothing
+  newsdataEnabled: boolean;        // NEWSDATA_ENABLED=1 switches the link-out source on (the DB flag app_config.linkout_cards must also be true)
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -49,6 +51,8 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
     eiaApiKey: clean(get('EIA_API_KEY')),
     censusApiKey: clean(get('CENSUS_API_KEY')),
+    newsdataApiKey: clean(get('NEWSDATA_API_KEY')),
+    newsdataEnabled: (get('NEWSDATA_ENABLED') ?? '').trim() === '1',
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };
@@ -56,7 +60,7 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
 
 export function describeFunctionEnv(e: FunctionEnv): string {
   const s = (v: string | null) => (v ? '[set]' : '[missing]');
-  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} BEA_API_KEY=${s(e.beaApiKey)} BLS_API_KEY=${s(e.blsApiKey)} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
+  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} BEA_API_KEY=${s(e.beaApiKey)} BLS_API_KEY=${s(e.blsApiKey)} NEWSDATA_API_KEY=${s(e.newsdataApiKey)} NEWSDATA_ENABLED=${e.newsdataEnabled ? 1 : 0} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
 }
 
 /** Length-independent string compare (the token is a secret). */
