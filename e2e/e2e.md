@@ -35,3 +35,7 @@ M9c wave 2: `wave2.spec.ts` (desktop project, each test in its own context) swit
 
 M9c design polish: `polish.spec.ts` (360 x 780 viewport) checks the feed header does not overflow the screen, the For you hint links are 44 px tall, the detail sheet has no "Source:" key point, and the Crypto opt-in row on `/signals` is one 56 px switch. Run: `E2E_PORT=8231 npx playwright test e2e/polish.spec.ts --workers=1`.
 M9c fix1: `fix1.spec.ts` (desktop project, own contexts) checks the FRED notice is fully visible on every data card at 375 x 812 and 360 x 640, and that a data card's More detail sheet shows "What this number measures" and Sources, never "isn't available". Run: `E2E_PORT=8171 npx playwright test e2e/fix1.spec.ts --workers=1`.
+
+## chart.spec.ts (M9c chart cards)
+
+Data cards show a history chart: the yield-curve card (four lines, dashes, legend, one `role=img` sentence), a single-series card, the detail sheet (low and high), dark mode. Checks at 360x740, 390x844, 820x1180 and 1280x800 that the agency citation ("via FRED") stays in view and the chart never overflows the screen. Screenshots go to `SHOTS_DIR` (default `../../../context/m9c-chart-shots` from a worktree). Run: `E2E_PORT=8450 npx playwright test e2e/chart.spec.ts --workers=1 --project=desktop`.

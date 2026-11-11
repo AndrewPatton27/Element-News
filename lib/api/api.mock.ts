@@ -9,6 +9,7 @@ import { mockFeedPage } from '../feed/feedLogic.ts';
 import { rebaseCards } from '../feed/rebase.ts';
 import { SAMPLE_NUMBER_TRENDS } from '../numbers/numberTrendsSample.ts';
 import { createMockFeatureApi } from './api.mockFeatures.ts';
+import { mockMacroHistory, sampleLevels } from '../history/mockHistory.ts';
 import { mockFeedStatus } from './mockStatus.ts';
 import { wantsWorstCase, worstCaseCards } from '../shared/mockWorst.ts';
 import { createMockCompanyApi } from '../companies/companyApi.ts';
@@ -62,6 +63,7 @@ export function createMockApi(): Api {
     feedStatus: () => wait(mockFeedStatus()),
     topStories: () => wait(mockFeedPage(cards, { mode: 'top', category: null, cursor: null, limit: 30 }).items.slice(0, 5)),
     numberTrends: () => wait(trends.map((t) => ({ ...t, points: [...t.points] }))),
+    macroHistory: (ids) => wait(mockMacroHistory(ids, sampleLevels(parseMacroFacts(numbers)))),
     search: (q, cursor, limit) => wait(features.search(q, cursor, limit)),
     relatedCards: (id, limit) => wait(features.relatedCards(id, limit)),
     card: (id) => wait(cards.find((c) => c.id.toLowerCase() === String(id).toLowerCase()) ?? null),

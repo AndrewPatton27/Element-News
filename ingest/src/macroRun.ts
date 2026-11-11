@@ -4,7 +4,8 @@
 
 import { config } from './config.ts';
 import type { Deps, RunStats } from './pipeline.ts';
-import { buildDataCard, buildObservation, buildYieldCurveCard, differenceSeries, fredUrl, parseFredObservations, type Point } from './sources/macro.ts';
+import { buildDataCard, buildObservation, buildYieldCurveCard, differenceSeries, fredUrl, parseFredObservations, SERIES, type Frequency, type Point } from './sources/macro.ts';
+import type { MacroObservation } from './types.ts';
 import { avgRatesUrl, debtUrl, parseAvgRates, parseDebt } from './sources/fiscaldata.ts';
 
 /** FRED series -> Numbers panel rows (api.upsert_macro) and, for big enough moves, data cards. Skipped without FRED_API_KEY. */
@@ -55,12 +56,39 @@ function targetRange(fetched: Map<string, Point[]>): string | undefined {
   return `${lo.value.toFixed(2)}% to ${hi.value.toFixed(2)}%`;
 }
 
+/** How many of the newest readings feed the data-card chart, per frequency (matches the windows in api.macro_history). */
+export const HISTORY_KEEP: Record<Frequency, number> = { daily: 70, weekly: 30, monthly: 14, quarterly: 9 };
+
+/** The newest readings of a series as observations (each formatted from the history up to it, like the live run and --backfill-macro). */
+export function historyObservations(id: string, points: Point[]): MacroObservation[] {
+  const info = SERIES[id];
+  if (!info) return [];
+  const out: MacroObservation[] = [];
+  for (let i = Math.max(0, points.length - HISTORY_KEEP[info.frequency]); i < points.length; i++) {
+    const o = buildObservation(id, points.slice(0, i + 1));
+    if (o) out.push(o);
+  }
+  return out;
+}
+
+/** Keeps the chart history of one series filled (one batched call). Never throws: a missing RPC or a failure only costs the chart. */
+async function storeHistory(deps: Deps, tag: string, id: string, points: Point[]): Promise<void> {
+  if (!deps.publisher.upsertMacroBatch) return;
+  try {
+    const rows = historyObservations(id, points);
+    if (rows.length > 1) await deps.publisher.upsertMacroBatch(rows);
+  } catch (e) {
+    deps.log(`${tag}: ${id}: chart history not stored: ${(e as Error).message}`);
+  }
+}
+
 /** One series' points -> Numbers panel row and, if `cardAllowed` and the move is big enough, a data card. */
 export async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean, ctx: { targetRange?: string } = {}): Promise<void> {
   const obs = buildObservation(id, points);
   if (!obs) { deps.log(`${tag}: ${id}: not enough data`); return; }
   await deps.publisher.upsertMacro(obs);
   stats.macro++;
+  await storeHistory(deps, tag, id, points);
   const card = cardAllowed ? buildDataCard(obs, [], ctx) : null;
   if (card) {
     const res = await deps.publisher.publishBlurb(card);
