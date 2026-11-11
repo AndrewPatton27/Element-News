@@ -25,7 +25,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router, usePathname } from 'expo-router';
+import { router, useGlobalSearchParams, usePathname } from 'expo-router';
+import { readFlags } from '../../lib/flags/flags';
+import { readSignals, writeSignals } from '../../lib/signals/signalsLogic';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_NAME } from '../../lib/api/config';
 import { DISCLAIMER_FALLBACK } from '../../lib/shared/labels';
@@ -366,22 +368,41 @@ export function Tutorial({ onExit }: { onExit: (how: TutorialExit) => void }) {
 // device (versioned key in lib/tutorialLogic.ts), signed in or not.
 export function TutorialGate() {
   const pathname = usePathname();
+  const params = useGlobalSearchParams<{ tab?: string; category?: string }>();
   const [open, setOpen] = useState(false);
   const checked = useRef(false);
+  // The URL the reader opened, kept for when the tour closes (flag `onboarding`: a feed URL keeps its tab).
+  const arrival = useRef<{ path: string; tab: string | null }>({ path: pathname, tab: null });
   useEffect(() => {
     if (checked.current) return;
     checked.current = true;
+    arrival.current = { path: pathname, tab: params.tab === 'top' || params.tab === 'latest' || params.tab === 'for_you' ? params.tab : null };
     if (shouldAutoShow(hasSeenTutorial(defaultStore()), pathname)) setOpen(true);
-  }, [pathname]);
+  }, [pathname, params.tab]);
   if (!open) return null;
   return (
     <Tutorial
       onExit={(how) => {
-        markTutorialSeen(defaultStore());
+        const store = defaultStore();
+        markTutorialSeen(store);
         setOpen(false);
+        if (how === 'signup') {
+          router.push('/signin?mode=signup' as never);
+          return;
+        }
+        if (readFlags().onboarding) {
+          // Skipping the tour also skips the 3-question setup (it stays reachable at /setup and in Account).
+          if (how === 'skip') writeSignals(store, { ...readSignals(store), setup: readSignals(store).setup ?? 'skipped' });
+          const { path, tab } = arrival.current;
+          if (path !== '/' && path !== '') return; // another screen was opened directly: stay on it
+          if (tab) {
+            // a feed URL keeps its tab; dl=1 lets the setup (after "Start reading") hand the tab back
+            router.replace(`/?tab=${tab}&t=${Date.now()}${how === 'done' ? '&dl=1' : ''}` as never);
+            return;
+          }
+        }
         // Finishing or skipping the tour lands on the Trending tab (the t value makes the feed re-read the tab).
-        if (how === 'signup') router.push('/signin?mode=signup' as never);
-        else router.replace(`/?tab=top&t=${Date.now()}` as never);
+        router.replace(`/?tab=top&t=${Date.now()}` as never);
       }}
     />
   );

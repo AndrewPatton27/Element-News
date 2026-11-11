@@ -17,8 +17,9 @@ import {
   writeSignals,
 } from '../signals/signalsLogic.ts';
 import { DEFAULT_WINDOW_MS, MAX_WINDOW_MS, SESSION_GAP_MS, cardsSince, sinceStart, startVisit, touchVisit } from '../since/sinceLogic.ts';
-import { GLOSSARY, segmentText } from '../glossary/glossary.ts';
-import { planSetup, skipSetup } from '../onboarding/setupLogic.ts';
+import { GLOSSARY, glossaryTermsIn, segmentText } from '../glossary/glossary.ts';
+import { loadSinceRaw, sinceCards, sincePillText } from '../since/sinceFeed.ts';
+import { INVEST_OPTIONS, joinNames, pickedReason, pickedTopicNames, planSetup, skipSetup } from '../onboarding/setupLogic.ts';
 import { menuItems } from '../feed/cardMenu.ts';
 import { memoryStore } from '../storage/storage.ts';
 import { DEVICE_DATA_KEYS, clearAll } from '../storage/localPrefs.ts';
@@ -136,8 +137,8 @@ test('since: only newer cards, macro first, newest first, no repeats', () => {
   assert.deepEqual(cardsSince([old, corp, corp2, macro, data, corp], from).map((c) => c.id), ['macro', 'data', 'corp', 'corp2']);
 });
 
-test('glossary: about 60 terms, first mention only, whole words, no network', () => {
-  assert.ok(GLOSSARY.length >= 55 && GLOSSARY.length <= 70, String(GLOSSARY.length));
+test('glossary: about 120 terms, first mention only, whole words, no network', () => {
+  assert.ok(GLOSSARY.length >= 55 && GLOSSARY.length <= 125, String(GLOSSARY.length));
   for (const g of GLOSSARY) assert.ok(g.meaning.length > 30 && g.meaning.length < 260, g.term);
   const segs = segmentText('CPI rose 0.3%. Yields fell and yields rose, the yield curve flattened. CPI again.');
   const terms = segs.filter((s) => s.term).map((s) => s.term?.term);
@@ -174,4 +175,54 @@ test('clear data on this device also forgets signals and the visit', () => {
   clearAll(store);
   assert.deepEqual(readSignals(store), EMPTY_SIGNALS);
   assert.equal(store.get('element.visit'), null);
+});
+
+test('setup (D-230): Rates, Labor and Trade stay visible as fine topics with a "because you picked" reason', () => {
+  const plan = planSetup({ topics: ['rates', 'labor', 'trade', 'tech-ai'], invest: null, depth: 'normal' }, EMPTY_SIGNALS);
+  assert.deepEqual(plan.signals.interests, ['rates', 'labor', 'trade']);
+  assert.deepEqual(plan.followTopics, ['economy']); // the server only knows the category ...
+  assert.deepEqual(pickedTopicNames(plan.signals), ['Rates', 'Labor', 'Trade', 'Tech/AI']); // ... the app keeps the names
+  assert.equal(pickedReason(plan.signals), 'Because you picked Rates, Labor, Trade and Tech/AI in setup.');
+  assert.equal(pickedReason(EMPTY_SIGNALS), null);
+  assert.equal(joinNames(['Rates']), 'Rates');
+  assert.equal(joinNames(['Rates', 'Labor']), 'Rates and Labor');
+});
+
+test('setup (D-230): "I am learning" is the first invest option and starts on money and economy news', () => {
+  assert.equal(INVEST_OPTIONS[0].id, 'learning');
+  assert.equal(INVEST_OPTIONS[0].label, 'I am learning');
+  assert.deepEqual(planSetup({ topics: [], invest: 'learning', depth: 'normal' }, EMPTY_SIGNALS).followTopics, ['personal-finance', 'economy']);
+});
+
+test('since (D-231): the pill and the page share one loader and filter, so the counts match; first visit says the window', async () => {
+  const now = Date.now();
+  const mk = (id: string, hoursAgo: number, category = 'economy') => card({ id, category: category as never, published_at: new Date(now - hoursAgo * 3_600_000).toISOString() });
+  const all = [mk('a', 1), mk('b', 2, 'tech'), mk('c', 5), mk('d', 30), mk('e', 40)];
+  let calls = 0;
+  const feed = async (q: { cursor: string | null }) => {
+    calls++;
+    return q.cursor === null ? { items: all.slice(0, 2), next_cursor: 'x' } : { items: all.slice(2), next_cursor: null };
+  };
+  const raw = await loadSinceRaw(feed, now - 24 * 3_600_000);
+  assert.equal(calls, 2);
+  const keepAll = (c: typeof raw) => c;
+  assert.equal(sinceCards(raw, now - 24 * 3_600_000, keepAll).length, 3);
+  assert.equal(sinceCards(raw, now - 24 * 3_600_000, (c) => c.filter((x) => x.category !== 'tech')).length, 2);
+  assert.equal(sincePillText(3, null, now - 24 * 3_600_000, now), '3 new in the last 24 hours · See what changed →');
+  assert.equal(sincePillText(3, now - 5 * 3_600_000, now - 5 * 3_600_000, now), '3 new since your last visit · See what changed →');
+});
+
+test('glossary (D-232): finance wording on real cards is covered, and the word row lists each term once', () => {
+  const sample = [
+    'The Fed held rates steady while core inflation cooled and the dot plot pointed to one rate cut.',
+    'Retail sales beat the consensus estimate; the ISM survey and consumer sentiment both improved.',
+    'WTI crude rose as OPEC held output; Brent also gained.',
+    'The company reported EBITDA of $2 billion, lifted gross margin, and filed a Form 4 and a Schedule 13D.',
+    'Credit spreads widened on junk bonds as a Chapter 11 filing and a covenant breach hit high-yield debt.',
+    'Net interest margin fell at banks and the FDIC raised its assessment; Treasury auctions drew weak demand.',
+  ];
+  for (const t of sample) assert.ok(segmentText(t).filter((x) => x.term).length >= 3, t);
+  const terms = glossaryTermsIn(['CPI rose. Core inflation cooled.', 'CPI again and the Fed.']);
+  assert.deepEqual(terms.map((t) => t.term), ['CPI', 'Core inflation', 'Federal Reserve']);
+  assert.ok(glossaryTermsIn(sample, 8).length <= 8);
 });

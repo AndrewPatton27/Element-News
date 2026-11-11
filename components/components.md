@@ -108,7 +108,7 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 
 ## Wave 2 (M9c, flags default OFF)
 
-- `card/GlossText.tsx` (D-02): `GlossText` draws text with its glossary terms underlined (dotted); tapping calls `onTerm`. `DefineSheet` is the small panel with the plain meaning (`SheetModal`, panel variant). `DetailBody` uses both when the `glossary` flag is on (key points and paragraphs); the feed card front is not underlined so a tap there still opens More detail.
+- `card/GlossText.tsx` (D-02): `GlossText` draws text with its glossary terms underlined (dotted); tapping calls `onTerm`. `DefineSheet` is the small panel with the plain meaning (`SheetModal`, panel variant). `DetailBody` uses both when the `glossary` flag is on (key points and paragraphs); the feed card front is not underlined so a tap there still opens More detail. `GlossaryWords` adds a "Words in this story" row of 44 px buttons under the detail text, since a dotted underline is only one text line tall (D-232).
 - `card/CardMenu.tsx`: with the `signals` flag the menu also offers Save for later (or Remove from saved), Mute <company> (first ticker) and Mute <topic> (first macro fine topic). The prop is absent otherwise and the menu is unchanged.
 - `card/Card.tsx`: with `signals` on and depth Short, a card shows one key point.
 

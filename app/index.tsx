@@ -48,7 +48,10 @@ import { readFlags } from '../lib/flags/flags';
 import { FINE_NAMES, fineChips, isFineTopic, laneVisible, matchesFine, MACRO_FINE, fineTopicsOf } from '../lib/topics/fineTopics';
 import { useSignals } from '../lib/signals/useSignals';
 import { interestsFirst, isSaved, toggleMutedTicker, toggleMutedTopic, toggleSaved, withoutMuted } from '../lib/signals/signalsLogic';
-import { cardsSince, sinceStart, startVisit, touchVisit } from '../lib/since/sinceLogic';
+import { sinceStart, startVisit, touchVisit } from '../lib/since/sinceLogic';
+import { pickedReason } from '../lib/onboarding/setupLogic';
+import { sincePillText } from '../lib/since/sinceFeed';
+import { useSinceCards } from '../lib/since/useSinceCards';
 import { hasSeenTutorial } from '../lib/tutorial/tutorialLogic';
 
 // Below this window width the right column is dropped.
@@ -66,7 +69,7 @@ export default function FeedScreen() {
   // Wave 2 flags (lib/flags/flags.ts): all off by default; with them off none of the code below changes the feed.
   const flags = useMemo(() => readFlags(), []);
   const { signals, update: updateSignals } = useSignals();
-  const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string; dl?: string }>();
   const { width, height: windowHeight } = useWindowDimensions();
   // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
   // nudge stays hidden there (the Me tab and the top bar still offer sign-in).
@@ -74,7 +77,7 @@ export default function FeedScreen() {
   // Landscape phones and 200% zoom (under 520 px tall): the category chips step aside too, so the
   // card keeps enough height to read; categories stay reachable by widening or rotating.
   const tinyHeight = !wide && windowHeight > 0 && windowHeight < 520;
-  const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' ? 'for_you' : 'top');
+  const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' || params.tab === 'latest' ? params.tab : 'top');
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
@@ -131,7 +134,9 @@ export default function FeedScreen() {
       if (flags.signals) out = withoutMuted(out, signals); // A-22 muted companies and fine topics
       if (flags.topics) {
         out = out.filter((c) => laneVisible(c, mode, signals.optIn)); // A-12 / D-121 opt-in lanes
-        if (fineSelected) out = out.filter((c) => matchesFine(c, fineSelected));
+        // With the Tech/AI lane on, the plain Tech chip folds into it, so Tech/AI shows both (D-231).
+        const techMerged = fineSelected === 'tech-ai' && signals.optIn.includes('tech-ai');
+        if (fineSelected) out = out.filter((c) => matchesFine(c, fineSelected) || (techMerged && c.category === 'tech'));
       }
       return out;
     },
@@ -212,7 +217,9 @@ export default function FeedScreen() {
     if (!flags.topics) return baseChips;
     // A-12: the six macro topics (and any opted-in lane) follow the categories; the reader's interests come first.
     const extra = fineChips(signals.optIn).filter((c) => !signals.mutedTopics.includes(c.slug));
-    return [...baseChips, ...favoritesFirst(extra, signals.interests)];
+    // Opted in to Tech/AI: that chip covers Tech too, so the two never sit side by side.
+    const base = signals.optIn.includes('tech-ai') ? baseChips.filter((c) => c.slug !== 'tech') : baseChips;
+    return [...base, ...favoritesFirst(extra, signals.interests)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flags.topics, categories, hidden, followed.join('|'), signals.optIn, signals.interests, signals.mutedTopics]);
   const allNames = flags.topics ? [...categories, ...fineChips(['crypto', 'tech-ai'])] : categories;
@@ -393,11 +400,19 @@ export default function FeedScreen() {
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('pagehide', onHide);
     };
   }, [flags.since]);
-  const sinceCount = flags.since && visit && mode === 'latest' ? cardsSince(items, sinceStart(visit)).length : 0;
+  // The pill counts with the same loader and filters as the /since page, so the two numbers are equal.
+  const sinceFrom = useMemo(() => (visit ? sinceStart(visit) : 0), [visit]);
+  const sinceAll = useSinceCards(flags.since && !!visit && mode === 'latest', sinceFrom);
+  const sinceCount = flags.since && visit && mode === 'latest' && sinceAll.done ? sinceAll.items.length : 0;
 
   // ---- A-17 three-question setup (flag `onboarding`): once, after the tour, skippable ----
   useEffect(() => {
-    if (flags.onboarding && focused && signals.setup === null && hasSeenTutorial(store)) router.replace('/setup' as never);
+    // A feed URL typed or shared on its own (a tab and no t) is never interrupted: setup waits for the next plain visit.
+    // After the tour on such a URL (dl=1) setup runs once and hands the requested tab back (setupNext).
+    const bareDeepLink = !!params.tab && !params.t;
+    if (flags.onboarding && focused && signals.setup === null && hasSeenTutorial(store) && !bareDeepLink) {
+      router.replace((params.dl && params.tab ? `/setup?next=${params.tab}` : '/setup') as never);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flags.onboarding, focused, signals.setup, params.t]);
 
@@ -456,10 +471,10 @@ export default function FeedScreen() {
         onPress={() => router.navigate('/since' as never)}
         accessibilityRole="link"
         testID="since-pill"
-        style={[styles.prompt, !wide && styles.promptNarrow, wide && styles.promptWide, { backgroundColor: p.dataSoft }]}
+        style={[styles.prompt, styles.promptNarrow, { backgroundColor: p.dataSoft }]}
       >
         <Text style={[styles.promptText, styles.sincePillText, { color: p.dataInk }]}>
-          {sinceCount} new since your last visit · See what changed →
+          {sincePillText(sinceCount, visit?.prev ?? null, sinceFrom)}
         </Text>
       </Pressable>
     ) : null;
@@ -489,6 +504,8 @@ export default function FeedScreen() {
       </View>
     ) : null;
 
+  // A-17: the topics picked in setup are named here ('Because you picked Rates and Labor'), since the server only knows categories.
+  const pickedLine = flags.onboarding ? pickedReason(signals) : null;
   // For you: the chips don't apply; show what it is built from instead.
   const forYouLine = forYou ? (
     <View style={[styles.forYouLine, !wide && styles.promptNarrow, wide && styles.forYouWide]}>
@@ -503,6 +520,11 @@ export default function FeedScreen() {
               ? `Tailored to ${followed.map((s) => categoryName(s, categories)).join(', ')} and your likes.`
               : 'Tailored to your likes.'}
       </Text>
+      {pickedLine ? (
+        <Text style={[styles.forYouText, { color: p.muted }]} testID="picked-reason">
+          {pickedLine}
+        </Text>
+      ) : null}
       {/* Own row with 44 px tall links (R-402): on a 360 px phone the old one-line version cut the hint to
           "Like cards o..." and left two 16-18 px tap targets. */}
       <View style={styles.forYouLinks}>
@@ -557,7 +579,6 @@ export default function FeedScreen() {
               />
             )}
             {prompt}
-            {sincePill}
           </>
         ) : undefined
       }
@@ -589,7 +610,8 @@ export default function FeedScreen() {
       )}
       {/* One page heading for screen readers; each card headline is a level-2 heading under it. */}
       <Text role="heading" aria-level={1} style={styles.srOnly}>{`Element: ${mode === 'latest' ? 'Latest' : forYou ? 'For you' : 'Trending'} stories`}</Text>
-      {wide ? null : sincePill}
+      {/* Above the card on every width, so it is on screen without scrolling the left rail (R-4xx). */}
+      {sincePill}
       {inlineError}
       <View style={styles.fill}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />

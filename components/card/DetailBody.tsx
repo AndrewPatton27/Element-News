@@ -19,7 +19,7 @@ import { fonts } from '../../lib/theme/theme';
 import { AiLabel, Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceList } from './SourceList';
 import { DataFacts } from './DataCard';
-import { DefineSheet, GlossText } from './GlossText';
+import { DefineSheet, GlossText, GlossaryWords } from './GlossText';
 import { flagOn } from '../../lib/flags/flags';
 import type { GlossaryTerm } from '../../lib/glossary/glossary';
 
@@ -80,6 +80,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
           </Text>
         ),
       )}
+      {gloss ? <GlossaryWords texts={[...keyPoints, ...paragraphs]} onTerm={setTerm} /> : null}
       {fallback ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
 
       <View style={styles.sources}>

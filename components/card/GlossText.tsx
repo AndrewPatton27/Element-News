@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import { SheetModal } from '../shell/SheetModal';
-import { segmentText, type GlossaryTerm } from '../../lib/glossary/glossary';
+import { glossaryTermsIn, segmentText, type GlossaryTerm } from '../../lib/glossary/glossary';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts, font, radius } from '../../lib/theme/theme';
 
@@ -31,6 +31,36 @@ export function GlossText({ text, style, onTerm }: { text: string; style?: Style
         ),
       )}
     </Text>
+  );
+}
+
+/**
+ * "Words in this story": one 44 px tall button per glossary term found in the texts. The dotted underline in the
+ * text is a tap target only as tall as a line of text; this row is the reliable one (D-232).
+ */
+export function GlossaryWords({ texts, onTerm }: { texts: string[]; onTerm: (t: GlossaryTerm) => void }) {
+  const p = usePalette();
+  const terms = useMemo(() => glossaryTermsIn(texts), [texts.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (terms.length === 0) return null;
+  return (
+    <View style={styles.words} testID="glossary-words">
+      <Text style={[styles.wordsLabel, { color: p.muted }]} accessibilityRole="header" aria-level={3}>
+        Words in this story
+      </Text>
+      <View style={styles.wordsRow}>
+        {terms.map((t) => (
+          <Pressable
+            key={t.term}
+            onPress={() => onTerm(t)}
+            accessibilityRole="button"
+            accessibilityLabel={`What does ${t.term} mean?`}
+            style={({ pressed }) => [styles.wordChip, { borderColor: p.borderStrong, backgroundColor: p.surface, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[styles.wordText, { color: p.accentInk }]}>{t.term}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -63,6 +93,11 @@ export function DefineSheet({ term, onClose }: { term: GlossaryTerm | null; onCl
 }
 
 const styles = StyleSheet.create({
+  words: { gap: 8 },
+  wordsLabel: { fontFamily: fonts.sansSemi, fontSize: 13 },
+  wordsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  wordChip: { minHeight: 44, minWidth: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  wordText: { fontFamily: fonts.sansSemi, fontSize: 15 },
   center: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24 },
   panel: { width: '100%', maxWidth: 360, borderRadius: radius.tile, borderWidth: 1, overflow: 'hidden' },
   body: { paddingTop: 20, paddingHorizontal: 20, paddingBottom: 16, gap: 6 },

@@ -1,4 +1,4 @@
-// D-02 tap-to-define (flag `glossary`): about 60 finance terms with a plain one- or two-sentence meaning. Static text
+// D-02 tap-to-define (flag `glossary`): about 120 finance terms with a plain one- or two-sentence meaning. Static text
 // written for Element, no AI and no network. Informational only: a definition says what a word means, never what to do.
 // Pure: no React imports (lib/__tests__/glossary.test.ts).
 
@@ -73,6 +73,64 @@ export const GLOSSARY: GlossaryTerm[] = [
   { term: 'Fiscal policy', match: ['fiscal policy'], meaning: 'A government decisions on taxes and spending. It is different from monetary policy, which a central bank sets.' },
   { term: 'Monetary policy', match: ['monetary policy'], meaning: 'A central bank actions on interest rates and the money supply to keep prices stable and jobs steady.' },
   { term: 'Deficit', match: ['budget deficit', 'deficit'], meaning: 'When a government spends more than it takes in during a period. The running total of past deficits is the national debt.' },
+  { term: 'Federal Reserve', match: ['Federal Reserve', 'the Fed'], meaning: 'The central bank of the United States. It sets short-term interest rates and acts to keep prices stable and jobs plentiful.' },
+  { term: 'Core inflation', match: ['core inflation', 'core CPI', 'core PCE'], meaning: 'Inflation that leaves out food and energy prices, which jump around a lot. It gives a steadier read on the trend.' },
+  { term: 'PPI', match: ['producer price index', 'PPI'], meaning: 'Producer price index: tracks the prices businesses get for what they sell. It often moves before consumer prices do.' },
+  { term: 'Rate cut', match: ['rate cuts', 'rate cut'], meaning: 'The central bank lowers its target interest rate. Borrowing usually gets cheaper, and savings rates tend to fall.' },
+  { term: 'Rate hike', match: ['rate hikes', 'rate hike'], meaning: 'The central bank raises its target interest rate. Borrowing usually gets more expensive, and savings rates tend to rise.' },
+  { term: 'Hawkish', match: ['hawkish'], meaning: 'Favoring higher interest rates to keep inflation down, even if growth slows.' },
+  { term: 'Dovish', match: ['dovish'], meaning: 'Favoring lower interest rates to support jobs and growth, even if inflation stays higher for longer.' },
+  { term: 'Soft landing', match: ['soft landing'], meaning: 'Inflation cools without a recession: the economy slows but does not shrink or lose many jobs.' },
+  { term: 'Stagflation', match: ['stagflation'], meaning: 'Slow growth and high inflation at the same time, which is unusual and hard for policymakers to fix.' },
+  { term: 'Retail sales', match: ['retail sales'], meaning: 'A monthly Commerce Department count of what shoppers spend in stores and online. It shows how strong consumer spending is.' },
+  { term: 'PMI', match: ["purchasing managers' index", 'purchasing managers index', 'PMI'], meaning: "Purchasing managers' index: a survey of business managers. A reading above 50 means the sector is growing, below 50 means it is shrinking." },
+  { term: 'ISM', match: ['ISM'], meaning: 'Institute for Supply Management: publishes monthly surveys of factory and service businesses. Above 50 means growth.' },
+  { term: 'Consumer sentiment', match: ['consumer sentiment', 'consumer confidence'], meaning: 'A survey of how people feel about their finances and the economy. It hints at whether they will spend or hold back.' },
+  { term: 'Housing starts', match: ['housing starts'], meaning: 'The number of new homes where construction began in a month. It is an early gauge of the housing market.' },
+  { term: 'Job openings', match: ['job openings', 'JOLTS'], meaning: 'Jobs employers have posted but not yet filled, from the JOLTS survey. More openings than job seekers means a tight labor market.' },
+  { term: 'Labor force participation', match: ['labor force participation', 'participation rate'], meaning: 'The share of adults who have a job or are looking for one. It falls when people retire or stop searching.' },
+  { term: 'Wage growth', match: ['wage growth', 'average hourly earnings'], meaning: 'How fast pay is rising. If wages rise faster than prices, workers can buy more than before.' },
+  { term: 'Crude oil', match: ['crude oil', 'crude'], meaning: 'Oil as it comes out of the ground, before it is refined into gasoline, diesel and other fuels. Its price feeds into fuel costs.' },
+  { term: 'WTI', match: ['West Texas Intermediate', 'WTI'], meaning: 'West Texas Intermediate: the main U.S. benchmark price for crude oil.' },
+  { term: 'Brent', match: ['Brent crude', 'Brent'], meaning: 'The main international benchmark price for crude oil, drawn from North Sea oil. It is the price many fuel costs are tied to.' },
+  { term: 'OPEC', match: ['OPEC+', 'OPEC'], meaning: 'A group of oil-producing countries that agree how much oil to pump. Its choices can push oil prices up or down.' },
+  { term: 'Commodity', match: ['commodities', 'commodity'], meaning: 'A basic raw material that is bought and sold in bulk, such as oil, wheat or copper.' },
+  { term: 'Futures', match: ['futures contracts', 'futures contract', 'futures'], meaning: 'An agreement to buy or sell something at a set price on a future date. Futures prices are often read as a market forecast.' },
+  { term: 'Hedge', match: ['hedging', 'hedge'], meaning: 'A move that offsets a risk, such as a company locking in a fuel price so a later jump does not hurt it.' },
+  { term: 'Leverage', match: ['leveraged', 'leverage'], meaning: 'Using borrowed money to do more than your own cash allows. It raises possible gains and possible losses.' },
+  { term: 'Collateral', match: ['collateral'], meaning: 'An asset a borrower pledges to a lender. If the loan is not repaid, the lender can take it.' },
+  { term: 'Capital expenditures', match: ['capital expenditures', 'capex'], meaning: 'Money a company spends on lasting things such as factories, equipment and data centers.' },
+  { term: 'Impairment', match: ['impairment', 'write-down', 'writedown', 'write-off'], meaning: 'A company lowers the recorded value of an asset because it is now worth less. It reduces reported profit.' },
+  { term: 'Restructuring', match: ['restructuring'], meaning: 'A company reorganizes its business, debt or staff, often to cut costs. It can include layoffs or closing sites.' },
+  { term: 'Spin-off', match: ['spin-off', 'spinoff'], meaning: 'A company splits off part of itself into a new, separate company, and shareholders receive shares in it.' },
+  { term: 'Tender offer', match: ['tender offer'], meaning: 'A public offer to buy shares from shareholders at a set price, usually higher than the market price.' },
+  { term: 'Secondary offering', match: ['secondary offering', 'follow-on offering', 'public offering'], meaning: 'A company that is already public sells more shares. It raises cash but means more shares exist.' },
+  { term: 'Convertible notes', match: ['convertible notes', 'convertible bonds'], meaning: 'Debt that the holder can swap for company shares at set terms. It pays interest like a bond but can turn into stock.' },
+  { term: 'Warrant', match: ['warrants', 'warrant'], meaning: 'A right to buy a company share at a set price before a set date.' },
+  { term: 'Covenant', match: ['covenants', 'covenant'], meaning: 'A promise in a loan agreement, such as keeping debt below a limit. Breaking it can let the lender demand repayment.' },
+  { term: 'Bankruptcy', match: ['bankruptcy', 'Chapter 11', 'Chapter 7'], meaning: 'A court process for a person or company that cannot pay its debts. Chapter 11 lets a business keep operating while it reorganizes.' },
+  { term: 'Antitrust', match: ['antitrust'], meaning: 'Laws that stop companies from gaining too much market power or fixing prices, so competition stays fair.' },
+  { term: 'Sanctions', match: ['sanctions'], meaning: 'Penalties one country puts on another, such as trade limits or frozen assets, to pressure its government.' },
+  { term: 'EBITDA', match: ['EBITDA'], meaning: 'Earnings before interest, taxes, depreciation and amortization: a rough measure of profit from running the business itself.' },
+  { term: 'Gross margin', match: ['gross margin', 'gross profit'], meaning: 'The share of revenue left after the direct cost of making the product. It shows how much each sale keeps before other expenses.' },
+  { term: 'Consensus estimate', match: ['consensus estimates', 'consensus estimate'], meaning: 'The average forecast from analysts who follow a company. Results are often judged as beating or missing it.' },
+  { term: 'Analyst', match: ['analysts', 'analyst'], meaning: 'A professional who studies companies or markets and publishes forecasts and ratings. Analysts can be wrong.' },
+  { term: 'Price target', match: ['price targets', 'price target'], meaning: 'An analyst guess of where a stock price will be in about a year. It is an opinion, not a promise.' },
+  { term: 'Upgrade and downgrade', match: ['upgraded', 'downgraded'], meaning: 'An analyst or rating agency raises or lowers its view of a company, stock or debt.' },
+  { term: 'Insider trading report', match: ['Form 4', 'insider buying', 'insider selling'], meaning: 'Company officers and large owners must report when they buy or sell company shares. These reports are filed with the SEC on Form 4.' },
+  { term: 'Schedule 13D', match: ['Schedule 13D', 'Schedule 13G', '13D', '13G'], meaning: 'A filing an investor makes after owning more than 5% of a company. 13D signals plans to push for change; 13G is for passive holders.' },
+  { term: 'Short selling', match: ['short selling', 'short interest', 'short sellers', 'short seller'], meaning: 'Betting a stock will fall by selling borrowed shares and buying them back later. Short interest is how many shares are sold short.' },
+  { term: 'Shares outstanding', match: ['shares outstanding'], meaning: 'The total number of a company shares held by all its owners. Profit per share depends on this count.' },
+  { term: 'Credit spread', match: ['credit spreads', 'credit spread'], meaning: 'The extra yield a company bond pays over a safe government bond. A wider spread means investors see more risk.' },
+  { term: 'High-yield bond', match: ['high-yield bonds', 'high-yield bond', 'junk bonds', 'junk bond'], meaning: 'A bond from a borrower with a lower credit rating. It pays a higher rate to make up for a bigger chance of not being repaid.' },
+  { term: 'Municipal bond', match: ['municipal bonds', 'municipal bond', 'muni bonds'], meaning: 'A bond sold by a state or local government. Interest is often free of federal income tax.' },
+  { term: 'Treasury bill', match: ['Treasury bills', 'Treasury bill', 'T-bills', 'T-bill'], meaning: 'A short-term U.S. government loan, from a few weeks to a year. It pays no regular interest; you buy it below face value.' },
+  { term: 'Treasury auction', match: ['Treasury auctions', 'Treasury auction'], meaning: 'The government sells new bonds and bills to investors on a schedule. Weak demand can push yields up.' },
+  { term: 'Real wages', match: ['real wages', 'inflation-adjusted'], meaning: 'Pay after taking out inflation. It shows whether your paycheck actually buys more than before.' },
+  { term: 'Net interest margin', match: ['net interest margin'], meaning: 'What a bank earns on loans minus what it pays on deposits, as a share of its assets. It is a core measure of bank profit.' },
+  { term: 'FDIC', match: ['FDIC', 'Federal Deposit Insurance Corporation'], meaning: 'Federal Deposit Insurance Corporation: a U.S. agency that insures bank deposits, up to $250,000 per depositor, per bank.' },
+  { term: 'Dot plot', match: ['dot plot'], meaning: 'A chart where each Federal Reserve official marks where they expect interest rates to be in coming years.' },
+  { term: 'Beige Book', match: ['Beige Book'], meaning: 'A Federal Reserve report, published about eight times a year, that gathers business stories from each region on how the economy is doing.' },
 ];
 
 export interface Segment {
@@ -100,7 +158,7 @@ const PATTERN = new RegExp(`(^|[^A-Za-z0-9])(${ENTRIES.map((e) => esc(e.phrase))
  * Splits text into plain pieces and glossary terms. Each term is marked only the first time it appears in the
  * text (underlining every repeat is noise), and at most `max` terms are marked.
  */
-export function segmentText(text: string, max = 4): Segment[] {
+export function segmentText(text: string, max = 6): Segment[] {
   if (!text) return [];
   const out: Segment[] = [];
   const used = new Set<string>();
@@ -120,4 +178,14 @@ export function segmentText(text: string, max = 4): Segment[] {
   }
   if (last < text.length) out.push({ text: text.slice(last) });
   return out.length ? out : [{ text }];
+}
+
+/** The distinct terms across several texts, in order of first appearance (the "Words in this story" row; at most `max`). */
+export function glossaryTermsIn(texts: string[], max = 8): GlossaryTerm[] {
+  const out: GlossaryTerm[] = [];
+  for (const t of texts) {
+    for (const s of segmentText(t)) if (s.term && !out.includes(s.term)) out.push(s.term);
+    if (out.length >= max) break;
+  }
+  return out.slice(0, max);
 }

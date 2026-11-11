@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAccount } from '../lib/account/accountContext';
 import { usePalette, useWide } from '../lib/theme/useTheme';
 import { fonts, font, radius } from '../lib/theme/theme';
@@ -31,12 +31,15 @@ export default function SetupScreen() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<SetupAnswers>(() => ({ ...EMPTY_ANSWERS, topics: [...signals.interests, ...signals.optIn], depth: signals.depth }));
   const on = readFlags().onboarding;
+  // A feed URL that came through the tour (?next=latest) gets its own tab back; otherwise For you.
+  const { next } = useLocalSearchParams<{ next?: string }>();
+  const nextTab = next === 'top' || next === 'latest' || next === 'for_you' ? next : null;
   useEffect(() => {
     if (!on) router.replace('/' as never);
   }, [on]);
   if (!on) return null;
 
-  const leave = () => router.replace('/?tab=for_you' as never);
+  const leave = () => router.replace(`/?tab=${nextTab ?? 'for_you'}` as never);
 
   async function finish() {
     const existing = acct.user && acct.prefs ? acct.prefs.followed : parseFollows(store.get(FOLLOWS_KEY)).topics;
@@ -54,7 +57,7 @@ export default function SetupScreen() {
   }
   function skip() {
     update(skipSetup);
-    router.replace('/' as never);
+    router.replace((nextTab ? `/?tab=${nextTab}` : '/') as never);
   }
 
   const heading = ['What do you want to follow?', 'Do you invest?', 'How much detail do you want?'][step];
@@ -67,7 +70,7 @@ export default function SetupScreen() {
   return (
     <ScreenShell tab="me" title="Set up Element">
       <View style={[styles.column, wide && styles.columnWide]} testID="setup">
-        <Text style={[styles.progress, { color: p.muted }]} accessibilityLiveRegion="polite">
+        <Text style={[styles.progress, { color: p.muted }]} accessibilityLiveRegion="polite" testID="setup-progress">
           Question {step + 1} of {STEPS}
         </Text>
         <Text style={[styles.heading, { color: p.ink, fontSize: wide ? font.title : 28 }]} accessibilityRole="header">
