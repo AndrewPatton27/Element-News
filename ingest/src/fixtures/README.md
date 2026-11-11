@@ -27,3 +27,5 @@ Labels: **REAL** = verbatim fetched content. **RECONSTRUCTED** = every value com
 | `sec-submissions-CIK0000320193.json` | RECONSTRUCTED (Apple's data.sec.gov submissions JSON, fetched 2026-10-17; identity fields and `filings.recent` verbatim, arrays filtered to the first 3 rows plus every 8-K / 8-K/A row) |
 | `fed-speeches.rss.xml`, `sec-press.rss.xml` | SYNTHETIC (shape of the Fed speeches and SEC press-release feeds; fictional text; dry run only) |
 | `fiscaldata-avg-interest-rates.json`, `fiscaldata-debt.json` | SYNTHETIC (Treasury FiscalData API shape, values are strings; dry run only) |
+| `sec-daily-index-form.idx` | REAL (header and a few lines of SEC's EDGAR daily index `form.20261110.idx`, fetched read-only 2026-11-11: 8-K, 8-K/A and 10-K lines); used by `test/sec-coverage-m9c.test.ts` |
+| `sec-company-tickers-extra.json` | REAL rows of SEC's `company_tickers_exchange.json` for the extended watch list in `contract/companiesExtra.ts` (written by `scripts/gen-companies-extra.mjs`) |

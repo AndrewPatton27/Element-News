@@ -11,6 +11,7 @@ import type { FetchLike } from '../src/allowlist.ts';
 
 // The fixture Apple 8-K was filed 2026-07-30 and these tests run at DRY_NOW (2026-10-17): the 21-day production window (M9c) would drop it.
 (config as unknown as { secLookbackDays: number }).secLookbackDays = 90;
+(config as unknown as { secIndex: { rotationPerRun: number } }).secIndex.rotationPerRun = 100_000;   // fixture holds Apple's list only
 
 const NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
 function writer(log: Array<{ name: string; retry: boolean }>): Summarizer {

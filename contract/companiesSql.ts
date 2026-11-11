@@ -6,6 +6,7 @@
 
 import { COMPANIES, tickerInText, type CompanyEntry } from './companies.ts';
 import { BUSINESS_WORDS } from './companyMatch.ts';
+import { COMPANIES_EXTRA, type ExtraCompany } from './companiesExtra.ts';
 
 export const SEED_BEGIN = '-- BEGIN GENERATED COMPANY SEED (scripts/gen-companies-sql.mjs; do not edit by hand)';
 export const SEED_END = '-- END GENERATED COMPANY SEED';
@@ -78,4 +79,25 @@ export function replaceBlock(file: string, begin: string, end: string, block: st
 export function readBlock(file: string, begin: string, end: string): string | null {
   const i = file.indexOf(begin), j = file.indexOf(end);
   return i < 0 || j < i ? null : file.slice(i, j + end.length);
+}
+
+export const EXTRA_BEGIN = '-- BEGIN GENERATED EXTRA COMPANY SEED (scripts/gen-companies-sql.mjs; do not edit by hand)';
+export const EXTRA_END = '-- END GENERATED EXTRA COMPANY SEED';
+
+/**
+ * Seed for the extended SEC watch list (contract/companiesExtra.ts): name-less directory rows (no aliases, no cues,
+ * no bare ticker match), so they are found by search and tagged through filings or "NYSE: XYZ" style tickers only.
+ * Idempotent: re-running updates names, categories and CIKs.
+ */
+export function extraCompaniesSeedSql(entries: readonly ExtraCompany[] = COMPANIES_EXTRA): string {
+  const rows = entries.map((e) => `  (${[lit(e.ticker), lit(e.name), lit(e.short), lit(e.cik), lit(e.exchange), lit(e.sector), lit(e.industry)].join(', ')})`);
+  return [
+    EXTRA_BEGIN,
+    'insert into core.companies (ticker, name, short_name, cik, exchange, sector, industry) values',
+    rows.join(',\n'),
+    'on conflict (ticker) do update set',
+    '  name = excluded.name, short_name = excluded.short_name, cik = excluded.cik, exchange = excluded.exchange,',
+    '  sector = excluded.sector, industry = excluded.industry;',
+    EXTRA_END,
+  ].join('\n');
 }
