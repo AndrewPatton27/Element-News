@@ -20,6 +20,7 @@ node src/main.ts --dry-run --only bea   # sources: sec, fed, fedspeech, secpress
 node src/main.ts --rewrite --limit 20   # redo older published cards in plain words, in place (needs migration 20261017050000)
 node src/main.ts --dry-run --rewrite    # the same on sample cards, no network
 node src/main.ts --backfill-macro --weeks 16   # one-off: FRED history so the Trends charts have ~12 points (needs FRED_API_KEY; no new cards; safe to re-run)
+node src/main.ts --backfill-cards --days 7       # one-off: publish the last 7 days of news cards (rounds until nothing new or the AI budget is used; --limit = items per round; macro/treasury excluded; safe to re-run; --dry-run tries it on fixtures)
 ```
 
 ## Environment variables

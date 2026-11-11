@@ -237,6 +237,14 @@ export const config = {
   } as Record<string, number>,
   fredLookbackDays: 500,                       // enough history for CPI year-over-year
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
+  cardBackfill: {                              // --backfill-cards (M9 item 1): bulk-publish the last N days of news cards
+    daysDefault: 7,
+    daysMax: 30,
+    limitPerRound: 50,                         // items summarized per round (each round re-reads every source)
+    maxRounds: 10,
+    aiReserve: 15,                             // stop with this many AI calls left today, for the normal cloud runs
+    excludeSources: ['macro', 'treasury'] as readonly string[],   // data-card sources: latest reading only, never backfilled
+  },
   backfillPauseMs: 700,                        // --backfill-macro: pause between FRED requests (limit is 120/minute)
   fedMaxAgeDays: 120,                            // ignore older press releases
   // BEA releases come 2-5 a week; on 2026-10-17 the newest was 11 days old, so 7 days would show none.

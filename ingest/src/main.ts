@@ -6,6 +6,8 @@
 //              (--limit = max cards; with --dry-run: the cards in src/fixtures/rewrite-cards.json)
 //   --backfill-macro  one-off: FRED history for the Trends charts via api.upsert_macro (no data cards);
 //              --weeks N = weeks of history (default 16); with --dry-run: DGS10 fixture only
+//   --backfill-cards  one-off: publish the last --days N days (default 7) of news cards in rounds until nothing new
+//              or the AI budget is used; --limit = items per round; macro/treasury excluded; safe to repeat
 //   --only     comma-separated subset of sources (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
@@ -23,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchAllowed } from './allowlist.ts';
 import { config, describeEnv, fedRegisterUrls, readEnv } from './config.ts';
 import { runOnce, SOURCE_NAMES, type Deps, type SourceName } from './pipeline.ts';
-import { runBackfill } from './backfill.ts';
+import { runBackfill, runCardBackfill } from './backfill.ts';
 import { runRewrite } from './rewrite.ts';
 import { runAudit, groqRevision } from './audit.ts';
 import { isMailCommand, mailMain } from './mailCli.ts';
@@ -46,11 +48,14 @@ export interface Args {
   rewrite: boolean;
   backfillMacro: boolean;
   weeks: number;
+  backfillCards: boolean;
+  days: number;
+  limitSet: boolean;
 }
 
 /** Parses CLI flags (see the header). Throws on an unknown option, an unknown --only source or a bad --limit. */
 export function parseArgs(argv: string[]): Args {
-  const a: Args = { dryRun: false, loop: false, only: [], limit: 20, json: false, rewrite: false, backfillMacro: false, weeks: config.backfillWeeksDefault };
+  const a: Args = { dryRun: false, loop: false, only: [], limit: 20, json: false, rewrite: false, backfillMacro: false, weeks: config.backfillWeeksDefault, backfillCards: false, days: config.cardBackfill.daysDefault, limitSet: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--dry-run') a.dryRun = true;
@@ -59,6 +64,12 @@ export function parseArgs(argv: string[]): Args {
     else if (k === '--json') a.json = true;
     else if (k === '--rewrite') a.rewrite = true;
     else if (k === '--backfill-macro') a.backfillMacro = true;
+    else if (k === '--backfill-cards') a.backfillCards = true;
+    else if (k === '--days') {
+      const n = Number(argv[++i]);
+      if (!Number.isInteger(n) || n < 1 || n > config.cardBackfill.daysMax) throw new Error(`--days needs a whole number from 1 to ${config.cardBackfill.daysMax}`);
+      a.days = n;
+    }
     else if (k === '--weeks') {
       const n = Number(argv[++i]);
       if (!Number.isInteger(n) || n < 1 || n > 520) throw new Error('--weeks needs a whole number from 1 to 520');
@@ -72,6 +83,7 @@ export function parseArgs(argv: string[]): Args {
       const n = Number(argv[++i]);
       if (!Number.isInteger(n) || n < 0) throw new Error('--limit needs a whole number');
       a.limit = n;
+      a.limitSet = true;
     } else throw new Error(`unknown option: ${k}`);
   }
   return a;
@@ -222,6 +234,8 @@ export async function main(argv: string[]): Promise<number> {
 
   if (args.rewrite && args.loop) throw new Error('--rewrite cannot be combined with --loop');
   if (args.backfillMacro && (args.rewrite || args.loop)) throw new Error('--backfill-macro cannot be combined with --rewrite or --loop');
+  if (args.backfillCards && (args.rewrite || args.loop || args.backfillMacro)) throw new Error('--backfill-cards cannot be combined with --rewrite, --loop or --backfill-macro');
+  const cardOpts = () => ({ days: args.days, only: args.only, limit: args.limitSet ? args.limit : undefined });
   if (args.dryRun) {
     const dry = createDryRunPublisher(args.rewrite ? (JSON.parse(fixture('rewrite-cards.json')) as { cards: RevisableCard[] }).cards : []);
     const deps: Deps = {
@@ -233,6 +247,13 @@ export async function main(argv: string[]): Promise<number> {
       now: DRY_NOW,                                           // fixtures are from this day
       log,
     };
+    if (args.backfillCards) {
+      const cs = await runCardBackfill(deps, cardOpts());
+      await refreshTrendingSafely(deps.publisher, log);
+      log(`dry run card backfill: ${JSON.stringify({ ...cs, perRound: undefined })}`);
+      if (args.json) console.log(JSON.stringify({ cards: dry.cards }, null, 2));
+      return 0;
+    }
     if (args.backfillMacro) {
       const bs = await runBackfill(deps, { weeks: args.weeks, pauseMs: 0 });
       log(`dry run backfill: ${JSON.stringify(bs)}`);
@@ -268,6 +289,12 @@ export async function main(argv: string[]): Promise<number> {
     log,
     reportCard: process.env.REPORT_CARD_PROTOCOL === '1' ? { enabled: true } : undefined,   // write -> score -> revise-once protocol, off by default
   };
+  if (args.backfillCards) {
+    const cs = await runCardBackfill(deps, cardOpts());
+    await refreshTrendingSafely(deps.publisher, log);
+    log(`card backfill finished: ${JSON.stringify({ ...cs, perRound: undefined })}`);
+    return 0;
+  }
   if (args.backfillMacro) {
     const bs = await runBackfill(deps, { weeks: args.weeks });
     log(`backfill finished: ${JSON.stringify(bs)}`);

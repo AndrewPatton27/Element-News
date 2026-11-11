@@ -101,3 +101,64 @@ test('backfill pauses between FRED requests and skips without a key', async () =
   await assert.rejects(() => runBackfill(none.deps, { weeks: 0 }), /whole number/);
   assert.ok(backfillFetchDays(16) > 500);
 });
+
+// ---- card backfill ----------------------------------------------------------------------
+
+import { fixtureFetcher, DRY_NOW } from '../src/main.ts';
+import { aiCallsLeft, newsSources, runCardBackfill } from '../src/backfill.ts';
+import { templateSummarizer } from '../src/summarizer/template.ts';
+
+function dryDeps() {
+  const dry = createDryRunPublisher();
+  const lines: string[] = [];
+  const deps: Deps = {
+    fetchText: fixtureFetcher(), publisher: dry.publisher, providers: [templateSummarizer], counter: memoryCounter(),
+    fredApiKey: 'dry-run', now: DRY_NOW, log: (s) => lines.push(s),
+  };
+  return { deps, dry, lines };
+}
+
+test('--backfill-cards and --days parse; bad days rejected', () => {
+  assert.equal(parseArgs([]).backfillCards, false);
+  assert.equal(parseArgs([]).days, config.cardBackfill.daysDefault);
+  const a = parseArgs(['--backfill-cards', '--days', '3', '--limit', '5']);
+  assert.equal(a.backfillCards, true);
+  assert.equal(a.days, 3);
+  assert.equal(a.limitSet, true);
+  assert.equal(parseArgs(['--backfill-cards']).limitSet, false);
+  assert.throws(() => parseArgs(['--days', '0']), /whole number/);
+  assert.throws(() => parseArgs(['--days', String(config.cardBackfill.daysMax + 1)]), /whole number/);
+});
+
+test('card backfill never includes data-card sources and rejects them in --only', async () => {
+  assert.ok(!newsSources().includes('macro'));
+  assert.ok(!newsSources().includes('treasury'));
+  await assert.rejects(runCardBackfill(dryDeps().deps, { only: ['macro'] }), /data-card sources/);
+  await assert.rejects(runCardBackfill(dryDeps().deps, { days: 0 }), /whole number/);
+});
+
+test('card backfill publishes, is idempotent, and a shorter window publishes no more cards', async () => {
+  const wide = dryDeps();
+  const a = await runCardBackfill(wide.deps, { days: 30, limit: 100 });
+  assert.ok(a.published > 0, 'fixtures should yield cards');
+  assert.equal(wide.dry.cards.length, a.published);
+  const again = await runCardBackfill(wide.deps, { days: 30, limit: 100 });
+  assert.equal(again.published, 0);                       // everything already handled
+  assert.equal(again.stoppedBy, 'no_new_cards');
+  const narrow = dryDeps();
+  const b = await runCardBackfill(narrow.deps, { days: 1, limit: 100 });
+  assert.ok(b.published <= a.published);
+  for (const c of narrow.dry.cards) assert.ok(Date.parse(String((c as { sort_at?: string }).sort_at)) >= DRY_NOW.getTime() - 86_400_000);
+});
+
+test('card backfill stops when the AI budget is used and never publishes template fallbacks', async () => {
+  const { deps, dry } = dryDeps();
+  const fake = { name: 'gemini', model: 'x', summarize: async () => { throw new Error('must not be called'); } } as unknown as Deps['providers'][number];
+  deps.providers = [fake];
+  for (let i = 0; i < 1000; i++) deps.counter.add('gemini');
+  assert.equal(aiCallsLeft(deps), 0);
+  const r = await runCardBackfill(deps, { days: 30 });
+  assert.equal(r.stoppedBy, 'ai_budget');
+  assert.equal(r.rounds, 0);
+  assert.equal(dry.cards.length, 0);
+});

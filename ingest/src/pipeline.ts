@@ -52,6 +52,7 @@ export interface Deps {
 export interface RunOptions {
   only?: SourceName[];
   limit?: number;                    // max news items summarized per run (all sources together)
+  maxItemAgeDays?: number;           // backfill: items published before now minus this many days are ignored (not even recorded)
 }
 
 export interface RunStats {
@@ -83,6 +84,11 @@ interface RunCtx {
 }
 let topicFilterState: TopicFilterState = createTopicFilterState();
 /** Recent live cards for the protocol's duplicate/relation check: loaded once per run, grown with this run's cards. */
+/** Backfill only: items published before this time (ms) are skipped. null = no age cutoff (normal runs). */
+let runMinPublishedMs: number | null = null;
+function tooOld(it: RawItem): boolean {
+  return runMinPublishedMs !== null && Date.parse(it.published_at) < runMinPublishedMs;
+}
 let runRecent: Array<{ id: string; headline: string; body: string | null }> | null = null;
 async function recentCards(deps: Deps) {
   if (!runRecent) {
@@ -109,6 +115,7 @@ export async function runOnce(deps: Deps, opts: RunOptions = {}): Promise<RunSta
   };
   topicFilterState = createTopicFilterState();
   runRecent = null;
+  runMinPublishedMs = opts.maxItemAgeDays === undefined ? null : deps.now.getTime() - opts.maxItemAgeDays * 86_400_000;
 
   const select = deps.selection?.enabled ?? config.selection.enabled;
   collector = select ? [] : null;                    // selection on: sources only collect; the budget is spent below
@@ -305,6 +312,7 @@ async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof cre
         continue;
       }
       const it = r.item;
+      if (tooOld(it)) { stats.skipped++; continue; }
       n++;
       const cand = { url: it.url, tickers: [], sortAt: new Date(it.published_at) };
       const d = guard.check(cand);
@@ -422,6 +430,7 @@ async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: nu
     let newHere = 0;
     const groupNew = new Map<string, number>();
     for (const it of job.items) {
+      if (tooOld(it)) { ctx.stats.skipped++; continue; }
       if (job.limits.total !== undefined && newHere >= job.limits.total) { deps.log(`new-item limit reached (${job.limits.total} new per run)`); break; }
       const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
       const d = ctx.guard.check(cand);
@@ -517,6 +526,7 @@ async function processItems(
 /** One candidate item through steps 2-7 of processItems. `known` = the item row when the selection step already recorded it. */
 async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise<void> {
   const { deps, stats, budget, guard, chain, pageText, preCheck, limits, perGroup } = job;
+  if (tooOld(it)) { stats.skipped++; return; }
   const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
   const d = guard.check(cand);
   if (!d.ok) { deps.log(`skip ${d.reason}: ${it.title}`); stats.skipped++; return; }
