@@ -4,7 +4,7 @@
 
 import { config } from './config.ts';
 import type { Deps, RunStats } from './pipeline.ts';
-import { buildDataCard, buildObservation, differenceSeries, fredUrl, parseFredObservations, type Point } from './sources/macro.ts';
+import { buildDataCard, buildObservation, buildYieldCurveCard, differenceSeries, fredUrl, parseFredObservations, type Point } from './sources/macro.ts';
 import { avgRatesUrl, debtUrl, parseAvgRates, parseDebt } from './sources/fiscaldata.ts';
 
 /** FRED series -> Numbers panel rows (api.upsert_macro) and, for big enough moves, data cards. Skipped without FRED_API_KEY. */
@@ -19,7 +19,7 @@ export async function runMacro(deps: Deps, stats: RunStats): Promise<void> {
       url.searchParams.set('api_key', deps.fredApiKey);          // never logged: errors print the host only
       const points = parseFredObservations(await deps.fetchText(url.toString(), 'api', 60));
       fetched.set(id, points);
-      await publishSeries(deps, stats, 'macro', id, points, true);
+      await publishSeries(deps, stats, 'macro', id, points, true, id === 'DFF' ? { targetRange: targetRange(fetched) } : {});
     } catch (e) {
       deps.log(`macro: ${id}: ${(e as Error).message}`);
     }
@@ -34,15 +34,34 @@ export async function runMacro(deps: Deps, stats: RunStats): Promise<void> {
       deps.log(`macro: ${id}: ${(e as Error).message}`);
     }
   }
+  // One daily Treasury yield-curve card from the points already fetched (no extra FRED calls).
+  try {
+    const card = buildYieldCurveCard(Object.fromEntries(fetched));
+    if (!card) deps.log('macro: yield curve: no card (a maturity is missing or lags the 10-year, or the move is below the threshold)');
+    else {
+      const res = await deps.publisher.publishBlurb(card);
+      if (res.status === 'published') stats.data_cards++;
+      deps.log(`macro: yield curve ${card.dedupe_key} -> data card ${res.status}`);
+    }
+  } catch (e) {
+    deps.log(`macro: yield curve: ${(e as Error).message}`);
+  }
+}
+
+/** "3.75% to 4.00%" from the fetched DFEDTARL / DFEDTARU points, when both have a reading on the same date. */
+function targetRange(fetched: Map<string, Point[]>): string | undefined {
+  const lo = fetched.get('DFEDTARL')?.at(-1), hi = fetched.get('DFEDTARU')?.at(-1);
+  if (!lo || !hi || lo.date !== hi.date) return undefined;
+  return `${lo.value.toFixed(2)}% to ${hi.value.toFixed(2)}%`;
 }
 
 /** One series' points -> Numbers panel row and, if `cardAllowed` and the move is big enough, a data card. */
-async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean): Promise<void> {
+async function publishSeries(deps: Deps, stats: RunStats, tag: string, id: string, points: Point[], cardAllowed: boolean, ctx: { targetRange?: string } = {}): Promise<void> {
   const obs = buildObservation(id, points);
   if (!obs) { deps.log(`${tag}: ${id}: not enough data`); return; }
   await deps.publisher.upsertMacro(obs);
   stats.macro++;
-  const card = cardAllowed ? buildDataCard(obs) : null;
+  const card = cardAllowed ? buildDataCard(obs, [], ctx) : null;
   if (card) {
     const res = await deps.publisher.publishBlurb(card);
     if (res.status === 'published') stats.data_cards++;

@@ -169,6 +169,7 @@ test('fedreg: an "Airworthiness Directives" title becomes a plain FAA safety-ord
   };
   const h = templateDraft({ item: itemOf(faaDoc), text: '' }).headline;
   assert.equal(h, 'The FAA issues a safety order for Boeing planes');
+  assert.equal(itemOf(faaDoc).category, 'safety', 'FAA directives are filed under Recalls & Safety');
   assert.doesNotMatch(h, /Airworthiness Directives|The Boeing Company Airplanes/);
   assert.ok(h.length <= config.headlineMaxChars);
 });

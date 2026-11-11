@@ -53,10 +53,10 @@ const ai = (draft: Partial<SummaryDraft>, calls: string[] = []): Summarizer => (
 
 // ---- selection ---------------------------------------------------------------------------
 
-test('--rewrite: CLI flag; current versions are sum-v6 and tpl-v5; only older cards are selected', async () => {
+test('--rewrite: CLI flag; current versions are sum-v6 and tpl-v6; only older cards are selected', async () => {
   assert.equal(parseArgs(['--rewrite', '--limit', '5']).rewrite, true);
-  assert.deepEqual(currentVersions(), ['sum-v6', 'tpl-v5']);
-  const fresh = [{ ...byId(1), id: 'a', prompt_version: 'sum-v6' }, { ...byId(3), id: 'b', prompt_version: 'tpl-v5' }];
+  assert.deepEqual(currentVersions(), ['sum-v6', 'tpl-v6']);
+  const fresh = [{ ...byId(1), id: 'a', prompt_version: 'sum-v6' }, { ...byId(3), id: 'b', prompt_version: 'tpl-v6' }];
   const r = rewriteDeps([...fresh, byId(3)], [templateSummarizer]);
   const s = await runRewrite(r.deps, { limit: 10 });
   assert.equal(s.selected, 1, 'only the old data card');
@@ -98,10 +98,10 @@ test('template and data cards: regenerated with the plain templates (no AI) plus
   assert.ok(sec.action === 'revise' && data.action === 'revise');
   if (sec.action !== 'revise' || data.action !== 'revise') return;
   assert.equal(sec.headline, 'Federal Reserve issues FOMC statement');
-  assert.equal(sec.prompt_version, 'tpl-v5');
+  assert.equal(sec.prompt_version, 'tpl-v6');
   assert.match(sec.detail!.paragraphs[1], /central bank/);
-  assert.equal(data.body, 'The 10-year Treasury yield, a rate that many mortgage and loan rates follow, was 5.10% on Oct 16, up 0.06 points from the prior day.');
-  assert.match(data.detail!.paragraphs[0], /up 0\.06 points from the prior day, when it was 5\.04%/);
+  assert.equal(data.body, 'The 10-year Treasury yield, the interest rate the U.S. government pays to borrow for 10 years, was 5.10% on Oct 16, up 6 basis points from the prior day. It is a widely used benchmark for long-term interest rates, including mortgage rates.');
+  assert.match(data.detail!.paragraphs[0], /up 6 basis points from the prior day, when it was 5\.04%/);
   for (const d of [sec.detail!, data.detail!]) assert.deepEqual(checkDetailShape(d), []);
 });
 
@@ -203,7 +203,7 @@ test('new cards: AI detail goes into the publish payload; template and data card
   assert.equal(quakes.length, 1, 'only the quakes above the publishing threshold, and at most 1 USGS card per run (narrow-source cap)');
   for (const q of quakes) {
     assert.deepEqual(checkDetailShape(q.detail), [], q.headline);
-    assert.equal(q.prompt_version, 'tpl-v5');
+    assert.equal(q.prompt_version, 'tpl-v6');
   }
   const it = (usgsToItem(parseUsgsGeoJson(fx('usgs-significant-week.geojson'))[0], DRY_NOW) as { item: RawItem }).item;
   assert.deepEqual(templateDetail(it)!.key_points, ['Magnitude 5.7', 'Location: 48 km WNW of Khuzdar, Pakistan', 'Time: 05:06 UTC on Oct 17', 'USGS alert level: yellow']);
