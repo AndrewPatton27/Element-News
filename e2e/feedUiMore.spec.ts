@@ -131,14 +131,14 @@ test('360 x 560 phone: "More detail" can be tapped on every card, also when the 
     const r = await page.evaluate(() => {
       const heads = Array.from(document.querySelectorAll('[data-testid="card-headline"]')) as HTMLElement[];
       const cur = heads.find((el) => { const b = el.getBoundingClientRect(); return b.width > 0 && b.top >= 0 && b.bottom <= window.innerHeight; });
-      const more = Array.from(document.querySelectorAll('[aria-label^="More detail"]')).find((b) => { const q = b.getBoundingClientRect(); return q.width > 0 && q.top < window.innerHeight && q.bottom > 0; }) as HTMLElement | undefined;
+      const more = Array.from(document.querySelectorAll('[aria-label^="More detail"]')).find((b) => { const q = b.getBoundingClientRect(); const c = q.top + q.height / 2; return q.width > 0 && c > 120 && c < window.innerHeight - 100; }) as HTMLElement | undefined;
       if (!cur) return { head: '', has: false, hit: false };
       if (!more) return { head: cur.innerText, has: false, hit: false };
       const q = more.getBoundingClientRect();
       const hit = document.elementFromPoint(q.left + 20, q.top + q.height / 2);
-      return { head: cur.innerText, has: true, hit: !!hit && (more === hit || more.contains(hit)) };
+      return { head: cur.innerText, has: true, hit: !!hit && (more === hit || more.contains(hit)), why: `${q.top}-${q.bottom} vs ${hit ? (hit.getAttribute('aria-label') || hit.tagName) + ' ' + hit.getBoundingClientRect().top : 'none'}` };
     });
-    if (r.has) expect(r.hit, `More detail is clipped on "${r.head}"`).toBe(true);
+    if (r.has) expect(r.hit, `More detail is clipped on "${r.head}" ${(r as { why?: string }).why}`).toBe(true);
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(900);
   }
