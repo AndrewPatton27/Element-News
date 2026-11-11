@@ -12,7 +12,7 @@ test('groqCapFromMeasuredTokens: TPD x 0.9 / tokens per call, limited by RPD; ba
   assert.equal(groqCapFromMeasuredTokens(3000, { freeRpd: null, freeTpd: null }), 0, 'no limits known: no computed cap');
 });
 
-test('the live Groq cap is unchanged (74)', () => {
-  assert.equal(groqDailyCap(), 74);
+test('the code Groq cap follows the measured sum-v7 tokens (62; the live core.ai_caps row is still 74 until Drew applies it)', () => {
+  assert.equal(groqDailyCap(), 62);
   assert.equal(config.groq.dailyCapCode, 80);
 });

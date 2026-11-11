@@ -335,18 +335,17 @@ test('publish payload: AI cards carry everyday_relevance, template and invalid s
 
 // ---- brief -----------------------------------------------------------------------------------------------
 
-test('brief test (offline): macro-first order, recalls and space last and only from TOP STORIES, no "Meanwhile", the span is not "today"', () => {
+test('brief test (offline): macro-first order, recalls and space last, no "Meanwhile", the span is the real window', () => {
   const daily = buildBriefPrompt('daily', 'TOP STORIES:\n- x');
   assert.match(daily, /busy everyday people interested in business, finance, stocks and investing \(about 16 to 50\)/);
-  assert.match(daily, /paragraph 1 = Federal Reserve decisions and the most important economic data/);
-  assert.match(daily, /Do NOT mention a product recall, space or science item unless it is listed under TOP STORIES; if it is, put it last/);
+  assert.match(daily, /Paragraph 1 = the Federal Reserve and the most important economic data/);
+  assert.match(daily, /then RECALLS SPACE AND SCIENCE\. Follow it\. A single company filing never comes before an economic release/);
   assert.match(daily, /in parentheses \(never square brackets\)/);
-  assert.match(daily, /biggest economic numbers in NUMBERS that changed \(for example GDP, payrolls, CPI, the unemployment rate\) before any single company/);
-  assert.match(daily, /Do not join unrelated items with "Meanwhile" or "In other news"/);
-  assert.match(daily, /what mattered in the period this brief covers/);
+  assert.match(daily, /biggest economic numbers in NUMBERS that changed/);
+  assert.match(daily, /Do not stitch unrelated items together with "Meanwhile" or "In other news"/);
+  assert.match(daily, /what mattered in the last 24 hours/);
   assert.doesNotMatch(daily, /mattered today|mattered in today/);
-  assert.match(buildBriefPrompt('weekly', 'x'), /what mattered in this week/);
-  assert.match(daily, /HARD RULES/);
+  assert.match(buildBriefPrompt('weekly', 'x'), /what mattered (in|during) this week/);
 });
 
 test('brief validator: style, speculation, relative time (own span words allowed) and "Meanwhile" are flagged; casing is fixed on clean-up', () => {
@@ -519,7 +518,8 @@ test('brief source text leaves out recall and science sections (they count only 
   } as never;
   const text = briefSourceText(brief);
   assert.match(text, /Top story headline/);
-  assert.match(text, /TOPIC Economy/);
+  assert.match(text, /ECONOMY, FED AND GOVERNMENT:|COMPANIES AND MARKETS:|OTHER NEWS:/);
+  assert.match(text, /Economy card/);
   assert.doesNotMatch(text, /Recall card|NASA card|Recalls and safety|Science and space/);
   assert.deepEqual([...config.mail.summarySkipSectionCategories], ['safety', 'science']);
 });

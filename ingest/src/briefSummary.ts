@@ -105,7 +105,11 @@ export function briefSourceText(brief: BriefInput): string {
     }
   }
   // Then the stories in the macro-first order: Fed and government, companies, other, recalls/space/science.
-  const ordered = orderBriefCards(allBriefCards(brief));
+  // Recall and science sections (config.mail.summarySkipSectionCategories) stay out of the AI text unless a card is also a headline card (D-111).
+  const skipCats = new Set<string>(config.mail.summarySkipSectionCategories);
+  const headIds = new Set((brief.headline_cards ?? []).map((c) => c.id));
+  const skipIds = new Set((brief.sections ?? []).filter((sec) => skipCats.has(sec.category)).flatMap((sec) => (sec.cards ?? []).map((c) => c.id)).filter((id) => !headIds.has(id)));
+  const ordered = orderBriefCards(allBriefCards(brief)).filter((c) => !skipIds.has(c.id));
   const headings: Record<BriefTier, string> = {
     0: 'ECONOMY, FED AND GOVERNMENT:', 1: 'COMPANIES AND MARKETS:', 2: 'OTHER NEWS:', 3: 'RECALLS, SPACE AND SCIENCE (LAST):',
   };
@@ -134,10 +138,10 @@ export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: 
   const c = config.mail;
   const span = briefPromptSpan(kind, window);
   const lines = [
-    `You write the short summary at the top of Element's ${kind} news brief for readers aged about 16 to 50 who follow business, the economy, markets and investing. They know the basics but prefer plain words.`,
+    `You write the short summary at the top of Element's ${kind} news brief for busy everyday people interested in business, finance, stocks and investing (about 16 to 50). They know the basics but prefer plain words.`,
     `Write about ${c.summaryTargetWords} words (between ${c.summaryMinWords} and ${c.summaryMaxWords}) in ${c.summaryParagraphs[0]} to ${c.summaryParagraphs[1]} short paragraphs, separated by one blank line, that tell a reader what mattered in ${span}.`,
     'Use ONLY facts stated in the BRIEF below. Do not add anything from memory.',
-    'STYLE: clear and direct, like a good markets newsletter. Short sentences. Calm, neutral tone. No hype. Give any term outside everyday finance words a plain definition of a few words in brackets.',
+    'STYLE: clear and direct, like a good markets newsletter. Short sentences. Calm, neutral tone. No hype. Give any term outside everyday finance words a plain definition of a few words in parentheses (never square brackets).',
     '- ORDER (most important first). Paragraph 1 = the Federal Reserve and the most important economic data in the BRIEF (inflation, jobs, GDP, rates, Treasury, BLS, BEA), with their numbers from NUMBERS. Paragraph 2 = market-moving news about large listed companies, one or two sentences each. Then a short paragraph on the other topics. Recalls, space and science items go last, and only if the BRIEF lists them.',
     '- The BRIEF lists its sections in this order already: NUMBERS, ECONOMY FED AND GOVERNMENT, COMPANIES AND MARKETS, OTHER NEWS, then RECALLS SPACE AND SCIENCE. Follow it. A single company filing never comes before an economic release.',
     '- Always mention the biggest economic numbers in NUMBERS that changed (for example GDP, payrolls, CPI, the unemployment rate, the 10-year yield) before any single company. Mention each number once.',

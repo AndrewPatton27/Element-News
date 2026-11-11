@@ -95,6 +95,13 @@ export const SERIES: Record<string, SeriesInfo> = {
  * what a reading will cause. Shown in the card body and in the detail sheet.
  */
 export const WHY: Record<string, string> = {
+  BLS_AHE: 'Wages are the biggest cost for most employers and the main income for most households, so this feeds into both prices and spending.',
+  BLS_ECI: 'It counts wages and benefits together and adjusts for shifts in the mix of jobs, so it is a cleaner read on labor costs than average pay.',
+  BLS_JOLTS: 'Job openings show how many positions employers want to fill, which is one way to see how tight the job market is.',
+  BEA_PCE_YOY: 'The Federal Reserve aims for 2% inflation as measured by this index, not by CPI.',
+  BEA_CORE_PCE_YOY: 'This is the version of the index the Federal Reserve watches most closely, because food and energy prices swing a lot.',
+  BEA_PERSONAL_INCOME: 'Household income is what spending is paid from, and spending is about two thirds of the economy.',
+  BEA_GDP: 'GDP is the broadest measure of the size of the U.S. economy.',
   DGS2: 'It shows borrowing costs at the short end of the Treasury market.',
   DGS3MO: "This is the shortest end of the Treasury curve, closest to the Fed's own short-term policy rate.",
   DGS5: 'It sits in the middle of the Treasury curve, between short-term and long-term borrowing costs.',
