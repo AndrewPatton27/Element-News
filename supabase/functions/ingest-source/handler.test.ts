@@ -34,7 +34,7 @@ function setup(o: { tick?: number; providers?: Summarizer[]; usage?: Record<stri
 test('options: source must be known; work_cap 1-20, default 5', () => {
   assert.deepEqual(parseIngestOptions({ source: 'fed' }), { source: 'fed', workCap: DEFAULT_WORK_CAP, finish: false });
   assert.equal(parseIngestOptions({ source: 'nasa', work_cap: '3', finish: 'true' }).workCap, 3);
-  for (const s of ['treasury', 'fedspeech', 'secpress']) assert.equal(parseIngestOptions({ source: s }).source, s);   // finance sources (2026-11-08)
+  for (const s of ['treasury', 'fedspeech', 'secpress', 'bls', 'beadata']) assert.equal(parseIngestOptions({ source: s }).source, s);   // finance sources (2026-11-08)
   assert.throws(() => parseIngestOptions({ source: 'guardian' }), /source must be one of/);
   assert.throws(() => parseIngestOptions({}), /source must be one of/);
   assert.throws(() => parseIngestOptions({ source: 'sec', work_cap: 0 }), /work_cap/);

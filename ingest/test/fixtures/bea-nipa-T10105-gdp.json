@@ -1,0 +1,220 @@
+{
+ "BEAAPI": {
+  "Request": {
+   "RequestParam": [
+    {
+     "ParameterName": "METHOD",
+     "ParameterValue": "GETDATA"
+    },
+    {
+     "ParameterName": "DATASETNAME",
+     "ParameterValue": "NIPA"
+    },
+    {
+     "ParameterName": "TABLENAME",
+     "ParameterValue": "T10105"
+    }
+   ]
+  },
+  "Results": {
+   "Statistic": "NIPA Table",
+   "UTCProductionTime": "2026-11-10T22:38:13.570",
+   "Dimensions": [
+    {
+     "Ordinal": "1",
+     "Name": "TableName",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "2",
+     "Name": "SeriesCode",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "3",
+     "Name": "LineNumber",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "4",
+     "Name": "LineDescription",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "5",
+     "Name": "TimePeriod",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "6",
+     "Name": "CL_UNIT",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "7",
+     "Name": "UNIT_MULT",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "8",
+     "Name": "METRIC_NAME",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "9",
+     "Name": "DataValue",
+     "DataType": "numeric",
+     "IsValue": "1"
+    }
+   ],
+   "Data": [
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2024Q1",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "28,793,191",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2024Q2",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "29,232,964",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2024Q3",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "29,568,256",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2024Q4",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "29,929,552",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2025Q1",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "30,171,979",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2025Q2",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "30,630,174",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2025Q3",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "31,180,493",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2025Q4",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "31,462,523",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2026Q1",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "31,906,274",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2026Q2",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "32,563,030",
+     "NoteRef": "T10105"
+    },
+    {
+     "TableName": "T10105",
+     "SeriesCode": "A191RC",
+     "LineNumber": "1",
+     "LineDescription": "Gross domestic product",
+     "TimePeriod": "2026Q3",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "33,010,036",
+     "NoteRef": "T10105"
+    }
+   ],
+   "Notes": [
+    {
+     "NoteRef": "T10105",
+     "NoteText": "Table 1.1.5. Gross Domestic Product [Billions of dollars] - LastRevised: October 29, 2026"
+    }
+   ]
+  }
+ }
+}

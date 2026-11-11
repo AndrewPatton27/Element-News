@@ -183,6 +183,8 @@ export const config = {
     'www.federalregister.gov', 'data.sec.gov',
     // Treasury FiscalData JSON API (average interest rates, debt to the penny): numbers only, never pages.
     'api.fiscaldata.treasury.gov',
+    // BLS public data API (series JSON, numbers only) and BEA data API (apps.bea.gov, already listed above for the RSS).
+    'api.bls.gov',
     // Broad topics (feed/API text only, never pages): Wikipedia REST featured feed, CPSC recalls API,
     // USGS earthquake GeoJSON, NASA news-release RSS.
     'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov'],
@@ -272,6 +274,27 @@ export const config = {
     } as Record<string, string>,
     // Only these series may become data cards (monthly series would otherwise give one card each per month).
     cardSeries: ['TREAS_AVG_NOTES'] as string[],
+  },
+  // BLS public data API (GET, one series per request; v1 needs no key: 25 requests/day, v2 with BLS_API_KEY: 500/day).
+  // Wages, Employment Cost Index and JOLTS: one data card per new period (monthly/quarterly), at most one run's
+  // worth of requests = series count. Both polled twice a day (cron), so about 6 requests/day on v1.
+  bls: {
+    base: 'https://api.bls.gov/publicAPI',
+    series: { CES0500000003: 'BLS_AHE', CIU1010000000000A: 'BLS_ECI', JTS000000000000000JOL: 'BLS_JOLTS' } as Record<string, string>,
+    attribution: 'Source: U.S. Bureau of Labor Statistics',
+  },
+  // BEA NIPA data API (GET, key = BEA_API_KEY; limits 100 requests, 100 MB, 30 errors per minute). OFF by default:
+  // the BEA API terms are not readable without signing in, so Drew confirms the reuse terms first (set BEA_DATA_ENABLED=1).
+  // One request per table; T20804 (PCE prices, monthly), T20600 (personal income, monthly), T10105 (GDP, quarterly).
+  beaData: {
+    enabled: false,
+    base: 'https://apps.bea.gov/api/data/',
+    tables: [
+      { table: 'T20804', frequency: 'M', yearsBack: 2, series: { DPCERG: 'BEA_PCE_YOY', DPCCRG: 'BEA_CORE_PCE_YOY' } },
+      { table: 'T20600', frequency: 'M', yearsBack: 1, series: { A065RC: 'BEA_PERSONAL_INCOME' } },
+      { table: 'T10105', frequency: 'Q', yearsBack: 1, series: { A191RC: 'BEA_GDP' } },
+    ] as { table: string; frequency: 'M' | 'Q'; yearsBack: number; series: Record<string, string> }[],
+    attribution: 'Source: U.S. Bureau of Economic Analysis',
   },
   // Federal Register final rules (JSON API, no key). The AI sees only each document's `abstract`;
   // documents without one are skipped. Reuse permitted (1 CFR 2.6); public-domain copy limit.

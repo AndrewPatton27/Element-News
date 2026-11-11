@@ -6,13 +6,14 @@
 import type { CardDetail, CategorySlug, MacroFact } from '../../../contract/types.ts';
 import { config } from '../config.ts';
 import type { MacroObservation, PublishPayload } from '../types.ts';
+import { AGENCY_SERIES } from './agencySeries.ts';
 
 // percent: level in %, change in points.  yoy: index level -> 12-month % change.
 // usd: dollar level (scaled), change in %.  number: a count (scaled), change as a count.
 type Unit = 'percent' | 'usd' | 'yoy' | 'number';
 export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
-interface SeriesInfo {
+export interface SeriesInfo {
   label: string;
   noun: string;                      // used in data-card headlines
   about: string;                     // plain explainer (a definition, not a claim about this reading)
@@ -28,7 +29,7 @@ interface SeriesInfo {
   source_short: string;
   sort_order: number;
   agency: { name: string; url: string; doc_label: string };   // primary source link on a data card
-  provider?: 'treasury';             // fetched from Treasury FiscalData, not FRED (fact links to the agency page)
+  provider?: 'treasury' | 'bls' | 'bea';   // fetched from the agency's own API, not FRED (fact links to the agency page)
   derived?: string;                  // computed by Element from other series (what from, in words)
   fredId?: string;                   // derived series: the FRED series its fact links to (it has no FRED page of its own)
 }
@@ -85,6 +86,7 @@ export const SERIES: Record<string, SeriesInfo> = {
   TREAS_AVG_BONDS: { label: 'Avg rate on T-bonds', noun: 'Average interest rate on Treasury bonds', about: 'what the government pays on its long-term borrowing, averaged over all bonds outstanding', unit: 'percent', decimals: 2, frequency: 'monthly', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 22, agency: AVG_RATES },
   TREAS_DEBT: { label: 'National debt', noun: 'Total U.S. national debt', about: 'everything the federal government owes', unit: 'usd', decimals: 2, frequency: 'daily', category: 'economy', provider: 'treasury', source_name: TREASURY, source_short: 'Treasury Fiscal Service', sort_order: 23,
     agency: { name: TREASURY, url: 'https://fiscaldata.treasury.gov/datasets/debt-to-the-penny/', doc_label: 'Debt to the Penny' } },
+  ...AGENCY_SERIES,
 };
 
 /**
@@ -260,7 +262,7 @@ function toMacroFact(o: MacroObservation): MacroFact {
     series_id: o.series_id, label: s.label, value: o.display_value, change: o.change_text,
     direction: o.direction, period: o.period_label, as_of: o.obs_date,
     source_name: s.source_name, source_short: s.source_short,
-    source_url: s.provider === 'treasury' ? s.agency.url : `https://fred.stlouisfed.org/series/${s.fredId ?? o.series_id}`, sort_order: s.sort_order,
+    source_url: s.provider ? s.agency.url : `https://fred.stlouisfed.org/series/${s.fredId ?? o.series_id}`, sort_order: s.sort_order,
   };
 }
 
@@ -337,7 +339,7 @@ export function buildDataCard(o: MacroObservation, extra: MacroObservation[] = [
     paragraphs: [
       `${reading} ${changeSentence}`,
       `What this number measures: ${s.about}. ${WHY[o.series_id] ?? ''}`.trim(),
-      s.provider === 'treasury' ? `The number comes from the ${s.agency.name}.`
+      s.provider ? `The number comes from the ${s.agency.name}.`
         : s.derived ? `Element worked this out from ${s.derived}, from the ${s.agency.name} through FRED.`
         : `The number comes from the ${s.agency.name}, shared through FRED.`,
     ],

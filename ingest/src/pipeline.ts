@@ -19,6 +19,7 @@ import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/f
 import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
 import { runMacro, runTreasury } from './macroRun.ts';
+import { runBeaData, runBls } from './agencyRun.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -31,8 +32,8 @@ import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, typ
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 
-export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
-export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
+export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata';
+export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -41,6 +42,8 @@ export interface Deps {
   providers: Summarizer[];
   counter: UsageCounter;
   fredApiKey: string | null;
+  /** BLS / BEA data API keys and the BEA data switch (agencyRun.ts); all optional */
+  keys?: { bls?: string | null; bea?: string | null; beaDataEnabled?: boolean };
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -134,6 +137,8 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
 
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('treasury')) await runTreasury(deps, stats);
+  if (only.has('bls')) await runBls(deps, stats);
+  if (only.has('beadata')) await runBeaData(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
   if (only.has('fedspeech')) await runFedSpeech(deps, ctx);
   if (only.has('secpress')) await runSecPress(deps, ctx);

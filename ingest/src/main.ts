@@ -6,7 +6,7 @@
 //              (--limit = max cards; with --dry-run: the cards in src/fixtures/rewrite-cards.json)
 //   --backfill-macro  one-off: FRED history for the Trends charts via api.upsert_macro (no data cards);
 //              --weeks N = weeks of history (default 16); with --dry-run: DGS10 fixture only
-//   --only     comma-separated subset of sources (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
+//   --only     comma-separated subset of sources (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
 //   --fix-category <card-id> <slug>   re-file one card (service role; api.set_card_category)
@@ -264,6 +264,7 @@ export async function main(argv: string[]): Promise<number> {
     providers,
     counter: fileCounter('state/ai-usage.json'),
     fredApiKey: env.fredApiKey,
+    keys: { bls: process.env.BLS_API_KEY?.trim() || null, bea: process.env.BEA_API_KEY?.trim() || null, beaDataEnabled: process.env.BEA_DATA_ENABLED === '1' },
     now: new Date(),
     log,
     reportCard: process.env.REPORT_CARD_PROTOCOL === '1' ? { enabled: true } : undefined,   // write -> score -> revise-once protocol, off by default
