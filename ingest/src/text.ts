@@ -3,7 +3,10 @@
 // list of common words are lowercased; every other word (company names, places, ALL-CAPS tickers,
 // acronyms, months, anything unknown) keeps its capitals. The first word is never changed.
 // mentionsProductCodes: finds outright mentions of model numbers, SKUs, UPCs and lot numbers.
+// fixProperNouns: deterministic casing fixer for AI text ("Nasa" -> "NASA", "mars" -> "Mars"); lists in config.
 // Inputs: a string. Outputs: a string or a list of matches.
+
+import { config } from './config.ts';
 
 /** Everyday words that are only capitalised in Title Case headlines. Names and places are NOT here on purpose. */
 const COMMON_LOWER: ReadonlySet<string> = new Set([
@@ -70,4 +73,54 @@ export function mentionsProductCodes(text: string): string[] {
   const hits = new Set<string>();
   for (const m of text.matchAll(/\b(?:SKUs?|UPCs?|GTINs?)\b|\b(?:model|lot|item|serial|batch)\s+(?:numbers?|nos?\b\.?|#|codes?)/gi)) hits.add(m[0].toLowerCase());
   return [...hits];
+}
+
+// ---- fixProperNouns (sum-v7) ------------------------------------------------------------------
+
+const escRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const titleCaseOf = (s: string): string => s[0] + s.slice(1).toLowerCase();
+
+/** Rules compiled once from config.properNounFixes (module load). */
+const FIXERS: { re: RegExp; to: (m: string, offset: number, whole: string) => string }[] = (() => {
+  const c = config.properNounFixes;
+  const out: { re: RegExp; to: (m: string, offset: number, whole: string) => string }[] = [];
+  // Acronyms: "Nasa" and "nasa" become "NASA". ALL CAPS text is left alone (already correct or a shouted headline).
+  for (const a of c.acronyms) {
+    out.push({ re: new RegExp(`(?<![A-Za-z0-9])(?:${escRe(titleCaseOf(a))}|${escRe(a.toLowerCase())})(?![A-Za-z0-9])`, 'g'), to: () => a });
+  }
+  // Ambiguous short forms: only the Title-case spelling, and not before a period or a hyphen ("Sec. 5", "Sec-ond").
+  for (const a of c.titleCaseOnlyAcronyms) {
+    out.push({ re: new RegExp(`(?<![A-Za-z0-9.])${escRe(titleCaseOf(a))}(?![A-Za-z0-9.\\-])`, 'g'), to: () => a });
+  }
+  for (const n of c.names) {
+    out.push({ re: new RegExp(`(?<![A-Za-z0-9])${escRe(n).replace(/\s+/g, '\\s+')}(?![A-Za-z0-9])`, 'gi'), to: (m) => (m === m.toUpperCase() ? m : n) });
+  }
+  if (c.usAbbreviation) out.push({ re: /(?<![A-Za-z0-9.])u\.s\.(?![A-Za-z0-9])/g, to: () => 'U.S.' });
+  return out;
+})();
+
+const NOT_THE_PLANET = /(?:full|new|blue|half|harvest|over the|once in a)\s+$/i;
+
+/** True when a space or mission word sits within 80 characters of `index` (so "mars" and "moon" are the places). */
+function nearSpaceWord(whole: string, index: number, length: number): boolean {
+  const near = whole.slice(Math.max(0, index - 80), index) + ' ' + whole.slice(index + length, index + length + 80);
+  return config.properNounFixes.spaceContext.test(near);
+}
+
+/**
+ * Deterministic casing fixer for AI text (headline, body, detail, brief summary). Run AFTER validation and
+ * before publish. Fixes "Nasa" -> "NASA", "Fcc" -> "FCC", "united states" -> "United States", "federal reserve",
+ * "u.s." -> "U.S.", and lower-case "mars" or "moon" when a space or mission word is next to them.
+ * Text that is already correct comes back identical (same string), and a second run changes nothing.
+ * One linear pass per rule; the rule list is fixed (config.properNounFixes).
+ */
+export function fixProperNouns(text: string): string {
+  if (!text) return text;
+  let s = text;
+  for (const f of FIXERS) s = s.replace(f.re, f.to);
+  s = s.replace(/(?<![A-Za-z0-9])(mars|moon)(?![A-Za-z0-9])/g, (m, _w, offset: number, whole: string) => {
+    if (NOT_THE_PLANET.test(whole.slice(Math.max(0, offset - 12), offset))) return m;
+    return nearSpaceWord(whole, offset, m.length) ? m[0].toUpperCase() + m.slice(1) : m;
+  });
+  return s;
 }

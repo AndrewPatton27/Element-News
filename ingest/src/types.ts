@@ -42,7 +42,7 @@ export interface SummaryDraft {
   category: string;
   event_type: string | null;
   tickers: string[];
-  /** AI only: 1-5, would a typical young adult notice or be affected? Not part of the card. */
+  /** AI only: 1-5, how much it matters to a reader who follows business, the economy, markets and investing (sum-v7 rubric). Stored on the card, not shown. */
   everyday_relevance?: number | null;
   /** In-depth summary (shown when the card is opened); null = none. */
   detail?: CardDetail | null;
@@ -92,6 +92,8 @@ export interface PublishPayload {
   prompt_version: string | null;
   attribution: string | null;
   detail?: CardDetail | null;
+  /** AI cards only: the 1-5 relevance score (stored on core.blurbs.everyday_relevance); null for template and data cards. */
+  everyday_relevance?: number | null;
   sources: {
     name: string;
     kind: SourceKind;
@@ -126,7 +128,7 @@ export interface RevisableCard {
 
 /** Payload for api.revise_blurb. */
 export type RevisePayload =
-  | { id: string; action: 'revise'; headline: string; body: string | null; ai_generated: boolean; model: string | null; prompt_version: string; detail: CardDetail | null }
+  | { id: string; action: 'revise'; headline: string; body: string | null; ai_generated: boolean; model: string | null; prompt_version: string; detail: CardDetail | null; everyday_relevance?: number | null }
   | { id: string; action: 'hide'; note: string };
 
 /** Payload for api.upsert_macro. */

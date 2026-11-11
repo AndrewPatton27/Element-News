@@ -14,6 +14,7 @@ Run `node -v` first. If it is below 22.18, install Node 24 LTS. There are no run
 cd ingest
 npm test                  # offline tests, no network, no keys
 npm run dry-run           # whole pipeline on fixtures, publishes nothing
+npm run prompt-tokens     # offline: estimated prompt size, sum-v6 vs the current prompt
 npm run ingest            # one live run (needs .env)
 node src/main.ts --once --only sec --limit 3
 node src/main.ts --dry-run --only bea   # sources: sec, fed, fedspeech, secpress, bea, fedreg, macro, treasury, wiki, cpsc, usgs, nasa
@@ -65,7 +66,7 @@ All in `src/config.ts`; the full explanation is in `ingest.md`.
 
 | Config value | Default | Meaning |
 |---|---|---|
-| `promptVersion` / `templateVersion` | `sum-v6` / `tpl-v5` | stored on each card; `--rewrite` redoes cards on any other version |
+| `promptVersion` / `templateVersion` | `sum-v7` / `tpl-v5` | stored on each card; `--rewrite` redoes cards on any other version |
 | `secExhibit.items` / `.types` / `.primaryMaxChars` | `['2.02']` / `['EX-99.1','EX-99.01','EX-99']` / `3000` | Item 2.02 filings also fetch the EX-99.1 press release (page host `www.sec.gov`) for the AI |
 | `earningsFigures.requiredItems` | `['2.02']` | an earnings card from these items needs a digit in its body (`no_figures`); template cards too |
 | `fedRegister.maxAirworthinessPerRun` | `1` | FAA airworthiness directives allowed per run (others: `skip faa_directive_cap`) |

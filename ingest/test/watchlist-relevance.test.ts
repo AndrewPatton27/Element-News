@@ -228,19 +228,21 @@ test('template wording is plain (no item numbers or "8-K" in the headline)', () 
 
 // ---- plain-language prompt --------------------------------------------------------------
 
-test('prompt: college-student audience, 8th-grade plain language, explain jargon, what happened first, relevance rubric', () => {
+test('prompt: everyday finance readers (16-50), 8th-grade plain language, defined jargon, subject-first headline, macro-first relevance rubric', () => {
   const it = { source: 'sec_8k', source_name: 'SEC', doc_label: 'Form 8-K', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'earnings', event_type: 'earnings' } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /college students and young adults/);
-  assert.match(p, /8th-grade reading level/);
-  assert.match(p, /short sentences\. No jargon/);
-  assert.match(p, /explain it in a few plain words/);
-  assert.match(p, /The headline says what happened\. Body sentence 1 does NOT say it again/);   // sum-v6: sentence 1 continues the headline
-  assert.match(p, /ONLY if that follows directly from the facts/);
+  assert.match(p, /busy everyday people interested in business, finance, stocks and investing \(about 16 to 50\)/);
+  assert.doesNotMatch(p, /college/i);
+  assert.match(p, /About an 8th-grade reading level/);
+  assert.match(p, /Short sentences, active voice/);
+  assert.match(p, /Define any other technical term in parentheses the first time/);
+  assert.match(p, /Body sentence 1 picks up where the headline stops/);   // sentence 1 continues the headline
+  assert.match(p, /ONLY when the source gives the reason/);
   assert.match(p, /aim for about 60/);
   assert.match(p, /"everyday_relevance": a whole number from 1 to 5/);
-  assert.match(p, /student loans, rent and prices, gas, travel and airfares/);
-  assert.match(p, /1 = institutional or routine paperwork/);
+  assert.match(p, /5 = moves markets or the economy/);
+  assert.match(p, /ordinary product recall: the default for recalls/);
+  assert.match(p, /1 = paperwork with no business effect/);
   assert.match(p, /HARD LIMITS.*headline at most 90 characters/);
   assert.ok(RESPONSE_SCHEMA.required.includes('everyday_relevance'));
   assert.equal(RESPONSE_SCHEMA.properties.everyday_relevance.type, 'INTEGER');

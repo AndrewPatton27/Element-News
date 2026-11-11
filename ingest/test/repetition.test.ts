@@ -142,16 +142,14 @@ test('chain: two repeating drafts fall back to the template card', async () => {
   assert.equal(r.ai_generated, false);
 });
 
-test('prompt (shared by Gemini and Groq): flow rules, bad/good example, retry hint; version sum-v6', () => {
+test('prompt (shared by Gemini and Groq): flow rules, bad/good example, retry hint; version sum-v7', () => {
   const prompt = buildPrompt({ item: gopro, text: 'SOURCE BODY' });
   assert.match(prompt, /FLOW AND NO REPETITION/);
-  assert.match(prompt, /NEVER restate the headline/);
-  assert.match(prompt, /Bad \(do not copy, example only\): headline "IRS lets people pay taxes by card"/);
-  assert.match(prompt, /Good \(example only\)/);
+  assert.match(prompt, /NEVER restate the headline's event or repeat its number/);
   assert.match(prompt, /Every sentence adds something new/);
   assert.match(prompt, /No filler/);
-  assert.match(prompt, /key_points add new facts and must NOT copy or reword the body sentences/);
+  assert.match(prompt, /key_points": 3 to 5 short sentences of at most 15 words each that add facts and do not reword the headline or body/);
   const retry = buildPrompt({ item: gopro, text: 'x', retryErrors: ['repetition: the first summary sentence repeats the headline'] });
-  assert.match(retry, /first sentence adds a NEW fact/);
-  assert.equal(config.promptVersion, 'sum-v6');
+  assert.match(retry, /each add a NEW fact instead of restating the headline/);
+  assert.equal(config.promptVersion, 'sum-v7');
 });

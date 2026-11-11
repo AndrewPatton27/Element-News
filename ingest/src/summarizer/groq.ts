@@ -8,7 +8,7 @@
 import { config, groqDailyCap, groqMinIntervalMs } from '../config.ts';
 import { fetchAllowed, type FetchLike } from '../allowlist.ts';
 import { AI_CATEGORY_SLUGS, assertPaidKeyFor } from '../validate.ts';
-import { buildPrompt, isDailyQuota, modelFallback, ProviderError, RateLimitedError, RELEVANCE_RUBRIC } from './gemini.ts';
+import { buildPrompt, isDailyQuota, modelFallback, ProviderError, RateLimitedError } from './gemini.ts';
 import type { Summarizer, SummaryDraft } from '../types.ts';
 
 type ResponseFormat = 'json_schema' | 'json_object';
@@ -20,12 +20,12 @@ export const GROQ_JSON_SCHEMA = {
   schema: {
     type: 'object',
     properties: {
-      headline: { type: 'string', description: `At most ${config.headlineMaxChars} characters.` },
+      headline: { type: 'string', description: `At most ${config.headlineMaxChars} characters. Sentence case with acronyms in capitals; starts with the subject; subject + verb + key fact.` },
       body: { type: ['string', 'null'], description: `2 or 3 sentences, at most ${config.bodyMaxWords} words.` },
       category: { type: 'string', enum: [...AI_CATEGORY_SLUGS] },
-      event_type: { type: ['string', 'null'] },
+      event_type: { type: ['string', 'null'], enum: [...config.aiEventTypes, null] },
       tickers: { type: 'array', items: { type: 'string' } },
-      everyday_relevance: { type: 'integer', description: `1 to 5. ${RELEVANCE_RUBRIC}` },
+      everyday_relevance: { type: 'integer', description: '1 to 5, scored with the rubric in the prompt.' },
       detail: {
         type: 'object',
         description: `In-depth version: ${config.detail.minParagraphs}-${config.detail.maxParagraphs} short paragraphs (<= ${config.detail.maxWords} words in total) and ${config.detail.minKeyPoints}-${config.detail.maxKeyPoints} key points (<= ${config.detail.keyPointMaxWords} words each).`,

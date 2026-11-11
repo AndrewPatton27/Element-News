@@ -174,7 +174,7 @@ test('rewrite: an earnings AI card gets the figures from EX-99.1; if the AI cann
   const s = await runRewrite(ok.deps);
   assert.equal(s.revised, 1);
   const [p] = ok.dry.revisions;
-  assert.ok(p.action === 'revise' && p.body === 'Apple reported revenue of $102.5 billion.' && p.prompt_version === 'sum-v6');
+  assert.ok(p.action === 'revise' && p.body === 'Apple reported revenue of $102.5 billion.' && p.prompt_version === 'sum-v7');
 
   const bad = rewriteRun([appleCard({ body: 'Apple filed a report.' })], [aiDraft('Apple shared results.'), templateSummarizer]);
   const s2 = await runRewrite(bad.deps);
@@ -276,8 +276,8 @@ test('product codes: validator rejects model number / SKU / UPC / lot number in 
 test('prompt: no model numbers/SKUs/UPCs/lot numbers in headline or body; key points only', () => {
   const it = { source: 'cpsc', source_name: 'CPSC', doc_label: 'Recall', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'safety', event_type: 'recall' } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /Never include model numbers, SKUs, UPCs or lot numbers in the headline or the body/);
-  assert.match(p, /put them in "detail"\.key_points only/);
+  assert.match(p, /Keep model numbers, SKUs, UPCs, lot numbers, docket, item or form numbers/);
+  assert.match(p, /out of the headline and body \("detail"\.key_points only\)|OUT of the headline and body \("detail"\.key_points only\)/);
 });
 
 test('CPSC template card: generic wording, no title, model numbers, SKUs or digits', () => {
@@ -324,16 +324,16 @@ test('template headlines are sentence case: Fed/BEA titles, SEC, Federal Registe
 test('prompt: sentence-case headline rule', () => {
   const it = { source: 'fed_rss', source_name: 'Fed', doc_label: 'Press release', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'policy', event_type: null } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /Use sentence case in the headline: capitalise only the first word and proper nouns/);
-  assert.match(p, /not "Primark Recalls Children's Coin Purses"/);
+  assert.match(p, /sentence case in the headline \(capitalise only the first word and proper nouns\)/);
+  assert.match(p, /"Nasa" and "mars" are errors/);
 });
 
 test('prompt: earnings cards must state figures; retry hint names no_figures; other cards do not get the block', () => {
   const gopro = classifySecEntry(parseSec8kAtom(fx('sec-8k-item-2.02.atom.xml'))[0], null);
   assert.ok('item' in gopro);
   const p = buildPrompt({ item: (gopro as { item: RawItem }).item, text: 'T' });
-  assert.match(p, /THIS IS AN EARNINGS CARD\. The body MUST state the real figures/);
-  assert.match(p, /never the filing itself/);
+  assert.match(p, /THIS IS AN EARNINGS CARD\. The body MUST state real figures/);
+  assert.match(p, /never the filing/);
   const retry = buildPrompt({ item: (gopro as { item: RawItem }).item, text: 'T', retryErrors: ['no_figures: an earnings card must state real figures'] });
   assert.match(retry, /Put the key figures from the source/);
   const restate = { ...(gopro as { item: RawItem }).item, items: items('4.02') };
@@ -342,7 +342,7 @@ test('prompt: earnings cards must state figures; retry hint names no_figures; ot
 
 // ---- (f) versions ---------------------------------------------------------------------------------
 
-test('versions: prompt sum-v6 and template tpl-v6 (the next --rewrite revisits every older card)', () => {
-  assert.equal(config.promptVersion, 'sum-v6');
+test('versions: prompt sum-v7 and template tpl-v6 (the next --rewrite revisits every older card)', () => {
+  assert.equal(config.promptVersion, 'sum-v7');
   assert.equal(config.templateVersion, 'tpl-v6');
 });

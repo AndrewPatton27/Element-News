@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --experimental-strip-types --test \"test/*.test.ts\"",
     "dry-run": "node src/main.ts --dry-run",
+    "prompt-tokens": "node --experimental-strip-types scripts/prompt-tokens.ts",
     "ingest": "node src/main.ts --once",
     "ingest:loop": "node src/main.ts --loop"
   }

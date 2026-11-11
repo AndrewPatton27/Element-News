@@ -3,7 +3,7 @@
 // api.put_brief_summary. Written ONLY from the cards and numbers inside the brief JSON.
 // Chain: Gemini -> Groq -> template (same keys, models and daily caps as the card pipeline).
 // Each AI draft is validated (sentence count, length, no advice words, every number in the brief,
-// copy limit, no repeated sentences) and retried once with the errors; a template summary built
+// copy limit, no repeated sentences, sum-v7 style / speculation / relative-time rules) and retried once with the errors; a template summary built
 // from the headlines is the last resort and never calls an AI.
 // Inputs: the brief JSON (public RPCs api.daily_brief / api.weekly_brief), AI keys, a usage counter.
 // Outputs: summary text + model name; with the service-role RPC, one row per (kind, for_date).
@@ -15,6 +15,8 @@ import { isDailyQuota, modelFallback, ProviderError, RateLimitedError } from './
 import type { UsageCounter } from './summarizer/chain.ts';
 import { checkRepetition, countWords, extractNumbers, findAdvice, longestCopiedRun, splitSentences } from './validate.ts';
 import { briefTier, orderBriefCards, type BriefTier } from '../../contract/briefOrder.ts';
+import { checkRelativeTime, checkSpeculation, checkStyle } from './styleChecks.ts';
+import { fixProperNouns } from './text.ts';
 import type { Brief, BlurbCard, MacroFact } from '../../contract/types.ts';
 
 export type BriefKind = 'daily' | 'weekly';
@@ -156,12 +158,12 @@ export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: 
   return lines.join('\n');
 }
 
-/** Cleans model output: trims, removes wrapping quotes, code fences and a leading label. */
+/** Cleans model output: trims, removes wrapping quotes, code fences and a leading label, fixes proper-noun casing (fixProperNouns). */
 export function cleanSummaryText(raw: string): string {
   let t = String(raw ?? '').trim().replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim();
   t = t.replace(/^(?:summary|brief summary)\s*:\s*/i, '');
   if (/^["“].*["”]$/s.test(t)) t = t.slice(1, -1).trim();
-  return t.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n');
+  return fixProperNouns(t.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n'));   // sum-v7: Nasa -> NASA
 }
 
 /** Validation errors for a summary against the brief text it was written from ([] = ok). */
@@ -186,6 +188,10 @@ export function validateBriefSummary(text: string, source: string): string[] {
   const run = longestCopiedRun(text, source);
   if (run > c.summaryCopyLimitWords) errors.push(`copies ${run} consecutive words from the brief (limit ${c.summaryCopyLimitWords})`);
   errors.push(...checkRepetition('', text));
+  // sum-v7: style, no speculation, no relative time except the brief's own span words, no "Meanwhile" stitching
+  errors.push(...checkStyle({ paragraphs: text.split(/\n\s*\n/) }));
+  errors.push(...checkSpeculation(text, source), ...checkRelativeTime(text, source, ['today', 'this week']));
+  if (/\b(?:Meanwhile|In other news)\b/i.test(text)) errors.push('style: do not join unrelated items with "Meanwhile" or "In other news"');
   return errors;
 }
 

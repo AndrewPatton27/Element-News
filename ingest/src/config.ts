@@ -35,15 +35,16 @@ export const config = {
     freeRpd: 1000 as number | null,
     freeTpm: 8000 as number | null,
     freeTpd: 200_000 as number | null,
-    // Tokens are the binding limit, so Groq gets less source text than Gemini. About 2.7k tokens per
-    // call since sum-v3 (prompt ~1.9k incl. 6,000 chars of source + ~0.8k output with the detail).
+    // Tokens are the binding limit, so Groq gets less source text than Gemini. 2,700 tokens per call with sum-v6
+    // (an estimate, never measured on Groq). sum-v7 (2026-11-10): the same two live Gemini calls with the same source text
+    // measured +515 prompt tokens (earnings 4,239 -> 4,754, recall 1,914 -> 2,429), so 2,700 + 515 = 3,215.
     sourceTextMaxChars: 6000,
-    estimatedTokensPerCall: 2700,
-    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 25.4 s,
+    estimatedTokensPerCall: 3215,
+    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 30.1 s,
     // this floor). The floor leaves room
     // for reasoning tokens we cannot measure offline.
     minIntervalMsFloor: 30_000,
-    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 74).
+    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 62; was 74 with sum-v6). core.ai_caps holds the live copy (reserve 5 for the brief).
     dailyCapCode: 80,
   },
   // Pacing safety margin for every AI provider: interval = ceil(60 s / (RPM * factor)).
@@ -58,7 +59,10 @@ export const config = {
   // numbers/SKUs/UPCs/lot numbers in the headline or summary, sentence-case headlines.
   // v6 (2026-10-18): flow and no repetition (D-58): the first body sentence continues from the headline
   // instead of restating it, no sentence repeats another, no filler; the validator rejects repetition.
-  promptVersion: 'sum-v6',
+  // v7 (2026-11-10, D-111/D-123): readers who follow business, finance and investing (about 16-50, plain 8th-grade words),
+  // macro-first relevance rubric, defined jargon, one direction word, numerals for dates, no field labels, no speculation or
+  // relative time. Validators: style:, speculation:, relative_time:, event_type enum, extended repetition; fixProperNouns.
+  promptVersion: 'sum-v7',
   // Version stored on template and data cards (no AI). tpl-v2 = plain wording (2026-10-17).
   // `--rewrite` redoes every published card whose prompt_version is neither this nor promptVersion.
   // v4: plain USGS headline+body and plain Federal Register headline. v5: sentence-case template headlines,
@@ -128,6 +132,9 @@ export const config = {
     // words also appears in it (or it starts with the headline text). Tuned on the fixtures: a normal
     // first sentence reuses the entity and the topic noun (about 0.3 to 0.5), a restatement reuses nearly all.
     headlineOverlapMax: 0.7,
+    // Same test for the detail (paragraph 1 and key point 1 against the headline). Live sum-v7 runs dropped the detail in about 1 of 4
+    // cards for this reason; raise it (for example to 0.85) to keep more details, lower it to be stricter.
+    detailHeadlineOverlapMax: 0.7,
     minHeadlineWords: 3,                       // a headline with fewer content words is only checked for "starts with"
     // (b) two summary sentences are near-duplicates when this share of the shorter one's content words
     // appears in the other.
@@ -159,6 +166,38 @@ export const config = {
   // Everywhere else they stay blocked. Investment words (buy, sell, price target, ...) are never
   // here, so investment advice stays blocked on safety cards too.
   safetyAdviceAllowlist: ['should'],
+  // Blocklist phrases that read as advice ONLY in market talk. "to the moon" is a stock-pump slogan, but also
+  // plain English in "missions to the Moon" (NASA cards were rejected for it, sum-v7 test). The phrase is blocked
+  // only when the same text also has one of these market words.
+  adviceMarketContext: {
+    'to the moon': /\b(stocks?|shares?|prices?|crypto|bitcoin|ethereum|tokens?|coins?|rally|rallies|market|markets|trad(?:e|es|ing|er|ers)|invest(?:or|ors|ing|ment|ments)?|portfolio)\b/i,
+  } as Readonly<Record<string, RegExp>>,
+
+  // sum-v7 validators (AI drafts only). Each word or phrase is an error when it is in the draft but NOT in the source text.
+  speculationWords: ['could', 'might', 'likely', 'is expected to', 'are expected to', 'is set to', 'are set to', 'poised to', 'may'] as readonly string[],
+  relativeTimeWords: ['today', 'yesterday', 'tomorrow', 'this week', 'next week', 'last week', 'this month', 'next month', 'last month', 'days away'] as readonly string[],
+  // Event types the AI may choose (schema enum and checkShape). Code sets world_event, recall, science and so on.
+  aiEventTypes: ['earnings', 'exec_change', 'deal', 'insider', 'macro_release', 'fed'] as readonly string[],
+  // Number tolerance (safety net, audit item 9): a draft figure that has a scale word ("1.5 billion") is also accepted when
+  // the source has the same value one scale step away ("1,500 million"). Percent figures stay exact. Never rounds.
+  numberScaleTolerance: true,
+  // fixProperNouns (text.ts): deterministic casing fixer for AI text, run after validation. Short, reviewed lists.
+  // acronyms: Title-case and lower-case forms become upper case ("Nasa" -> "NASA"). names: any non-upper-case spelling
+  // becomes the canonical one. Anything already correct is never changed.
+  properNounFixes: {
+    acronyms: ['NASA', 'FCC', 'FAA', 'FOMC', 'FDA', 'FDIC', 'CFPB', 'CFTC', 'CPSC', 'USGS', 'OPEC', 'FTC', 'IRS', 'EPA', 'DOJ', 'GDP', 'CPI', 'BLS', 'BEA'] as readonly string[],
+    // "Sec" is a real abbreviation too (seconds, "Sec. 5"), so it is fixed only as a bare word that is not followed by a period.
+    titleCaseOnlyAcronyms: ['SEC'] as readonly string[],
+    names: [
+      'United States', 'Federal Reserve', 'Federal Open Market Committee', 'Social Security', 'Wall Street', 'Medicare', 'Medicaid',
+      'Treasury Department', 'White House', 'Supreme Court', 'Congress',
+    ] as readonly string[],
+    usAbbreviation: true,                      // "u.s." -> "U.S."
+    // Mars and Moon are also common words: fixed only when a space or mission word is near.
+    spaceContext: /\b(nasa|moon|mars|lunar|astronauts?|missions?|rovers?|spacecraft|planets?|orbit|artemis|crew|rocket|rockets)\b/i,
+  },
+  // `--rewrite` stops hiding cards (keeps them) once hidden / selected passes this share (same idea as reportCard.auditHideMaxFraction).
+  rewriteHideMaxFraction: 0.4,
 
   // Candidate selection (run-wide budget): every source's candidates are collected first (no AI call), scored
   // without AI, and the run's budget (default 20 new items) is spent on the best ones. enabled=false = the old
@@ -563,6 +602,9 @@ export const config = {
     summaryMinSentences: 8,
     summaryMaxSentences: 26,
     summaryMaxWords: 290, summaryMinWords: 200, summaryTargetWords: 250, summaryParagraphs: [3, 4] as readonly number[],
+    // Topic sections with these categories are left out of the text the AI summarizes (recalls and space or science items belong
+    // in the summary only when they are TOP STORIES: sum-v7 brief rule; the model ignored the written rule in 3 of 3 live runs).
+    summarySkipSectionCategories: ['safety', 'science'] as readonly string[],
     summaryCopyLimitWords: 10,                 // longest run copied from the brief's own cards (they are already short rewrites)
     summaryMaxTokens: 3000,                     // includes Groq reasoning tokens
     // Email provider. 'outbox' writes files; 'resend' needs RESEND_API_KEY + EMAIL_FROM + the --send flag.

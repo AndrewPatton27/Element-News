@@ -109,7 +109,8 @@ export interface Source {
 }
 
 /**
- * In-depth summary shown when a card is opened. Plain language (about 8th-grade level):
+ * In-depth summary shown when a card is opened. Plain words for readers who follow business and markets
+ * (about 8th-grade level; uncommon terms are explained in a few words):
  * 2-4 short paragraphs (<= 180 words in total) and 3-5 key points (each <= 15 words).
  * Same rules as the card: facts from the source only, no advice, no predictions.
  */
