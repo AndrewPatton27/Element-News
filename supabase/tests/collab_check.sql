@@ -268,7 +268,7 @@ begin
   if jsonb_array_length(api.feed_for_you() -> 'items') <> 20 then raise exception 'FAIL: api.feed_for_you() with defaults broke'; end if;
   select string_agg(key, ',' order by key) into got from jsonb_object_keys(api.feed_for_you(null, 10)->'items'->0) key;
   select string_agg(key, ',' order by key) into a1
-    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null}'::jsonb) key;
+    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null,"reason":null}'::jsonb) key;
   if got is distinct from a1 then raise exception 'FAIL: card keys differ: % vs %', got, a1; end if;
 
   -- ---- 8. quality: a smoothed "opened when shown" rate reaches Trending -----------------

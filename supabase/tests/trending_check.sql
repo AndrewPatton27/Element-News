@@ -216,7 +216,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
   select string_agg(key, ',' order by key) into k1 from jsonb_object_keys(api.feed_for_you(null, 10)->'items'->0) key;
   select string_agg(key, ',' order by key) into k2
-    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null}'::jsonb) key;
+    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null,"reason":null}'::jsonb) key;
   if k1 is distinct from k2 then raise exception 'FAIL: card keys differ: % vs %', k1, k2; end if;
   if k1 not like '%detail%' then raise exception 'FAIL: detail key missing'; end if;
   if (api.feed('top', null, 10)->'items'->0) ? 'my_reaction' then raise exception 'FAIL: api.feed leaks my_reaction'; end if;
