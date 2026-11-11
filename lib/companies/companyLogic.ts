@@ -120,10 +120,10 @@ export function parseCardCompanies(x: unknown): Record<string, CardCompany[]> {
 
 // ---- wording ---------------------------------------------------------------------------------
 
-/** "12 cards in 30 days", "1 card in 30 days", "No cards in 30 days". */
+/** "12 cards in 30 days", "1 card in 30 days", "No cards in the last 30 days" (says what the window is, not that there is no news). */
 export function cardCountText(c: Pick<CompanySummary, 'card_count' | 'days'>): string {
   const days = `${c.days} day${c.days === 1 ? '' : 's'}`;
-  if (c.card_count <= 0) return `No cards in ${days}`;
+  if (c.card_count <= 0) return `No cards in the last ${days}`;
   return `${c.card_count} card${c.card_count === 1 ? '' : 's'} in ${days}`;
 }
 
