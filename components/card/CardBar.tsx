@@ -37,7 +37,8 @@ export function BarSource({ card, onPress, timeLabel, size = 'phone', link, link
   // also holds the Next hint and would cut it to a stub); it truncates before the agency name.
   const doc = wide && showDoc && m.docLabel && m.shortName.length <= WIDE_DOC_LABEL_MAX_NAME ? m.docLabel : null;
   const name = m.shortName;
-  const time = wide ? m.time : m.timeShort;
+  // Phone bars drop the "Added " prefix ("50 min"): it only made the label too long to fit beside a short agency name (R-403).
+  const time = wide ? m.time : m.timeShort.replace(/^Added /, '');
   return (
     <Pressable
       onPress={onPress}
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
   source: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, maxWidth: '100%', paddingRight: 6, flexShrink: 1 },
   glyph: { flexShrink: 0 },
   doc: { flexShrink: 1, minWidth: 0, fontFamily: fonts.sans },
-  name: { flexShrink: 1, minWidth: 36, fontFamily: fonts.sansSemi, fontSize: 14 },
+  name: { flexShrink: 1, minWidth: 30, fontFamily: fonts.sansSemi, fontSize: 14 },
   nameWide: { fontSize: 15 },
   nameSmall: { fontSize: 13 },
   // R-403: a long time label ("As of Nov 11" on a data card) used to squeeze a short agency name down to "F". The time now

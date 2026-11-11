@@ -116,7 +116,7 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 
 - `States.tsx`: `BriefSkeleton` (a lead card plus two story tiles, still, same radius as the real Brief) replaces the spinner while the Brief loads.
 - `SortToggle.tsx`: under 380 px wide the three tabs use 10 px side padding (14 px elsewhere) so the header no longer runs past the screen edge on a 360 px phone.
-- `CardBar.tsx`: the time label (`As of Nov 11`, `Added 50 min`) now truncates before the agency name (flexShrink 4 against 1, name keeps at least 36 px); before, a short name like "Fed" was squeezed to "F".
+- `CardBar.tsx`: the time label (`As of Nov 11`, `Added 50 min`) now truncates before the agency name (flexShrink 4 against 1, name keeps at least 30 px; phone bars drop the "Added " prefix); before, a short name like "Fed" was squeezed to "F".
 - `BriefLead.tsx`: rows are 44 px tall (were 36).
 - `SearchSuggestions.tsx`: headlines get 3 lines on phones (the topic button is 112 px max) instead of cutting at 2.
 - `DetailBody.tsx` uses `detailKeyPoints` (`lib/shared/detail.ts`): no "Source: ..." bullet (the source line and Sources list say it) and, on a data card, no bullet that repeats a number from the numbers panel.
