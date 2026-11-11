@@ -24,6 +24,8 @@ export interface FunctionEnv {
   blsApiKey: string | null;        // optional: switches the BLS source to API v2 (500 requests/day)
   beaApiKey: string | null;
   beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
+  occEnabled: boolean;             // REGPRESS_OCC_ENABLED=1 turns the OCC press-release feed on (no readable reuse terms)
+  annualEnabled: boolean;          // ANNUAL_FIGURES_ENABLED=1 turns the annual figures source (SSA COLA ...) on
   eiaApiKey: string | null;
   censusApiKey: string | null;
   newsdataApiKey: string | null;   // NEWSDATA_API_KEY: link-out source; none = it does nothing
@@ -49,6 +51,8 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     blsApiKey: clean(get('BLS_API_KEY')),
     beaApiKey: clean(get('BEA_API_KEY')),
     beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
+    occEnabled: (get('REGPRESS_OCC_ENABLED') ?? '').trim() === '1',
+    annualEnabled: (get('ANNUAL_FIGURES_ENABLED') ?? '').trim() === '1',
     eiaApiKey: clean(get('EIA_API_KEY')),
     censusApiKey: clean(get('CENSUS_API_KEY')),
     newsdataApiKey: clean(get('NEWSDATA_API_KEY')),

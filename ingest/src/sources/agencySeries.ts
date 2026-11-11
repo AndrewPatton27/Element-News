@@ -23,4 +23,12 @@ export const AGENCY_SERIES: Record<string, SeriesInfo> = {
     source_name: BEA, source_short: 'BEA', sort_order: 65, agency: { name: BEA, url: 'https://www.bea.gov/data/income-saving/personal-income', doc_label: 'Personal income' } },
   BEA_GDP: { label: 'GDP (dollars)', noun: 'U.S. GDP', about: 'the total value of everything the U.S. economy produces, at a yearly rate', unit: 'usd', decimals: 2, suffix: ' (annual rate)', frequency: 'quarterly', category: 'economy', provider: 'bea',
     source_name: BEA, source_short: 'BEA', sort_order: 66, agency: { name: BEA, url: 'https://www.bea.gov/data/gdp/gross-domestic-product', doc_label: 'Gross domestic product' } },
+  BLS_CPI_FOOD_HOME: { label: 'Grocery prices (yearly)', noun: 'Grocery prices', about: 'the yearly change in what households pay for food bought at stores', unit: 'yoy', decimals: 1, frequency: 'monthly', category: 'economy', provider: 'bls',
+    source_name: BLS, source_short: 'BLS', sort_order: 86, agency: { name: BLS, url: 'https://www.bls.gov/cpi/', doc_label: 'Consumer Price Index, food at home' } },
+  BLS_CPI_RENT: { label: 'Rent (yearly)', noun: 'Rent', about: 'the yearly change in what tenants pay for their primary residence', unit: 'yoy', decimals: 1, frequency: 'monthly', category: 'economy', provider: 'bls',
+    source_name: BLS, source_short: 'BLS', sort_order: 87, agency: { name: BLS, url: 'https://www.bls.gov/cpi/', doc_label: 'Consumer Price Index, rent of primary residence' } },
+  BLS_CPI_ELECTRICITY: { label: 'Electricity prices (yearly)', noun: 'Electricity prices', about: 'the yearly change in what households pay for electricity', unit: 'yoy', decimals: 1, frequency: 'monthly', category: 'economy', provider: 'bls',
+    source_name: BLS, source_short: 'BLS', sort_order: 88, agency: { name: BLS, url: 'https://www.bls.gov/cpi/', doc_label: 'Consumer Price Index, electricity' } },
+  BLS_CPI_MEDICAL: { label: 'Medical care prices (yearly)', noun: 'Medical care prices', about: 'the yearly change in what people pay for doctors, hospitals, drugs and health insurance', unit: 'yoy', decimals: 1, frequency: 'monthly', category: 'economy', provider: 'bls',
+    source_name: BLS, source_short: 'BLS', sort_order: 89, agency: { name: BLS, url: 'https://www.bls.gov/cpi/', doc_label: 'Consumer Price Index, medical care' } },
 };

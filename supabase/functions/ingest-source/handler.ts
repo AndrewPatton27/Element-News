@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, newsdata_market, newsdata_latest),
+// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, beige, trade, regpress, annual, newsdata_market, newsdata_latest),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
@@ -103,7 +103,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       providers,
       counter: tracker.counter,
       fredApiKey: env.fredApiKey,
-      keys: { bls: env.blsApiKey, bea: env.beaApiKey, beaDataEnabled: env.beaDataEnabled },
+      keys: { bls: env.blsApiKey, bea: env.beaApiKey, beaDataEnabled: env.beaDataEnabled, annualEnabled: env.annualEnabled, occEnabled: env.occEnabled },
       eiaApiKey: env.eiaApiKey,
       censusApiKey: env.censusApiKey,
       // NewsData.io credits: one atomic database take per request (core.ai_usage, provider 'newsdata'), cap = the daily credit budget
