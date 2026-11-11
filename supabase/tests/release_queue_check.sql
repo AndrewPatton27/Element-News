@@ -99,3 +99,17 @@ begin
 
   raise exception 'ALL RELEASE QUEUE CHECKS PASSED';
 end $$;
+
+-- M9c fix: a deep queue is released faster (20261143000000)
+do $$
+declare v_n int; v_rel int;
+begin
+  update core.drip_config set enabled = true, window_start_hour_et = 0, window_end_hour_et = 24, weekdays_only = false;
+  delete from core.blurbs where status = 'queued';
+  insert into core.blurbs (id, kind, status, headline, body, category, published_at, sort_at, queued_at, importance)
+    select gen_random_uuid(), 'summary', 'queued', 'queued ' || g, 'b', 'Business', now() - interval '3 hours', now() - interval '3 hours', now() - interval '2 hours', 1
+    from generate_series(1, 48) g;
+  v_rel := core.release_queued_cards(now() + interval '5 hours');
+  if v_rel <> 3 then raise exception 'FAIL: deep queue (48) should release ceil(48/16)=3 per run, released %', v_rel; end if;
+  delete from core.blurbs where headline like 'queued %';
+end $$;
