@@ -18,7 +18,7 @@ export const REPORT_REASONS = [
 ] as const;
 
 export type ReportReason = (typeof REPORT_REASONS)[number]['code'];
-export type ReportStatus = 'ok' | 'invalid' | 'unavailable' | 'error';
+export type ReportStatus = 'ok' | 'invalid' | 'unavailable' | 'rate_limited' | 'error';
 export interface ReportResult { ok: boolean; status: ReportStatus }
 
 const ID = /^[0-9a-z][0-9a-z_-]{0,63}$/i;
@@ -35,6 +35,7 @@ export function isValidReport(cardId: unknown, reason: unknown): boolean {
 export function reportToast(r: ReportResult): string {
   if (r.ok) return 'Thanks. We will take a look.';
   if (r.status === 'unavailable') return 'Reporting is not available yet.';
+  if (r.status === 'rate_limited') return 'You have sent a lot of reports. Try again in an hour.';
   if (r.status === 'invalid') return 'That report could not be sent.';
   return 'Could not send the report. Try again later.';
 }

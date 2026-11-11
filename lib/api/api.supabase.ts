@@ -261,7 +261,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
         // a void RPC answers with an empty body, so read only the status (not call(), which parses JSON)
         const res = await doFetch(`${opts.url}/rest/v1/rpc/report_blurb`, { method: 'POST', headers, body: JSON.stringify({ p_id: cardId, p_reason: reason }) });
         if (res.ok) return { ok: true, status: 'ok' };
-        return { ok: false, status: res.status === 404 ? 'unavailable' : 'error' };
+        return { ok: false, status: res.status === 404 ? 'unavailable' : res.status === 429 ? 'rate_limited' : 'error' };
       } catch {
         return { ok: false, status: 'error' };
       }
