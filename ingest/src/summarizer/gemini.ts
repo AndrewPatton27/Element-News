@@ -192,11 +192,15 @@ export function createGeminiSummarizer(opts: {
   dailyCap?: number;
   timeoutMs?: number;
   fallbackModel?: string | null;
+  /** false = no second-model attempt after an HTTP 5xx (tests). Default: on. */
+  overloadFallback?: boolean;
   /** true only for a paid (billing-enabled) key; rule 3: Guardian text is refused otherwise. Default false (D-13 free tier). */
   paidKey?: boolean;
 }): Summarizer {
   const mf = modelFallback(opts.model ?? config.gemini.model, opts.fallbackModel === undefined ? config.gemini.fallbackModel : opts.fallbackModel);
   const paidKey = opts.paidKey === true;
+  const primaryModel = opts.model ?? config.gemini.model;
+  const fallbackName = opts.fallbackModel === undefined ? config.gemini.fallbackModel : opts.fallbackModel;
   return {
     name: 'gemini',
     usesAi: true,
@@ -207,7 +211,7 @@ export function createGeminiSummarizer(opts: {
     minIntervalMs: opts.minIntervalMs ?? minIntervalMs(config.gemini.freeRpm, 5000),
     async summarize(input): Promise<SummaryDraft> {
       assertPaidKeyFor(input.item, { name: 'gemini', paidKey });   // rule 3, before any request
-      const res = await mf.call((model) => fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
+      const send = (model: string) => fetchAllowed(config.gemini.endpoint.replace('{model}', model), {
         kind: 'api',
         method: 'POST',
         fetchImpl: opts.fetchImpl,
@@ -222,7 +226,18 @@ export function createGeminiSummarizer(opts: {
             responseSchema: RESPONSE_SCHEMA,
           },
         }),
-      }), input.onExtraCall);
+      });
+      let res = await mf.call(send, input.onExtraCall);
+      // M9c (R-300): HTTP 500/502/503/504 ("model overloaded", 7 of 25 live calls on 2026-11-10) used to send the item straight to
+      // Groq (30 s pacing, 62 calls a day). The other Gemini model has its own capacity and its own free quota: try it once
+      // before giving up on Gemini. The extra request is counted against the daily cap like any other.
+      if (res.status >= 500 && res.status <= 504 && opts.overloadFallback !== false) {
+        const other = mf.model === primaryModel ? (fallbackName ?? null) : primaryModel;
+        if (other && other !== mf.model) {
+          input.onExtraCall?.();
+          res = await send(other);
+        }
+      }
       if (res.status === 429) throw new RateLimitedError('gemini', isDailyQuota(res.text));
       if (res.status < 200 || res.status >= 300) {
         throw new ProviderError(`gemini: HTTP ${res.status}: ${res.text.slice(0, 200)}`);

@@ -199,6 +199,17 @@ export const config = {
   // `--rewrite` stops hiding cards (keeps them) once hidden / selected passes this share (same idea as reportCard.auditHideMaxFraction).
   rewriteHideMaxFraction: 0.4,
 
+  // M9c yield work (R-300). An item whose AI drafts were all rejected and that could not become a template card used to stay
+  // 'new' for ever, so the same item (Best Buy 2.02, Aug 27) used 2 Gemini + 2 Groq calls EVERY hour (96 calls a day, the
+  // whole Groq cap). Such an item is now retried at most this many times (counter in status_note 'retry:<n>:<code>'), then skipped.
+  // Outcomes where no AI was reachable at all (cap, rate limit) are not counted: they stay 'new' for free.
+  softRetry: { maxFailures: 3 },
+  // Edge Function work cap (new items per call) when the request gives none; MAX_WORK_CAP 20 still applies. 'sec' is higher:
+  // 523 filings are listed per run, earnings season brings dozens of real new ones, and each takes about 10 s (Gemini pacing 5 s
+  // plus 2-3 page fetches) inside the 100 s soft budget. Routine 5.02 skips do not count towards it (guardPublisher refund).
+  workCapBySource: { sec: 10 } as Record<string, number>,
+  defaultWorkCap: 5,
+
   // Candidate selection (run-wide budget): every source's candidates are collected first (no AI call), scored
   // without AI, and the run's budget (default 20 new items) is spent on the best ones. enabled=false = the old
   // fixed source order (macro, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa), each source taking what it wants.
@@ -433,7 +444,10 @@ export const config = {
   secTickersUrl: 'https://www.sec.gov/files/company_tickers_exchange.json',
   // Per-company filing list (JSON, data.sec.gov, API host list). {cik} = 10-digit CIK.
   secSubmissionsUrl: 'https://data.sec.gov/submissions/CIK{cik}.json',
-  secLookbackDays: 90,                        // per-company 8-Ks filed within this many days
+  // Per-company 8-Ks filed within this many days. Was 90 (laptop backfill): every hourly run then re-listed ~520 filings, 100 old ones sat
+  // unfinished for weeks and a run could not reach its tail inside the time budget. 21 days keeps the per-company lists useful as a
+  // safety net for the 40-entry current feed without stale quarter-old cards (M9c, R-300).
+  secLookbackDays: 21,
   // Earnings press release. An Item 2.02 8-K is usually a cover page; the figures sit in the EX-99.1
   // exhibit (a page on www.sec.gov, so the page host list already allows it). For a filing with one of
   // these items the exhibit is fetched through the same limiter and cache and its text goes to the AI
@@ -476,7 +490,7 @@ export const config = {
   topRolePattern: /\b(chief executive officer|chief financial officer|ceo|cfo|chair|chairman|chairwoman|chairperson|(?<!vice )president)\b/i,
   roleChangePattern: /\b(resign\w*|retire\w*|appoint\w*|depart\w*|step(?:s|ped)? down|succeed\w*|successor|named|terminat\w*|separat\w*|transition\w*)\b/i,
   // Template cards (no AI, so no relevance score) only for these items of watch-list companies.
-  templateSecItems: ['2.02', '5.02', '1.05', '4.02', '2.05', '2.03'],
+  templateSecItems: ['2.02', '5.02', '1.05', '4.02', '2.05', '2.03', '1.01', '2.01'],   // 1.01 material agreement, 2.01 completed acquisition or sale (M9c, R-300)
   // AI everyday_relevance score (1-5) below this: the card is not published (logged as low_relevance).
   minEverydayRelevance: 3,
   // Optional boost for watch-list cards. NOT applied: importance is computed only in the ranking SQL

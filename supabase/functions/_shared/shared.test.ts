@@ -162,6 +162,27 @@ test('guardPublisher: work cap and deadline defer items without writing them', a
   assert.deepEqual([g.counts.itemsNew, g.counts.deferredCap, g.counts.deferredTime, g.counts.stoppedBy], [2, 1, 1, 'time']);
 });
 
+test('guardPublisher: a routine 5.02 skip (closed before any AI call) gives its work-cap slot back; other skips do not', async () => {
+  const b = createTimeBudget({ now: fakeClock().now });
+  const dry = createDryRunPublisher();
+  const set: string[] = [];
+  const base = { ...dry.publisher, setItemStatus: async (_id: string, st: string, note: string) => { set.push(`${st}:${note}`); } };
+  const g = guardPublisher(base, b, 2);
+  const it = (n: number) => ({ ...item, url: `https://www.sec.gov/r${n}` }) as RawItem;
+  const a = await g.publisher.upsertItem(it(1));
+  await g.publisher.setItemStatus(a.id, 'skipped', 'routine_5.02');
+  const c = await g.publisher.upsertItem(it(2));
+  await g.publisher.setItemStatus(c.id, 'skipped', 'low_relevance (2)');        // one AI call was spent: keeps its slot
+  assert.equal(g.counts.itemsNew, 1, 'routine slot refunded, low_relevance slot kept');
+  assert.equal((await g.publisher.upsertItem(it(3))).is_new, true);
+  assert.equal((await g.publisher.upsertItem(it(4))).status, 'deferred', 'cap 2 reached again');
+  assert.deepEqual(set, ['skipped:routine_5.02', 'skipped:low_relevance (2)']);
+  await g.publisher.setItemStatus(a.id, 'skipped', 'routine_5.02');
+  await g.publisher.setItemStatus(a.id, 'skipped', 'routine_5.02');
+  await g.publisher.setItemStatus(a.id, 'skipped', 'routine_5.02');
+  assert.ok(g.counts.itemsNew >= 0, 'never negative');
+});
+
 test('guardFetch: no request after the hard deadline', async () => {
   const c = fakeClock();
   const b = createTimeBudget({ now: c.now });

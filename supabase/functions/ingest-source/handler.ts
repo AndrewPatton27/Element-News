@@ -20,7 +20,9 @@ import { createServiceRpc, type Rpc } from '../_shared/rpc.ts';
 import { buildRunSummary, runLogPayload, startRunLog, type RunSummary } from '../_shared/runSummary.ts';
 import { createUsageTracker, rpcUsageStore, withUsage, type UsageStore } from '../_shared/usage.ts';
 
-export const DEFAULT_WORK_CAP = 5;
+export const DEFAULT_WORK_CAP = config.defaultWorkCap;
+/** Work cap when the request gives none: config.workCapBySource (sec 10) or the default 5. */
+export function defaultWorkCapFor(source: string): number { return config.workCapBySource[source] ?? DEFAULT_WORK_CAP; }
 export const MAX_WORK_CAP = 20;
 
 export interface IngestOptions {
@@ -35,7 +37,7 @@ export interface IngestOptions {
 export function parseIngestOptions(o: Record<string, unknown>): IngestOptions {
   const source = String(o.source ?? '');
   if (!(SOURCE_NAMES as readonly string[]).includes(source)) throw new Error(`source must be one of ${SOURCE_NAMES.join(', ')}`);
-  const cap = o.work_cap === undefined || o.work_cap === '' ? DEFAULT_WORK_CAP : Number(o.work_cap);
+  const cap = o.work_cap === undefined || o.work_cap === '' ? defaultWorkCapFor(source) : Number(o.work_cap);
   if (!Number.isInteger(cap) || cap < 1 || cap > MAX_WORK_CAP) throw new Error(`work_cap must be a whole number from 1 to ${MAX_WORK_CAP}`);
   return { source: source as SourceName, workCap: cap, finish: truthy(o.finish) };
 }

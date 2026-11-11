@@ -22,6 +22,8 @@ export interface Publisher {
   refreshTrending?(): Promise<unknown>;
   /** End of a run: purge old ML shadow-log rows and apply the storage stop rule (api.ml_purge). */
   mlPurge?(): Promise<unknown>;
+  /** One call for a whole candidate list: the URLs an earlier run already finished (api.items_handled, status other than 'new'). Optional; a failure means "unknown", never "handled". */
+  handledUrls?(urls: string[]): Promise<Set<string>>;
   auditCards?(): Promise<RevisableCard[]>;
   setAuditStatus?(id: string, status: string): Promise<void>;
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
@@ -68,6 +70,14 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
   return {
     upsertItem: (item) => rpc('upsert_item', { p: itemPayload(item) }),
     setItemStatus: async (id, status, note) => { await rpc('set_item_status', { p_id: id, p_status: status, p_note: note }); },
+    async handledUrls(urls) {
+      const out = new Set<string>();
+      for (let i = 0; i < urls.length; i += 500) {           // api.items_handled reads at most 2000 per call; 500 keeps the request small
+        const got = await rpc<string[] | null>('items_handled', { p_urls: urls.slice(i, i + 500) });
+        for (const u of got ?? []) out.add(u);
+      }
+      return out;
+    },
     publishBlurb: (p) => rpc('publish_blurb', { p }),
     upsertMacro: async ({ move: _move, ...o }) => { await rpc('upsert_macro', { p: o }); },   // move is not stored
     listToRevise: (current, limit) => rpc('blurbs_to_revise', { p_current: current, p_limit: limit }),

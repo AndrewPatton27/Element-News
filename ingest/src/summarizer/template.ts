@@ -43,6 +43,14 @@ const PLAIN_ITEM: Record<string, { headline: (co: string) => string; body: (co: 
     headline: (co) => `${co} reports a cybersecurity incident`,
     body: (co) => `${co} told the SEC about a serious cybersecurity incident, such as a hack. Open the filing for details.`,
   },
+  '1.01': {
+    headline: (co) => `${co} signs a major agreement`,
+    body: (co) => `${co} told the SEC it entered into a major agreement. Open the filing to see the terms.`,
+  },
+  '2.01': {
+    headline: (co) => `${co} completes an acquisition or asset sale`,
+    body: (co) => `${co} told the SEC it finished buying a business or selling assets. Open the filing for the details.`,
+  },
   '4.02': {
     headline: (co) => `${co} says some past financial reports were wrong`,
     body: (co) => `${co} told the SEC that some earlier financial reports can no longer be trusted and must be fixed. Open the filing for details.`,

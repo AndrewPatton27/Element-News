@@ -139,7 +139,7 @@ test('pipeline: AI drafts without figures are rejected twice, nothing is publish
   assert.equal(s.published, 0);
   assert.equal(s.skipped, 2, 'Apple no_figures + the routine Costco 5.02 in the feed');
   assert.equal(r.dry.cards.length, 0);
-  assert.ok(r.lines.includes('skip no_figures (earnings card without figures, template): Apple Inc. 8-K'), r.lines.join('\n'));
+  assert.ok(r.lines.some((l) => l.startsWith('skip no_figures (earnings card without figures, template): Apple Inc. 8-K')), r.lines.join('\n'));
   assert.deepEqual(r.statuses.filter((x) => !x.includes('routine')), ['skipped:no_figures']);
 });
 
