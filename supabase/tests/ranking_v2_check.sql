@@ -185,13 +185,13 @@ begin
     perform set_config('role', 'authenticated', true);
     perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
     r := api.feed_for_you(c0, 10);
-    perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10);
+    perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm';
     if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: mode % differs from v5', n; end if;
     if r ->> 'next_cursor' is distinct from (r2 ->> 'next_cursor') || '||1|' || n then raise exception 'FAIL: mode % cursor %', n, r ->> 'next_cursor'; end if;
     perform set_config('role', 'authenticated', true);
     cur := r ->> 'next_cursor';
     r := api.feed_for_you(cur, 10);
-    perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(cur, 10);
+    perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(cur, 10), ua) - '_perm';
     if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: mode % page 2 differs from v5', n; end if;
   end loop;
   perform set_config('role', 'authenticated', true);
@@ -207,7 +207,7 @@ begin
   update core.rank_params set value = 2 where key = 'foryou_ml_mode';
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '1' then
     raise exception 'FAIL: mode 2 without a model must equal v5 (cursor %)', r ->> 'next_cursor';
   end if;
@@ -247,7 +247,7 @@ begin
     raise exception 'FAIL: same cursor gave a different page';
   end if;
   perform set_config('role', 'none', true);
-  r2 := core.feed_for_you_v6(cur, 10, m_ok, seed);
+  r2 := core.fy_post(core.feed_for_you_v6(cur, 10, m_ok, seed), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: wrapper page 2 differs from v6'; end if;
   if split_part(r ->> 'next_cursor', '|', 8) <> '2' or split_part(r ->> 'next_cursor', '|', 10) <> seed::text then
     raise exception 'FAIL: page 2 cursor %', r ->> 'next_cursor';
@@ -298,7 +298,7 @@ begin
     update core.rank_params set value = n where key = 'foryou_ml_mode';
     perform set_config('role', 'authenticated', true);
     r := api.feed_for_you(cur, 10);
-    perform set_config('role', 'none', true); r2 := core.feed_for_you_v6(cur, 10, m_ok, seed);
+    perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v6(cur, 10, m_ok, seed), ua) - '_perm';
     if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '2'
        or split_part(r ->> 'next_cursor', '|', 10) <> seed::text then
       raise exception 'FAIL: mode % did not keep the v6 scroll (cursor %)', n, r ->> 'next_cursor';
@@ -316,7 +316,7 @@ begin
   insert into core.ml_models (version, gate_passed) values ('test-newer', true);
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(cur, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v6(cur, 10, m_ok, seed);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v6(cur, 10, m_ok, seed), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: running scroll changed model'; end if;
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(null, 10);
@@ -360,7 +360,7 @@ begin
   update core.rank_params set value = 100 where key = 'v2_holdout_pct';
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '1' then raise exception 'FAIL: holdout not on v5'; end if;
   if (select ml_mode || '/' || ranker || '/' || holdout from core.ml_pages where page_id = (r ->> 'page_id')::uuid) <> '2/fy-formula-v4/true' then
     raise exception 'FAIL: holdout page row';

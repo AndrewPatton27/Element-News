@@ -188,17 +188,18 @@ begin
   page := api.feed_for_you(null, 10);
   select string_agg(replace(x->>'headline', 'ACCT ', ''), ',' order by o) into got
     from jsonb_array_elements(page -> 'items') with ordinality as t(x, o) where o <= 5;
-  if got is distinct from 'D2,ENE,MKT,LIKED,TECH' then
-    raise exception 'FAIL: for-you order for A is %, expected D2,ENE,MKT,LIKED,TECH', got;
+  --               M9b (20261126000000): a followed topic also gets fy_follow_topic_hours (+6), which lifts TECH first
+  if got is distinct from 'TECH,D2,ENE,MKT,LIKED' then
+    raise exception 'FAIL: for-you order for A is %, expected TECH,D2,ENE,MKT,LIKED', got;
   end if;
-  if (page->'items'->3->>'my_reaction') is distinct from 'like' or (page->'items'->0->>'my_reaction') is not null then
-    raise exception 'FAIL: my_reaction wrong: % / %', page->'items'->3->'my_reaction', page->'items'->0->'my_reaction';
+  if (page->'items'->4->>'my_reaction') is distinct from 'like' or (page->'items'->0->>'my_reaction') is not null then
+    raise exception 'FAIL: my_reaction wrong: % / %', page->'items'->4->'my_reaction', page->'items'->0->'my_reaction';
   end if;
 
   -- same card shape as api.feed (plus my_reaction)
   select string_agg(key, ',' order by key) into k1 from jsonb_object_keys(page->'items'->0) key;
   select string_agg(key, ',' order by key) into k2
-    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null}'::jsonb) key;
+    from jsonb_object_keys((api.feed('top', null, 10)->'items'->0) || '{"my_reaction":null,"reason":null}'::jsonb) key;
   if k1 is distinct from k2 then raise exception 'FAIL: card keys differ: % vs %', k1, k2; end if;
 
   -- paging: every remaining card exactly once, never ECO or DIS

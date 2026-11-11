@@ -75,7 +75,7 @@ export function useFeedHeads(api: Api, account: AccountApi | undefined, userId: 
     void Promise.all([
       api.feed({ mode: 'top', category, cursor: null, limit: 10 }),
       api.feed({ mode: 'latest', category, cursor: null, limit: 10 }),
-      userId && account ? account.feedForYou(null, 10, followedStoryIds(userId)) : Promise.resolve(null),
+      userId && account ? account.feedForYou(null, 10, followedStoryIds(userId), readLocal(defaultStore()).follows.tickers) : Promise.resolve(null),
       // Same wider pool as the signed-out For you feed, so the head card is one the feed also ranks (shared short cache).
       guest ? fetchExtraPool(api, readLocal(defaultStore()).follows, readLocal(defaultStore()).hiddenTopics).catch(() => []) : Promise.resolve([] as BlurbCard[][]),
     ]).then(([topRaw, latestRaw, personalRaw, extra]) => {
@@ -135,7 +135,7 @@ export function useFeed(api: Api, query: FeedQuery, account?: AccountApi, filter
             if (query.mode === 'for_you' && query.user && account) {
               // Server order stays; each page gets the shared post-step (spread from Trending's top stories,
               // diversify last). Trending's top ids are only needed on page 1.
-              const [page, top] = await Promise.all([account.feedForYou(c, 10, followedStoryIds(query.user ?? null)), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
+              const [page, top] = await Promise.all([account.feedForYou(c, 10, followedStoryIds(query.user ?? null), readLocal(defaultStore()).follows.tickers), c ? Promise.resolve(null) : api.feed({ mode: 'top', category: null, cursor: null, limit: 10 }).catch(() => null)]);
               const topItems = trendingOrder(top?.items ?? []);
               pageIds.note('for_you', page);
               return reorderUnseen(page, (xs) => finishForYou(xs, new Set(topItems.slice(0, 10).map((x) => x.id)), topItems[0]?.id ?? null));

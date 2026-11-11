@@ -37,8 +37,8 @@ test('For you first card differs from Trending first card for a reader with like
   const out = rankForYou(mergePool(trending, latest), prefs, new Set(), 't1');
   assert.notEqual(out[0].id, 't1');
   assert.equal(new Set(out.map((c) => c.id)).size, out.length);
-  // with no signals it is freshness, not Trending's order
-  assert.equal(rankForYou(mergePool(trending, latest), noPrefs, new Set(), 't1')[0].id, 'n1');
+  // with no signals it is freshness (per-topic half-life from the reading time), not Trending's order
+  assert.equal(rankForYou(mergePool(trending, latest), noPrefs, new Set(), 't1', new Set(), Date.parse('2026-10-18T15:00:00Z'))[0].id, 'n1');
 });
 
 test('seen and reacted cards sink below equally fresh unseen ones (soft penalty, not a bucket)', () => {

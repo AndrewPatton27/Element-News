@@ -57,7 +57,7 @@ begin
   select string_agg(key || '=' || value::text, ',' order by key) into got from core.rank_params
    where key in ('foryou_negative_scale', 'foryou_cold_step_hours', 'foryou_cold_events', 'following_half_life_hours',
                  'foryou_half_life_markets', 'foryou_half_life_science', 'foryou_half_life_safety', 'foryou_half_life_economy');
-  if got is distinct from 'following_half_life_hours=12,foryou_cold_events=5,foryou_cold_step_hours=4,foryou_half_life_economy=8,foryou_half_life_markets=8,foryou_half_life_safety=8,foryou_half_life_science=8,foryou_negative_scale=2' then
+  if got is distinct from 'following_half_life_hours=12,foryou_cold_events=5,foryou_cold_step_hours=4,foryou_half_life_economy=24,foryou_half_life_markets=8,foryou_half_life_safety=8,foryou_half_life_science=8,foryou_negative_scale=2' then
     raise exception 'FAIL: rank_params defaults are %', got;
   end if;
   if (select value from core.rank_params where key = 'foryou_category_step_hours') not in (0.75) then

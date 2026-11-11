@@ -13,8 +13,8 @@ begin
   select id into ua from auth.users where email = 'element-test-a@example.com';
   update core.blurbs set status = 'hidden' where status = 'published';
 
-  if (select value from core.rank_params where key = 'fedreg_noneconomic_micro') is distinct from 0 then
-    raise exception 'FAIL: fedreg_noneconomic_micro must ship at 0'; end if;
+  if (select value from core.rank_params where key = 'fedreg_noneconomic_micro') is distinct from 1 then
+    raise exception 'FAIL: fedreg_noneconomic_micro must be 1 (D-115, set by 20261126000000_foryou_m9b.sql)'; end if;
   begin
     update core.rank_params set value = 2 where key = 'fedreg_noneconomic_micro';
     raise exception 'FAIL: value 2 must be refused';
@@ -38,6 +38,7 @@ begin
          'https://www.federalregister.gov/'||dedupe_key,'public_domain',true,attribution
     from core.blurbs where dedupe_key like 'fr-%';
 
+  update core.rank_params set value = 0 where key = 'fedreg_noneconomic_micro';   -- ships 1 since D-115; start from off
   -- off: pages unchanged by this migration (micro_cap_pick sees no micro card), FAA cards bunch at the top
   off_top := api.feed('top', null, 20, null);
   off_lat := api.feed('latest', null, 20, null);
