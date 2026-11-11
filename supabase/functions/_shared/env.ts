@@ -25,6 +25,8 @@ export interface FunctionEnv {
   beaApiKey: string | null;
   beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
   occEnabled: boolean;             // REGPRESS_OCC_ENABLED=1 turns the OCC press-release feed on (no readable reuse terms)
+  intlEnabled: boolean;            // INTLCB_ENABLED=1 turns the ECB / Bank of England / BIS headline source on
+  intlNoncommercialOk: boolean;    // INTLCB_NONCOMMERCIAL_OK=1 also allows the Bank of England and BIS feeds (non-commercial-only terms)
   annualEnabled: boolean;          // ANNUAL_FIGURES_ENABLED=1 turns the annual figures source (SSA COLA ...) on
   eiaApiKey: string | null;
   censusApiKey: string | null;
@@ -52,6 +54,8 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     beaApiKey: clean(get('BEA_API_KEY')),
     beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
     occEnabled: (get('REGPRESS_OCC_ENABLED') ?? '').trim() === '1',
+    intlEnabled: (get('INTLCB_ENABLED') ?? '').trim() === '1',
+    intlNoncommercialOk: (get('INTLCB_NONCOMMERCIAL_OK') ?? '').trim() === '1',
     annualEnabled: (get('ANNUAL_FIGURES_ENABLED') ?? '').trim() === '1',
     eiaApiKey: clean(get('EIA_API_KEY')),
     censusApiKey: clean(get('CENSUS_API_KEY')),

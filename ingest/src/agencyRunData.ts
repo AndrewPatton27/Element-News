@@ -16,6 +16,10 @@ import { mtsCard, mtsUrl, parseMts } from './sources/mts.ts';
 import { fomcCard, upcomingMeetings } from './sources/fomc.ts';
 import { beigeCard, beigeDue, beigeSummaryUrl, parseBeigeSummary } from './sources/beige.ts';
 import { parseRss } from './sources/fed.ts';
+import { parseBis } from './sources/bis.ts';
+import { parseBoe } from './sources/boe.ts';
+import { parseEcb } from './sources/ecb.ts';
+import { intlCard, selectIntl } from './sources/intlcb.ts';
 import { regPressCard, selectRegPress } from './sources/regpress.ts';
 import { parseTrade, selectTrade, tradeCard, tradeUrl } from './sources/trade.ts';
 import { annualCard, annualDue } from './sources/annual.ts';
@@ -176,6 +180,24 @@ export async function runRegPress(deps: Deps, stats: RunStats): Promise<void> {
     }
   }
   await publishCards(deps, stats, 'regpress', cards, c.maxCardsPerRun);
+}
+
+/** ECB, Bank of England and BIS headlines (RSS, template cards). OFF unless INTLCB_ENABLED=1; BoE and BIS also need INTLCB_NONCOMMERCIAL_OK=1. */
+export async function runIntlCb(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.intlcb;
+  if (!c.enabled && !deps.keys?.intlEnabled) { deps.log('intlcb: disabled (INTLCB_ENABLED not set), skipping'); return; }
+  for (const feed of c.feeds) {
+    if (feed.noncommercial && !deps.keys?.intlNoncommercialOk) { deps.log(`intlcb: ${feed.id}: disabled (INTLCB_NONCOMMERCIAL_OK not set), skipping`); continue; }
+    try {
+      const xml = await deps.fetchText(feed.url, 'api', config.feedCacheTtlMinutes);
+      const parse = feed.id === 'ecb' ? parseEcb : feed.id.startsWith('bis') ? parseBis : parseBoe;
+      const items = selectIntl(parse(xml), deps.now);
+      deps.log(`intlcb: ${feed.id}: ${items.length} items in the last ${c.maxAgeDays} days`);
+      await publishCards(deps, stats, `intlcb:${feed.id}`, items.map((i) => intlCard(i, feed)), c.maxCardsPerFeed);
+    } catch (e) {
+      deps.log(`intlcb: ${feed.id} failed: ${(e as Error).message}`);
+    }
+  }
 }
 
 /** Annual figures (SSA COLA ...) from the hand-verified list. OFF unless ANNUAL_FIGURES_ENABLED=1 (deps.keys.annualEnabled). */

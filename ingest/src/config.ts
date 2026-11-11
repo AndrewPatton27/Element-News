@@ -234,7 +234,7 @@ export const config = {
   // apps.bea.gov serves only the BEA release RSS here (feed text, never pages).
   // www.federalregister.gov serves only its JSON documents API here (never pages).
   // data.sec.gov serves only the per-company submissions JSON here (filing lists, never pages).
-  apiHosts: ['api.stlouisfed.org', 'home.treasury.gov', 'generativelanguage.googleapis.com', 'api.groq.com', 'apps.bea.gov',
+  apiHosts: ['www.ecb.europa.eu', 'www.bankofengland.co.uk', 'www.bis.org', 'api.stlouisfed.org', 'home.treasury.gov', 'generativelanguage.googleapis.com', 'api.groq.com', 'apps.bea.gov',
     'www.federalregister.gov', 'data.sec.gov',
     // Treasury FiscalData JSON API (average interest rates, debt to the penny): numbers only, never pages.
     'api.fiscaldata.treasury.gov',
@@ -470,6 +470,23 @@ export const config = {
         { id: 'occ', url: 'https://www.occ.gov/rss/occ_news.xml', agency: 'Office of the Comptroller of the Currency', short: 'OCC', needsFlag: true },   // OFF unless REGPRESS_OCC_ENABLED=1: no OCC reuse statement could be read (its policy pages return 404)
         { id: 'cfpb', url: 'https://www.consumerfinance.gov/about-us/newsroom/feed/', agency: 'Consumer Financial Protection Bureau', short: 'CFPB', needsFlag: false },
       ] as { id: string; url: string; agency: string; short: string; needsFlag: boolean }[],
+    },
+    // Foreign central-bank headlines (M9 intl sources): ECB, Bank of England, BIS RSS (feed text only). Terms read 2026-11-11
+    // (context/data-sources.md): ECB allows reuse with credit; Bank of England and BIS allow non-commercial use only, so those two
+    // run only with INTLCB_NONCOMMERCIAL_OK=1 as well. OFF by default: needs INTLCB_ENABLED=1 (deps.keys.intlEnabled). Template card,
+    // verbatim headline + link, no description text, no AI. IMF (403 to bots, no automated use) and World Bank (non-commercial,
+    // no feed) are skipped; Treasury has no RSS feed.
+    intlcb: {
+      enabled: false,
+      maxAgeDays: 3,
+      maxCardsPerFeed: 2,
+      feeds: [
+        { id: 'ecb', url: 'https://www.ecb.europa.eu/rss/press.html', agency: 'European Central Bank', short: 'ECB', docLabel: 'ECB press release or speech', hosts: ['www.ecb.europa.eu'], noncommercial: false },
+        { id: 'boenews', url: 'https://www.bankofengland.co.uk/rss/news', agency: 'Bank of England', short: 'Bank of England', docLabel: 'Bank of England news', hosts: ['www.bankofengland.co.uk'], noncommercial: true },
+        { id: 'boespeech', url: 'https://www.bankofengland.co.uk/rss/speeches', agency: 'Bank of England', short: 'Bank of England', docLabel: 'Bank of England speech', hosts: ['www.bankofengland.co.uk'], noncommercial: true },
+        { id: 'bispress', url: 'https://www.bis.org/doclist/all_pressrels.rss', agency: 'Bank for International Settlements', short: 'BIS', docLabel: 'BIS media release', hosts: ['www.bis.org'], noncommercial: true },
+        { id: 'biscb', url: 'https://www.bis.org/doclist/cbspeeches.rss', agency: 'Bank for International Settlements', short: 'BIS', docLabel: 'Central banker speech (via BIS)', hosts: ['www.bis.org'], noncommercial: true },
+      ] as { id: string; url: string; agency: string; short: string; docLabel: string; hosts: string[]; noncommercial: boolean }[],
     },
     // Annual figures (M9c3): Social Security COLA, Medicare premiums, IRS retirement limits. ssa.gov / cms.gov / irs.gov are not rule-2
     // domains, so the numbers are copied by hand from the agency announcement into this list (facts, public domain) and a
