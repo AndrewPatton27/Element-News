@@ -21,9 +21,28 @@ export function changeColor(p: Palette, f: Pick<MacroFact, 'series_id' | 'direct
   return changeToneColor(p, f.series_id, f.direction);
 }
 
-export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean }) {
+// The required notices (rule 8: the FRED notice) of a data card. The feed card renders them itself, outside its
+// scrolling middle, so a long card can never clip them (M9c fix #2); everywhere else DataFacts renders them.
+export function DataNotices({ card, config, small }: { card: BlurbCard; config: AppConfig | null; small?: boolean }) {
   const p = usePalette();
-  const notices = cardNotices(card, config);
+  return (
+    <>
+      {cardNotices(card, config).map((n) => (
+        <Text
+          key={n.key}
+          style={[styles.notice, small && styles.noticeSmall, { color: p.muted }]}
+          {...(n.url ? linkProps(n.url) : {})}
+          accessibilityRole={n.url ? 'link' : 'text'}
+        >
+          {n.text}
+        </Text>
+      ))}
+    </>
+  );
+}
+
+export function DataFacts({ card, config, compact, dense, hideNotices }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean; hideNotices?: boolean }) {
+  const p = usePalette();
   // One number gets the design's 64 px. Two short ones sit side by side, smaller, with the change
   // on its own line. Three numbers, or any long value ("10,284.57"), become rows (label and
   // citation left, value and change right), so a number never breaks across lines (break-ui).
@@ -83,16 +102,7 @@ export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; c
           </Text>
         ) : null}
       </View>
-      {notices.map((n) => (
-        <Text
-          key={n.key}
-          style={[styles.notice, (compact || dense) && styles.noticeSmall, { color: p.muted }]}
-          {...(n.url ? linkProps(n.url) : {})}
-          accessibilityRole={n.url ? 'link' : 'text'}
-        >
-          {n.text}
-        </Text>
-      ))}
+      {hideNotices ? null : <DataNotices card={card} config={config} small={compact || dense} />}
     </View>
   );
 }

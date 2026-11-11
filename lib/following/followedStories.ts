@@ -182,3 +182,16 @@ export function sortStories(rows: StoryRow[]): StoryRow[] {
   const latest = (r: StoryRow) => (r.updates.length ? Date.parse(r.updates[0].published_at) : -1);
   return rows.map((r, i) => ({ r, i })).sort((a, b) => latest(b.r) - latest(a.r) || a.i - b.i).map((x) => x.r);
 }
+
+/**
+ * "More stories you may like" must not repeat what the stories section above already shows: the followed story
+ * cards and the update cards in their timelines (M9c #4: the CPI card was listed under both).
+ */
+export function withoutShownStories(items: BlurbCard[], followed: readonly { id: string }[], rows: readonly StoryRow[]): BlurbCard[] {
+  const shown = new Set<string>(followed.map((s) => s.id));
+  for (const r of rows) {
+    shown.add(r.story.id);
+    for (const u of r.updates) shown.add(u.id);
+  }
+  return shown.size ? items.filter((c) => !shown.has(c.id)) : items;
+}

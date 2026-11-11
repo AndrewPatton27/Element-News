@@ -17,14 +17,24 @@ export const MARKET_SERIES = ['DGS10', 'DGS2', 'DFF', 'DCOILWTICO'];
 export const BRIEF_CAPS = { perEmailPerDay: 5, globalPerHour: 200 };
 
 export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], trends: NumberTrend[], storyLinks: { card_id: string; related_id: string; kind: StoryLink["kind"] }[] = [], clock: () => number = Date.now) {
-  // Give the regular sample feed a small, deterministic linked-story chain too.
-  const sampleLinks = storyLinks.length ? storyLinks : (() => {
+  // M9c #4 (same rule as core.cards_share_entity): a link between two cards counts only when they share a ticker
+  // symbol or a macro series. Cards of the same topic or the same agency are not enough.
+  const sharesEntity = (a: BlurbCard, b: BlurbCard) =>
+    a.tickers.some((t) => b.tickers.some((u) => u.symbol.toLocaleUpperCase() === t.symbol.toLocaleUpperCase())) ||
+    a.macro.some((m) => b.macro.some((n) => n.series_id === m.series_id));
+  const linkOk = (l: { card_id: string; related_id: string }) => {
+    const a = cards.find((c) => c.id === l.card_id);
+    const b = cards.find((c) => c.id === l.related_id);
+    return !!a && !!b && sharesEntity(a, b);
+  };
+  // Give the regular sample feed a small, deterministic linked-story chain too (only between cards that share an entity).
+  const sampleLinks = (storyLinks.length ? storyLinks : (() => {
     const anchor = cards.find((c) => c.category === 'markets');
-    const updates = cards.filter((c) => c.id !== anchor?.id && (c.category === 'markets' || c.category === 'earnings')).slice(0, 2);
-    const angle = cards.find((c) => c.id !== anchor?.id && c.category !== 'markets' && c.category !== 'earnings');
-    if (!anchor || updates.length < 2 || !angle) return storyLinks;
-    return [{ card_id: updates[0].id, related_id: anchor.id, kind: 'update' as const }, { card_id: updates[1].id, related_id: anchor.id, kind: 'related' as const }, { card_id: angle.id, related_id: anchor.id, kind: 'angle' as const }];
-  })();
+    if (!anchor) return storyLinks;
+    const mates = cards.filter((c) => c.id !== anchor.id && sharesEntity(anchor, c));
+    const kinds = ['update', 'related', 'angle'] as const;
+    return mates.slice(0, 3).map((c, i) => ({ card_id: c.id, related_id: anchor.id, kind: kinds[i] }));
+  })()).filter(linkOk);
   let tagCache: Map<string, CardCompany[]> | null = null;
   const companyTags = () => (tagCache ??= tagSampleCards(cards));
   const page = (items: BlurbCard[], cursor?: string | null, limit = 20): FeedPage => {
@@ -169,7 +179,8 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       const mentioned = (c: BlurbCard) => (tags.get(c.id) ?? []).find((t) => tickers.has(t.ticker.toLocaleLowerCase()));
       const direct = cards.filter((c) => topics.has(c.category.toLocaleLowerCase()) || c.sources.some((s) => sources.has(s.name.toLocaleLowerCase())) || c.tickers.some((t) => tickers.has(t.symbol.toLocaleLowerCase())) || !!mentioned(c));
       const directIds = new Set(direct.map((c) => c.id));
-      const linkedFollow = sampleLinks.flatMap((l) => { const follows=directIds.has(l.related_id)?l.related_id:directIds.has(l.card_id)?l.card_id:null; const id=follows===l.related_id?l.card_id:l.related_id; const c=cards.find((x)=>x.id===id); const target=cards.find((x)=>x.id===follows); return c&&target?[{...c,story_link:{kind:l.kind,related_id:target.id,related_headline:target.headline},follow_reason:l.kind==="update"?"Update to a story you follow":l.kind==="angle"?"Another angle on a story you follow":"Related to something you follow"}]:[]; });
+      const linkedSeen = new Set<string>();
+      const linkedFollow = sampleLinks.flatMap((l) => { const follows=directIds.has(l.related_id)?l.related_id:directIds.has(l.card_id)?l.card_id:null; const id=follows===l.related_id?l.card_id:l.related_id; if (directIds.has(id) || linkedSeen.has(id)) return []; linkedSeen.add(id); const c=cards.find((x)=>x.id===id); const target=cards.find((x)=>x.id===follows); return c&&target?[{...c,story_link:{kind:l.kind,related_id:target.id,related_headline:target.headline},follow_reason:l.kind==="update"?"Update to a story you follow":l.kind==="angle"?"Another angle on a story you follow":"Related to something you follow"}]:[]; });
       const linkedIds=new Set(linkedFollow.map(c=>c.id));
       const followedTickers = new Set(direct.flatMap((c) => c.tickers.map((t) => t.symbol.toLocaleLowerCase())));
       const related = cards.filter((c) => !directIds.has(c.id) && !linkedIds.has(c.id) && (c.tickers.some((t) => followedTickers.has(t.symbol.toLocaleLowerCase())) || direct.some((d) => d.category === c.category)));

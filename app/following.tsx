@@ -26,7 +26,7 @@ import { ScreenShell } from '../components/shell/ScreenShell';
 import { clearStoryUpdates, FollowedStories, useStoryRows } from '../components/following/FollowedStories';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
-import { storiesHeader } from '../lib/following/followedStories';
+import { storiesHeader, withoutShownStories } from '../lib/following/followedStories';
 import { useFollowedStories } from '../lib/following/useFollowedStories';
 import { FollowingFeed } from '../components/following/FollowingFeed';
 import { SourcesSheet } from '../components/card/SourcesSheet';
@@ -103,7 +103,7 @@ export default function FollowingScreen() {
     return () => { focused.current = false; if (timer.current) clearTimeout(timer.current); };
   }, [refresh]));
   const rawItems = freshItems ?? state.items;
-  const items = visible(rerankFollowing(rawItems, acct.localPrefs));
+  const items = withoutShownStories(visible(rerankFollowing(rawItems, acct.localPrefs)), followedStories.stories, rows);
 
   const empty = following ? (
     <View style={styles.none} accessibilityLiveRegion="polite">

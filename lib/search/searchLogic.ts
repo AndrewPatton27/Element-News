@@ -101,17 +101,22 @@ export const SEARCH_DETAIL_WEIGHT = 0.2; // settings.md: search_detail_weight (v
 export const SEARCH_MIN_QUALITY = 0.5; // settings.md: search_min_quality
 const TRENDING_HALF_LIFE_HOURS = 8; // rank_params.half_life_hours
 
+// v9 (M9c #3): question filler is dropped too, so "is the economy ok" searches "economy".
 const STOPWORDS = new Set(
-  'the a an and or of to in on for at by with is are was were be it its as from that this what how why who about into'.split(' '),
+  ('the a an and or of to in on for at by with is are was were be it its as from that this what how why who about into ' +
+    'ok okay doing going now today my me do does should can will you your we our there any am').split(' '),
 );
+// v9: words that only describe the thing searched ("gas prices", "savings account"): dropped when another word
+// remains, so the card does not have to say "prices" or "account" (core.search_modifiers in SQL).
+export const SEARCH_MODIFIERS = new Set(['price', 'prices', 'cost', 'costs', 'account', 'accounts']);
 
 // Same groups as core.search_synonyms.
 export const SYNONYM_GROUPS: readonly (readonly string[])[] = [
   ['fed', 'federal reserve', 'fomc'],
-  ['rate', 'rates', 'interest'],
+  ['rate', 'rates', 'interest', 'savings', 'apy'],
   ['inflation', 'cpi', 'prices'],
   ['jobs', 'employment', 'unemployment', 'payrolls'],
-  ['oil', 'crude', 'wti'],
+  ['oil', 'crude', 'wti', 'gas', 'gasoline', 'diesel', 'fuel', 'petrol'],
   ['stocks', 'equities', 'markets'],
   ['quake', 'earthquake', 'tremor'],
   ['recall', 'recalls'],
@@ -128,7 +133,59 @@ export function searchTerms(raw: string): string[] {
     if (w.length >= 2 && !STOPWORDS.has(w) && !out.includes(w)) out.push(w);
     if (out.length === SEARCH_MAX_TERMS) break;
   }
-  return out;
+  const core = out.filter((w) => !SEARCH_MODIFIERS.has(w));
+  return core.length ? core : out;
+}
+
+// ---- v9: aliases and generic-query demotion (mirrors 20261137000200_search_v9.sql) ----
+//
+// An alias is a whole query (its words after stop words and modifiers) that names a topic. Cards whose headline
+// matches the alias pattern, or that carry one of its macro series, get +SEARCH_ALIAS_TIER, so "CPI" opens with
+// the CPI data card. Insider-trade (Form 4) and filing cards lose SEARCH_FILING_PENALTY when the query names no
+// company: "gas prices" is not a question about a director's share sale.
+export const SEARCH_ALIAS_TIER = 5; // core.search_aliases tier (c_alias_tier in SQL)
+export const SEARCH_FILING_PENALTY = 5; // c_filing_penalty in SQL
+const FED_RE = /\b(fed|federal reserve|fomc|rates?|treasury|yield|mortgage)\b/;
+const OIL_RE = /\b(gas|gasoline|oil|crude|wti|diesel|fuel)\b/;
+const JOBS_RE = /\b(jobs?|unemployment|payrolls?|employment|labor)\b/;
+const INFL_RE = /\b(cpi|consumer prices?|consumer price index|inflation)\b/;
+const ECON_RE = /\b(economy|economic|gdp|growth|inflation|jobs|unemployment|payrolls|recession|fed|federal reserve|interest rates?)\b/;
+export const SEARCH_ALIASES: Record<string, { re: RegExp; series: string[] }> = {
+  cpi: { re: INFL_RE, series: ['CPIAUCSL'] },
+  economy: { re: ECON_RE, series: ['GDP', 'UNRATE', 'PAYEMS', 'CPIAUCSL'] },
+  gdp: { re: /\b(gdp|economy|growth)\b/, series: ['GDP'] },
+  jobs: { re: JOBS_RE, series: ['UNRATE', 'PAYEMS'] },
+  unemployment: { re: JOBS_RE, series: ['UNRATE', 'PAYEMS'] },
+  gas: { re: OIL_RE, series: ['DCOILWTICO'] },
+  gasoline: { re: OIL_RE, series: ['DCOILWTICO'] },
+  diesel: { re: OIL_RE, series: ['DCOILWTICO'] },
+  fuel: { re: OIL_RE, series: ['DCOILWTICO'] },
+  'diesel fuel': { re: OIL_RE, series: ['DCOILWTICO'] },
+  oil: { re: OIL_RE, series: ['DCOILWTICO'] },
+  savings: { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
+  'savings interest': { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
+  'savings rates': { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
+  apy: { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
+  rates: { re: FED_RE, series: ['DFF', 'DGS10'] },
+  'interest rates': { re: FED_RE, series: ['DFF', 'DGS10'] },
+};
+
+export function aliasFor(terms: string[]): { re: RegExp; series: string[] } | null {
+  return SEARCH_ALIASES[terms.join(' ')] ?? null;
+}
+
+export function matchesAlias(card: BlurbCard, alias: { re: RegExp; series: string[] }): boolean {
+  return alias.re.test(clean([card.headline])) || card.macro.some((m) => alias.series.includes(m.series_id));
+}
+
+/** Form 4 insider trades and filing-sourced cards (8-K, 10-Q, ...): the kinds a general question should not lead with. */
+export function isFilingLike(card: BlurbCard): boolean {
+  return card.event_type === 'insider' || card.sources.some((x) => x.kind === 'filing');
+}
+
+/** True when a query word is a ticker or a word of a company name on some card: the query is about a company. */
+export function namesCompany(cards: BlurbCard[], terms: string[]): boolean {
+  return terms.some((t) => cards.some((c) => c.tickers.some((k) => k.symbol.toLocaleLowerCase() === t || clean([k.name]).split(' ').includes(t))));
 }
 
 // A rough English stem (the database uses Postgres's english stemmer).
@@ -260,7 +317,7 @@ export function affinityPrior(tasteHours: number, capHours: number = AFFINITY_CA
 }
 
 export function searchOrderKey(
-  o: { visible: boolean; relevance: number; terms: number; rankPart: number; affinity?: number | null },
+  o: { visible: boolean; relevance: number; terms: number; rankPart: number; affinity?: number | null; bonus?: number },
   weight: number = SEARCH_PRIOR_WEIGHT,
   affinityShare: number = SEARCH_PRIOR_AFFINITY_SHARE,
 ): number {
@@ -268,7 +325,7 @@ export function searchOrderKey(
   const a = clamp(affinityShare, 0, 1);
   const rel = Math.min(Math.round(o.relevance * 10000) / 10000 / Math.max(o.terms, 1), 1);
   const prior = o.affinity === null || o.affinity === undefined ? o.rankPart : (1 - a) * o.rankPart + a * o.affinity;
-  return Math.round(((o.visible ? SEARCH_VISIBLE_TIER : 0) + (1 - w) * rel + w * prior) * 1e9) / 1e9;
+  return Math.round(((o.visible ? SEARCH_VISIBLE_TIER : 0) + (o.bonus ?? 0) + (1 - w) * rel + w * prior) * 1e9) / 1e9;
 }
 
 export interface SearchRankOptions {
@@ -283,16 +340,22 @@ export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: B
   const terms = searchTerms(raw);
   if (terms.length === 0) return [];
   const now = opts.nowHours ?? Date.now() / 3_600_000;
+  const alias = aliasFor(terms);
+  const generic = alias !== null || !namesCompany(cards, terms);
   return cards
     .map((c) => {
       const s = terms.map((t) => termScores(t, c));
-      return { c, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0), vis: s.some((x) => x.visible && x.gate > 0) };
+      return { c, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0), vis: s.some((x) => x.visible && x.gate > 0), all: s.every((x) => x.gate > 0) };
     })
-    .filter((x) => x.q >= SEARCH_MIN_QUALITY)
+    // v8/v9: every query word must match, not only enough of them ("Beige Book" is not "bookings")
+    .filter((x) => x.q >= SEARCH_MIN_QUALITY && x.all)
     .map((x) => ({
       c: x.c,
       k: searchOrderKey(
-        { visible: x.vis, relevance: x.rq, terms: terms.length, rankPart: rankPrior(trendingHours(x.c), now), affinity: opts.tasteHours ? affinityPrior(opts.tasteHours(x.c)) : null },
+        {
+          visible: x.vis, relevance: x.rq, terms: terms.length, rankPart: rankPrior(trendingHours(x.c), now), affinity: opts.tasteHours ? affinityPrior(opts.tasteHours(x.c)) : null,
+          bonus: (alias && matchesAlias(x.c, alias) ? SEARCH_ALIAS_TIER : 0) - (generic && isFilingLike(x.c) ? SEARCH_FILING_PENALTY : 0),
+        },
         opts.weight,
         opts.affinityShare,
       ),
