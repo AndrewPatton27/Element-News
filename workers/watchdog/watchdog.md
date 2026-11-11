@@ -61,7 +61,7 @@ Healthchecks.io check would also email when the Worker stops (not enabled).
 | `HEALTHCHECK_URL` | optional secret | not used; leave unset and the ping is skipped |
 
 Set each secret with `npx wrangler secret put <NAME>` in this folder (type the value there; never put it in a file).
-Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 15 jobs: 10 ingest and brief jobs plus fedspeech, secpress, treasury and the two ranking checks; change it whenever a cron job is added or removed) are constants at the top of `src/logic.ts`.
+Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 22 jobs (15 before M9 plus bls, beadata, eia, auctions, fomc and the two purge jobs; the original 15 were: 10 ingest and brief jobs plus fedspeech, secpress, treasury and the two ranking checks; change it whenever a cron job is added or removed) are constants at the top of `src/logic.ts`.
 
 ## Supply floor
 
