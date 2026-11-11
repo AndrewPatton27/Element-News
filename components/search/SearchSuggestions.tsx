@@ -41,7 +41,7 @@ export function SearchSuggestions({ items, categories, onOpen, onPickTopic, sign
                 <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>
                   {suggestionMeta(topic, cardTime(c))}
                 </Text>
-                <Text style={[styles.headline, wide && styles.headlineWide, { color: p.ink }]} numberOfLines={2}>
+                <Text style={[styles.headline, wide && styles.headlineWide, { color: p.ink }]} numberOfLines={wide ? 2 : 3}>
                   {clampHeadline(c.headline)}
                 </Text>
               </Pressable>
@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.sans, fontSize: 12 },
   headline: { fontFamily: fonts.serif, fontSize: 17, lineHeight: 21 },
   headlineWide: { fontSize: 19, lineHeight: 23 },
-  topic: { minHeight: 44, maxWidth: 130, paddingHorizontal: 12, borderRadius: radius.chip, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  topic: { minHeight: 44, maxWidth: 112, paddingHorizontal: 12, borderRadius: radius.chip, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   topicText: { fontFamily: fonts.sansSemi, fontSize: 13 },
 });

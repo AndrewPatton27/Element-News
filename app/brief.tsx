@@ -49,7 +49,7 @@ import { NumbersTicker } from '../components/numbers/NumbersTicker';
 import { DetailSheet } from '../components/card/DetailSheet';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { Shell, Wordmark } from '../components/shell/Shell';
-import { ErrorState, LoadingState } from '../components/shell/States';
+import { BriefSkeleton, ErrorState } from '../components/shell/States';
 
 // A brief older than this is fetched again when the reader comes back to the tab.
 const STALE_MS = 10 * 60_000;
@@ -168,9 +168,7 @@ export default function BriefScreen() {
     body = <ErrorState title="Could not load the brief" message={error} onRetry={refresh} />;
   } else if (!data || !view || !unfiltered) {
     body = (
-      <View style={styles.center}>
-        <LoadingState label={`Loading your ${mode} brief…`} />
-      </View>
+      <BriefSkeleton label={`Loading your ${mode} brief…`} />
     );
   } else if (briefIsEmpty(view)) {
     const hiddenAll = !briefIsEmpty(unfiltered);
@@ -270,6 +268,8 @@ export default function BriefScreen() {
   return (
     <Shell active="brief" bare notice>
       <View style={[styles.header, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
+        {/* D-214: the phone header has no visible "Brief" title (the Daily / Weekly tabs and the bottom tab name the page), so screen readers get one page heading. */}
+        <Text role="heading" aria-level={1} style={styles.srOnly}>{`Brief: ${mode === 'weekly' ? 'weekly' : 'daily'}`}</Text>
         <View style={styles.brand}>
           <Wordmark size={22} />
         </View>
@@ -296,12 +296,12 @@ export default function BriefScreen() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   fill: { flex: 1 },
   strip: { borderBottomWidth: 1 },
   header: { flexDirection: 'row', alignItems: 'flex-end', height: MOBILE_HEADER_HEIGHT, paddingLeft: 16, paddingRight: 12, borderBottomWidth: 1 },
   brand: { height: MOBILE_HEADER_HEIGHT - 1, justifyContent: 'center', marginRight: 6 },
   scroll: { paddingHorizontal: space.page, paddingTop: 14, paddingBottom: space.md, gap: 18 },
-  center: { minHeight: 260 },
   columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 36 },
   main: { flex: 1, minWidth: 0 },
   aside: { width: 320, gap: 16 },

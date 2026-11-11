@@ -2,8 +2,8 @@
 // (link glyph, agency or outlet, when it was published; opens the sources sheet with
 // links to every original) and the card's action buttons on the right (like,
 // dislike, follow, share: passed in as children, so each screen keeps its own
-// reaction logic). The bar never wraps: the agency name truncates first, the
-// time and the 44 px buttons never shrink. Labels: lib/shared/cardBody.ts.
+// reaction logic). The bar never wraps: the time label truncates first, then the agency
+// name; the 44 px buttons never shrink. Labels: lib/shared/cardBody.ts.
 
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -100,10 +100,12 @@ const styles = StyleSheet.create({
   source: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, maxWidth: '100%', paddingRight: 6, flexShrink: 1 },
   glyph: { flexShrink: 0 },
   doc: { flexShrink: 1, minWidth: 0, fontFamily: fonts.sans },
-  name: { flexShrink: 1, fontFamily: fonts.sansSemi, fontSize: 14 },
+  name: { flexShrink: 1, minWidth: 36, fontFamily: fonts.sansSemi, fontSize: 14 },
   nameWide: { fontSize: 15 },
   nameSmall: { fontSize: 13 },
-  time: { flexShrink: 0, fontFamily: fonts.sans, fontSize: 14 },
+  // R-403: a long time label ("As of Nov 11" on a data card) used to squeeze a short agency name down to "F". The time now
+  // gives way first (shrinks 4x faster than the name), so the agency stays readable.
+  time: { flexShrink: 4, minWidth: 0, fontFamily: fonts.sans, fontSize: 14 },
   timeWide: { fontSize: 15 },
   count: { flexShrink: 0, fontFamily: fonts.sansSemi, fontSize: 12, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
   actions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
