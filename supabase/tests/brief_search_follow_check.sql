@@ -135,7 +135,7 @@ begin
   -- briefs
   r := api.daily_brief();
   if jsonb_typeof(r->'headline_cards') <> 'array' or jsonb_array_length(r->'headline_cards') > 3 or jsonb_array_length(r->'sections') > 8 or jsonb_array_length(r->'numbers') > 4 then raise exception 'FAIL: daily brief shape/limits'; end if;
-  if (r->>'window_hours')::int not in (24,48,72) then raise exception 'FAIL: daily window'; end if;
+  if (r->>'window_hours')::int not in (24,72) then raise exception 'FAIL: daily window'; end if;
   if jsonb_array_length(r->'headline_cards') < 1 then raise exception 'FAIL: daily brief empty'; end if;
   r := api.weekly_brief();
   if (r->>'window_hours')::int <> 168 or jsonb_array_length(r->'movers') > 4 or jsonb_array_length(r->'headline_cards') < 1 then raise exception 'FAIL: weekly brief shape/limits'; end if;

@@ -54,3 +54,5 @@ Every fixture card is fictional. Company names, tickers, numbers and links are m
 ## Changing the contract
 
 The contract is frozen. Any change to `types.ts` or the fixture shapes needs review and must be made on both sides (database functions and app) in the same change.
+
+`briefOrder.ts`: the Brief ordering rule (D-119). `briefTier`, `categoryTier`, `orderBriefCards` and `briefLeadCards` put economy, Fed and government cards before single-company news, other news next, recalls, space and science last (stable inside a tier). Shared by the brief prompt (ingest) and the Brief screen. The Brief JSON gained optional `window_kind`, `brief_date`, `fallback`, `as_of`, and the summary `for_date` (older servers omit them).

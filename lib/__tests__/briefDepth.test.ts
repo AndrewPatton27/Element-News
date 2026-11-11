@@ -54,13 +54,19 @@ test('topic importance is the best card first, not the card count', async () => 
   assert.equal(daily.sections[0]?.total, 2);
 });
 
-test('daily window widens 24 -> 48 -> 72 h when fewer than 12 cards; weekly stays 168', async () => {
-  const mk = (ages: number[]) => ages.map((h, i) => card({ id: `w${i}`, sort_at: hoursAgo(h) }));
-  const api = (ages: number[]) => createMockFeatureApi(mk(ages), [], []);
-  assert.equal((await api(Array(12).fill(1)).dailyBrief()).window_hours, 24, '12 in 24 h: no widening');
-  assert.equal((await api([1, 1, 1, ...Array(12).fill(30)]).dailyBrief()).window_hours, 48);
-  assert.equal((await api([1, 1, 1, ...Array(8).fill(30), 60, 60, 60]).dailyBrief()).window_hours, 72, '11 in 48 h widens again');
+test('daily window is the real 24 h (never widened by thin supply); weekly stays 168', async () => {
+  const TUE = Date.parse('2026-11-10T15:00:00Z'); // a Tuesday (New York)
+  const ago = (h: number) => new Date(TUE - h * 3_600_000).toISOString();
+  const api = (ages: number[]) => createMockFeatureApi(ages.map((h, i) => card({ id: `w${i}`, sort_at: ago(h) })), [], [], [], () => TUE);
+  const d12 = await api(Array(12).fill(1)).dailyBrief();
+  assert.equal(d12.window_hours, 24);
+  assert.equal(d12.window_kind, '24h');
+  assert.equal(d12.fallback, false);
+  const d3 = await api([1, 1, 1, ...Array(12).fill(30)]).dailyBrief();
+  assert.equal(d3.window_hours, 24, 'thin supply (3 in 24 h) is not widened');
+  assert.equal(d3.headline_cards.length > 0, true);
   assert.equal((await api([1]).weeklyBrief()).window_hours, 168);
+  assert.equal((await api([1]).weeklyBrief()).window_kind, 'week');
 });
 
 test('empty supply gives empty sections without throwing', async () => {

@@ -1,4 +1,4 @@
-// Brief summary: a 3-5 sentence plain-language summary of a whole daily or weekly brief, written by
+// Brief summary: a 200-290 word, 3-4 paragraph plain-language summary of a whole daily or weekly brief, written by
 // the AI ONCE per brief per day/week (never per request or per subscriber) and stored with
 // api.put_brief_summary. Written ONLY from the cards and numbers inside the brief JSON.
 // Chain: Gemini -> Groq -> template (same keys, models and daily caps as the card pipeline).
@@ -10,10 +10,11 @@
 
 import { fetchAllowed, type FetchLike } from './allowlist.ts';
 import { aiDailyCap, config, groqDailyCap } from './config.ts';
-import { summaryDate, summaryIsCurrent } from './briefTime.ts';
+import { summaryDate, summaryIsCurrent, windowSpan } from './briefTime.ts';
 import { isDailyQuota, modelFallback, ProviderError, RateLimitedError } from './summarizer/gemini.ts';
 import type { UsageCounter } from './summarizer/chain.ts';
 import { checkRepetition, countWords, extractNumbers, findAdvice, longestCopiedRun, splitSentences } from './validate.ts';
+import { briefTier, orderBriefCards, type BriefTier } from '../../contract/briefOrder.ts';
 import type { Brief, BlurbCard, MacroFact } from '../../contract/types.ts';
 
 export type BriefKind = 'daily' | 'weekly';
@@ -93,18 +94,22 @@ export function allBriefNumbers(brief: BriefInput): MacroFact[] {
 export function briefSourceText(brief: BriefInput): string {
   const lines: string[] = [];
   const card = (c: BlurbCard) => `- ${oneLine(c.headline)}${c.body ? `. ${oneLine(c.body)}` : ''}`;
-  const top = brief.headline_cards ?? [];
-  if (top.length) lines.push('TOP STORIES:', ...top.map(card));
-  if (brief.markets?.cards?.length) lines.push('MARKETS:', ...brief.markets.cards.map(card));
-  for (const s of brief.sections ?? []) {
-    if (s.cards?.length) lines.push(`TOPIC ${oneLine(s.label)}:`, ...s.cards.map(card));
-  }
+  // One numbers block, first: the economic prints lead the brief (D-119).
   const nums = allBriefNumbers(brief);
   if (nums.length) {
     lines.push('NUMBERS:');
     for (const n of nums) {
       lines.push(`- ${oneLine(n.label)}: ${oneLine(n.value)}${n.change ? `, change ${oneLine(n.change)}` : ''}${n.direction ? ` (${n.direction})` : ''}${n.period ? `, ${oneLine(n.period)}` : ''}`);
     }
+  }
+  // Then the stories in the macro-first order: Fed and government, companies, other, recalls/space/science.
+  const ordered = orderBriefCards(allBriefCards(brief));
+  const headings: Record<BriefTier, string> = {
+    0: 'ECONOMY, FED AND GOVERNMENT:', 1: 'COMPANIES AND MARKETS:', 2: 'OTHER NEWS:', 3: 'RECALLS, SPACE AND SCIENCE (LAST):',
+  };
+  for (const tier of [0, 1, 2, 3] as BriefTier[]) {
+    const cards = ordered.filter((c) => briefTier(c) === tier);
+    if (cards.length) lines.push(headings[tier], ...cards.map(card));
   }
   return lines.join('\n');
 }
@@ -116,24 +121,34 @@ export function briefIsEmpty(brief: BriefInput): boolean {
 
 // ---- prompt and validation ----------------------------------------------------------------
 
-/** The prompt for one brief. `retryErrors` are the validator errors of the previous draft. */
-export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: string[]): string {
+/** The span text for a prompt: the real window of the brief ("the last 24 hours", "the time since Friday", "this week"). */
+export function briefPromptSpan(kind: BriefKind, window?: { kind?: string; hours?: number }): string {
+  if (kind === 'weekly') return 'this week';
+  return windowSpan(window?.kind, window?.hours).span;
+}
+
+/** The prompt for one brief (sum-v7, section 2.4). `retryErrors` are the validator errors of the previous draft. */
+export function buildBriefPrompt(kind: BriefKind, source: string, retryErrors?: string[], window?: { kind?: string; hours?: number }): string {
   const c = config.mail;
-  const span = kind === 'daily' ? 'today' : 'this week';
+  const span = briefPromptSpan(kind, window);
   const lines = [
-    `You write the short summary at the top of Element's ${kind} news brief for college students and busy young adults.`,
-    `Write about ${c.summaryTargetWords} words (between ${c.summaryMinWords} and ${c.summaryMaxWords}) in ${c.summaryParagraphs[0]} to ${c.summaryParagraphs[1]} short paragraphs, separated by one blank line, that tell a reader what mattered ${span}.`,
+    `You write the short summary at the top of Element's ${kind} news brief for readers aged about 16 to 50 who follow business, the economy, markets and investing. They know the basics but prefer plain words.`,
+    `Write about ${c.summaryTargetWords} words (between ${c.summaryMinWords} and ${c.summaryMaxWords}) in ${c.summaryParagraphs[0]} to ${c.summaryParagraphs[1]} short paragraphs, separated by one blank line, that tell a reader what mattered in ${span}.`,
     'Use ONLY facts stated in the BRIEF below. Do not add anything from memory.',
-    'STYLE: plain words at about an 8th-grade reading level, short sentences, no jargon. Calm, neutral tone. No hype.',
-    '- Cover the BREADTH of the brief: mention several different topics, not only the first one.',
-    '- Paragraph 1: the single most important story and why it matters. Paragraph 2: the other important topics, one or two sentences each. Then a paragraph on markets (stories and numbers) when the BRIEF has them. Last paragraph: what to keep an eye on, ONLY if the BRIEF supports it.',
-    '- The last sentence may say why it matters to a regular person, ONLY if that follows directly from the brief.',
+    'STYLE: clear and direct, like a good markets newsletter. Short sentences. Calm, neutral tone. No hype. Give any term outside everyday finance words a plain definition of a few words in brackets.',
+    '- ORDER (most important first). Paragraph 1 = the Federal Reserve and the most important economic data in the BRIEF (inflation, jobs, GDP, rates, Treasury, BLS, BEA), with their numbers from NUMBERS. Paragraph 2 = market-moving news about large listed companies, one or two sentences each. Then a short paragraph on the other topics. Recalls, space and science items go last, and only if the BRIEF lists them.',
+    '- The BRIEF lists its sections in this order already: NUMBERS, ECONOMY FED AND GOVERNMENT, COMPANIES AND MARKETS, OTHER NEWS, then RECALLS SPACE AND SCIENCE. Follow it. A single company filing never comes before an economic release.',
+    '- Always mention the biggest economic numbers in NUMBERS that changed (for example GDP, payrolls, CPI, the unemployment rate, the 10-year yield) before any single company. Mention each number once.',
+    '- Cover the BREADTH of the brief: mention several different topics, not only the first one. Do not stitch unrelated items together with "Meanwhile" or "In other news"; start a new sentence about the new topic.',
+    '- Why it matters: only when the BRIEF states the reason or a comparison. No could, may, likely or expected to unless the BRIEF says it, and then attribute it. Name scheduled next steps only when the BRIEF gives a date.',
+    '- One direction word per change ("fell 18% to"), "percentage points" not "pts", acronyms in capitals (NASA, FOMC, SEC, FCC, CPI, GDP, U.S.), proper nouns capitalised (Mars, Moon, United States), dates as numerals ("Nov 5").',
+    `- Attribute claims and forecasts to who made them. Use no relative time words other than the brief's own span (${span}).`,
     'HARD RULES (a summary that breaks one is rejected):',
     '- Every number you write must appear in the BRIEF exactly as written. Do not calculate new numbers. Do not write dates or times unless they are in the BRIEF.',
     '- Never give investment advice, opinions or predictions. Do not use words like buy, sell, should, recommend, price target.',
     `- Do not copy more than ${c.summaryCopyLimitWords - 2} words in a row from the BRIEF; rephrase.`,
     '- Every sentence adds something new. No filler such as "In summary" or "This means that".',
-    '- Plain text only: no headings, bullets, markdown, links or quotation marks around the whole answer. Separate paragraphs with exactly one blank line.',
+    '- Plain text only: no headings, bullets, markdown, links or quotation marks around the whole answer. Separate paragraphs with exactly one blank line. (The app adds its own 3-bullet lead; do not write one.)',
     'Return only the summary text.',
   ];
   if (retryErrors?.length) lines.push('', `Your previous answer was rejected for: ${retryErrors.join('; ')}. Fix these problems.`);
@@ -180,8 +195,8 @@ const stripEnd = (s: string) => oneLine(s).replace(/[.!?]+$/, '');
 
 /** Summary built straight from the headlines and topic names. No AI; used when both providers fail. */
 export function templateBriefSummary(kind: BriefKind, brief: BriefInput): string {
-  const span = kind === 'daily' ? 'today' : 'this week';
-  const heads = (brief.headline_cards?.length ? brief.headline_cards : allBriefCards(brief)).map((c) => stripEnd(c.headline)).filter(Boolean);
+  const span = kind === 'daily' ? (brief.window_kind === 'since_friday' ? 'since Friday' : 'today') : 'this week';
+  const heads = orderBriefCards(allBriefCards(brief)).map((c) => stripEnd(c.headline)).filter(Boolean);
   const topics = (brief.sections ?? []).filter((s) => s.cards?.length).map((s) => stripEnd(s.label)).filter(Boolean);
   const out: string[] = [];
   if (heads[0]) out.push(`The top story ${span}: ${heads[0]}.`);
@@ -285,7 +300,7 @@ export async function generateBriefSummary(
       counter.add(m.name);
       let raw: string;
       try {
-        raw = await m.generate(buildBriefPrompt(kind, source, retryErrors));
+        raw = await m.generate(buildBriefPrompt(kind, source, retryErrors, { kind: brief.window_kind, hours: brief.window_hours }));
       } catch (e) {
         log.push(`${m.name}: ${(e as Error).name}: ${(e as Error).message}`);
         break;                                      // 429, timeout or provider error: next provider
@@ -348,6 +363,7 @@ export async function runBriefSummary(
       out.push({ kind, status: 'exists', for_date, text: brief.summary?.text, model: brief.summary?.model, brief });
       continue;
     }
+    if (brief.fallback) { deps.log(`${kind}: no new stories in the window (the brief shows older cards), keeping the last summary`); out.push({ kind, status: 'empty', for_date, brief }); continue; }
     if (briefIsEmpty(brief)) { deps.log(`${kind}: the brief has no stories, nothing to summarize`); out.push({ kind, status: 'empty', for_date, brief }); continue; }
     const r = await generateBriefSummary(kind, brief, deps.models, deps.counter);
     for (const l of r.log) deps.log(`${kind}: ${l}`);

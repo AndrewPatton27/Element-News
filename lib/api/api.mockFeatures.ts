@@ -2,6 +2,7 @@
 // Kept separate from fixture-loading code so these rules can run under node:test.
 import type { BlurbCard, Brief, BriefSubscribeResult, BriefSubscriptionInput, BriefTokenResult, FeedPage, MyBriefChangeResult, MyBriefSubscription, MacroFact, NumberTrend, StoryLink } from '../../contract/types.ts';
 import { mockRankScore } from '../feed/feedLogic.ts';
+import { dailyWindow } from '../brief/briefWindow.ts';
 import { rankSearch } from '../search/searchLogic.ts';
 import { isValidBriefInput, normalizeBriefEmail } from '../shared/types.ts';
 import { tagSampleCards } from '../companies/companyApi.ts';
@@ -15,7 +16,7 @@ export const MARKET_SERIES = ['DGS10', 'DGS2', 'DFF', 'DCOILWTICO'];
 /** Same caps as api.subscribe_brief (context/settings.md). */
 export const BRIEF_CAPS = { perEmailPerDay: 5, globalPerHour: 200 };
 
-export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], trends: NumberTrend[], storyLinks: { card_id: string; related_id: string; kind: StoryLink["kind"] }[] = []) {
+export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], trends: NumberTrend[], storyLinks: { card_id: string; related_id: string; kind: StoryLink["kind"] }[] = [], clock: () => number = Date.now) {
   // Give the regular sample feed a small, deterministic linked-story chain too.
   const sampleLinks = storyLinks.length ? storyLinks : (() => {
     const anchor = cards.find((c) => c.category === 'markets');
@@ -34,15 +35,26 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
   // Same rules as api.daily_brief / api.weekly_brief (migration 20261018030000_brief_depth.sql):
   // a section for every topic (best 8, most important first), deeper for the top topics, one card per story.
   const BRIEF_MAX_SECTIONS = 8;
-  const BRIEF_WIDEN_BELOW = 12;
+  const BRIEF_FALLBACK_MAX_HOURS = 720; // like core.brief_effective_window: reach back to the last good cards, at most 30 days
   const storyKey = (c: BlurbCard) => (c as { dedupe_key?: string }).dedupe_key ?? c.id; // server cards carry dedupe_key
   const briefLimit = (rank: number, top: number) => (rank <= 3 ? top : rank <= 5 ? 3 : 2);
   const brief = (requestedWindow: number): Brief => {
-    const inWindow = (hours: number) => cards.filter((c) => Date.parse(c.sort_at) >= Date.now() - hours * 3_600_000);
-    let window_hours = requestedWindow;
-    if (requestedWindow === 24) {
-      if (inWindow(24).length < BRIEF_WIDEN_BELOW) window_hours = inWindow(48).length < BRIEF_WIDEN_BELOW ? 72 : 48;
+    const inWindow = (hours: number) => cards.filter((c) => Date.parse(c.sort_at) >= clock() - hours * 3_600_000);
+    // 24 h (72 h on Monday, "since Friday"); weekly 168 h. Never empty: no card in the window = last good cards, flagged.
+    const daily = requestedWindow !== 168;
+    const win = daily ? dailyWindow(new Date(clock())) : { hours: 168, kind: 'week' as const };
+    let window_hours = win.hours;
+    let fallback = false;
+    let as_of: string | null = null;
+    if (inWindow(window_hours).length === 0) {
+      const newest = cards.reduce((m, c) => Math.max(m, Date.parse(c.sort_at)), 0);
+      if (newest > 0 && clock() - newest <= BRIEF_FALLBACK_MAX_HOURS * 3_600_000) {
+        fallback = true;
+        window_hours = Math.min(BRIEF_FALLBACK_MAX_HOURS, Math.max(window_hours, Math.ceil((clock() - newest) / 3_600_000) + 24));
+      }
     }
+    const inView = inWindow(window_hours);
+    if (inView.length) as_of = new Date(inView.reduce((m, c) => Math.max(m, Date.parse(c.sort_at)), 0)).toISOString();
     const top = requestedWindow === 168 ? 8 : 6;
     const seen = new Set<string>();
     const rankedAll = inWindow(window_hours)
@@ -59,7 +71,8 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
     const ranked = rankedAll.filter((c) => !MARKET_CATEGORIES.has(c.category));
     const topics = groupTopics(ranked).slice(0, BRIEF_MAX_SECTIONS);
     return {
-      generated_at: new Date().toISOString(), window_hours,
+      generated_at: new Date(clock()).toISOString(), window_hours, window_kind: win.kind, fallback, as_of,
+      brief_date: new Date(clock()).toISOString().slice(0, 10),
       headline_cards: groupTopics(rankedAll).slice(0, 3).map(([, g]) => g[0]),
       sections: topics.map(([category, grouped], i) => ({
         category, slug: category, label: category, rank: i + 1, total: grouped.length, cards: grouped.slice(0, briefLimit(i + 1, top)),
@@ -71,6 +84,7 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       markets: { cards: marketCards.slice(0, 6), numbers: numbers.filter((n) => MARKET_SERIES.includes(n.series_id)).slice(0, 4), total: marketCards.length },
     };
   };
+  const emptyMockBrief = (): Brief => ({ generated_at: new Date(0).toISOString(), window_hours: 24, headline_cards: [], sections: [], numbers: [] });
   // In-memory email subscriptions with the same answers as the RPCs (never reveals an existing address).
   type Sub = { email: string; token: string; status: 'pending' | 'active' | 'unsubscribed' } & BriefSubscriptionInput;
   const subs = new Map<string, Sub>();
@@ -176,7 +190,7 @@ export function createMockFeatureApi(cards: BlurbCard[], numbers: MacroFact[], t
       ];
       return page(items, f.cursor, f.limit);
     },
-    dailyBrief: () => brief(24),
+    dailyBrief: () => ((globalThis as { __ELEMENT_MOCK_EMPTY_BRIEF__?: boolean }).__ELEMENT_MOCK_EMPTY_BRIEF__ ? emptyMockBrief() : brief(24)), // the flag simulates a back end with no brief yet (e2e)
     weeklyBrief: () => ({ ...brief(168), movers: trends.slice(0, 4).map((t) => ({ ...t, points: [...t.points] })) }),
   };
 }

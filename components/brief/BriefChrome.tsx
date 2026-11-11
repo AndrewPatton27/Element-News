@@ -61,14 +61,14 @@ export function BriefEmpty({
   const p = usePalette();
   const name = mode === 'weekly' ? 'weekly' : 'daily';
   return (
-    <View style={[styles.empty, { backgroundColor: p.surface, borderColor: p.border }]} accessibilityLabel={hidden ? 'Brief is hidden by your settings' : 'Brief not ready'}>
+    <View style={[styles.empty, { backgroundColor: p.surface, borderColor: p.border }]} accessibilityLabel={hidden ? 'Brief is hidden by your settings' : 'No stories in the brief yet'}>
       <Text accessibilityRole="header" style={[styles.emptyTitle, { color: p.ink }]}>
-        {hidden ? 'Everything here is hidden' : `Your ${name} brief is not ready yet`}
+        {hidden ? 'Everything here is hidden' : `No stories in your ${name} brief yet`}
       </Text>
       <Text style={[styles.emptyText, { color: p.muted }]}>
         {hidden
           ? 'The topics and sources you switched off cover this whole brief. You can change that in your account.'
-          : `The ${name} brief is put together from the top stories of the ${mode === 'weekly' ? 'week' : 'day'}. Check back soon, or read what is new in the feed.`}
+          : `The ${name} brief fills in as soon as stories are published. Try again in a moment, or read what is new in the feed.`}
       </Text>
       <View style={styles.emptyActions}>
         {hidden && onSettings ? (
