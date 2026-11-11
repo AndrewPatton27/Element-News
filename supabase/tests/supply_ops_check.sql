@@ -4,7 +4,7 @@
 do $$
 declare
   j jsonb; r jsonb; v_id uuid; v_cat text;
-  tok constant text := 'test-watchdog-token-0123456789';
+  tok constant text := 'test-watchdog-token-0123456789-abcdefghij';
 begin
   delete from core.blurbs;
   select slug into v_cat from core.categories limit 1;

@@ -16,6 +16,7 @@ declare
   clients text[];
   owner_name text;
   rn text;
+  leftover text;
 begin
   if not exists (select 1 from pg_namespace where nspname = 'net') then
     raise notice 'revoke_pg_net: schema net not present, nothing to do';
@@ -56,6 +57,15 @@ begin
       raise warning 'revoke_pg_net: could not revoke on % (%), run as supabase_admin in the dashboard SQL editor', f.sig, sqlerrm;
     end;
   end loop;
+
+  -- final check: fail loudly (rolls the migration back) if any client role can still execute a net.* function
+  select string_agg(p.oid::regprocedure::text || ' -> ' || r, '; ') into leftover
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  cross join unnest(clients) r
+  where n.nspname = 'net' and has_function_privilege(r, p.oid, 'execute');
+  if leftover is not null then
+    raise exception 'revoke_pg_net: client roles can still execute net functions: %. Run the revokes as supabase_admin in the dashboard SQL editor.', leftover;
+  end if;
 end
 $net$;
 

@@ -25,7 +25,7 @@ begin
   perform api.report_blurb(v_id, 'inaccurate');
   select count(*) into v_n from core.blurb_reports where blurb_id = v_id;
   if v_n <> 1 then raise exception 'FAIL: duplicate report stored (% rows)', v_n; end if;
-  if exists (select 1 from core.blurb_reports where reporter_key like '%203.0.113.9%' or reporter_key = 'anon') then
+  if exists (select 1 from core.blurb_reports where reporter_key like '%203.0.113.9%' or reporter_key in ('anon','none')) then
     raise exception 'FAIL: the IP address must not be stored, and a header must give a hashed key'; end if;
   if not exists (select 1 from core.blurb_reports where reporter_key like 'i:%' and reporter_id is null) then
     raise exception 'FAIL: anonymous key missing'; end if;
@@ -41,7 +41,7 @@ begin
   exception when sqlstate 'PT429' then v_ok := true; end;
   if not v_ok then raise exception 'FAIL: the 21st report in an hour was not limited'; end if;
   -- a different client is not affected
-  perform set_config('request.headers', '{"x-forwarded-for":"198.51.100.4, 10.0.0.1"}', true);
+  perform set_config('request.headers', '{"cf-connecting-ip":"198.51.100.4, 10.0.0.1"}', true);
   perform api.report_blurb(v_id, 'misleading');
 
   -- 4. global ceiling

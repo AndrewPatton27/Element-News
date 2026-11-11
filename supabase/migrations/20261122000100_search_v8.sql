@@ -95,6 +95,7 @@ begin
          coalesce(max(value) filter(where key='search_min_relevance'),0.05),
          coalesce(max(value) filter(where key='search_recency_weight'),0.3)
     into v_h,v_cap,v_w,v_aw,v_hw,v_mpen,v_cmin,v_idf,v_pcap,v_mr,v_rw from core.rank_params;
+  v_pcap := least(greatest(coalesce(v_pcap,2000),1),10000);   -- clamp: a bad rank_params value cannot widen the scan
   v_mr := least(greatest(v_mr,0),0.5); v_rw := least(greatest(v_rw,0),1);
   v_h := greatest(v_h,0.5); v_w := least(greatest(v_w,0),0.5); v_aw := least(greatest(v_aw,0),1);
   v_hw := least(greatest(v_hw,0),1); v_mpen := least(greatest(v_mpen,0),1);

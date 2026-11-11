@@ -4,7 +4,7 @@
 do $$
 declare
   j jsonb; n int; rid bigint; rid2 bigint; today date := (now() at time zone 'utc')::date;
-  tok constant text := 'test-watchdog-token-0123456789';
+  tok constant text := 'test-watchdog-token-0123456789-abcdefghij';
 begin
   delete from ingest.run_log;
   delete from core.blurbs;
