@@ -29,3 +29,31 @@ export function decideReportCardRetry(note: string | null | undefined, code: str
   if (failures >= max) return { status: 'skipped', note: code, failures };
   return { status: 'new', note: `report_card_retry:${failures}:${code}`, failures };
 }
+
+// ---- soft retry: AI drafts rejected, no template card possible (M9c, R-300) ------------------------------------------------
+const SOFT_NOTE = /^retry:(\d{1,3}):/;
+
+/** Failures recorded so far by decideSoftRetry (0 when the note holds no such counter). */
+export function softRetryFailures(note: string | null | undefined): number {
+  const m = SOFT_NOTE.exec(note ?? '');
+  return m ? Math.min(Number(m[1]), 999) : 0;
+}
+
+/**
+ * True when at least one AI provider answered and its draft was rejected by a check (chain log line "<provider>: rejected
+ * (attempt n)"). Only then does a failure count against the item: a run with no reachable AI (cap, rate limit, no key) says
+ * nothing about the item and leaves it for a later run without using up a retry.
+ */
+export function aiDraftsRejected(chainLog: readonly string[]): boolean {
+  return chainLog.some((l) => /: rejected \(attempt \d+\)/.test(l));
+}
+
+/**
+ * The item just failed (`code` = 'template_not_allowed' or 'no_figures'). Failure n = previous + 1. Below `max` it stays 'new'
+ * with note 'retry:<n>:<code>' (api.upsert_item returns the note next run); at `max` it is skipped with the plain code.
+ */
+export function decideSoftRetry(note: string | null | undefined, code: string, max: number = config.softRetry.maxFailures): RetryDecision {
+  const failures = softRetryFailures(note) + 1;
+  if (failures >= max) return { status: 'skipped', note: code, failures };
+  return { status: 'new', note: `retry:${failures}:${code}`, failures };
+}

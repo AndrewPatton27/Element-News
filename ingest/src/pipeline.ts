@@ -32,7 +32,7 @@ import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, type TopicFilterState } from './topicFilter.ts';
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
-import { decideReportCardRetry } from './retry.ts';
+import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
   | 'eia' | 'census' | 'auctions' | 'fomc';
@@ -461,6 +461,7 @@ interface Job {
 async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: number): Promise<void> {
   const cands: Array<{ source: string; score: number; job: Job; it: RawItem; row: ItemRow }> = [];
   for (const job of jobs) {
+    await dropHandled(job);
     let newHere = 0;
     const groupNew = new Map<string, number>();
     for (const it of job.items) {
@@ -552,7 +553,8 @@ async function processItems(
   const job: Job = { items, deps, stats, budget, guard, chain, pageText, preCheck, limits, fresh: 0, alreadyHandled: 0, perGroup: new Map() };
   const collector = runState().collector;
   if (collector) { collector.push(job); return { fresh: 0, alreadyHandled: 0 }; }   // candidate selection: spent later by runSelected
-  for (const it of items) {
+  await dropHandled(job);
+  for (const it of job.items) {
     if (budget.left <= 0) { deps.log('limit reached'); break; }
     if (limits.total !== undefined && job.fresh >= limits.total) {
       deps.log(`new-item limit reached (${limits.total} new per run)`);
@@ -562,6 +564,31 @@ async function processItems(
   }
   limits.onDone?.({ fresh: job.fresh, alreadyHandled: job.alreadyHandled });
   return { fresh: job.fresh, alreadyHandled: job.alreadyHandled };
+}
+
+/**
+ * One database call for the whole candidate list (publisher.handledUrls): items an earlier run already finished are
+ * counted as skipped + alreadyHandled and removed from job.items, so they cost no per-item upsert round trip. Before
+ * this an SEC run spent its 100 s time budget on about 340 such upserts and stopped with 180 filings unvisited (R-300).
+ * Same outcome as the per-item check in handleItem, which still runs for everything left. No handledUrls, or a failure
+ * of the call = nothing is dropped (the per-item check decides).
+ */
+async function dropHandled(job: Job): Promise<void> {
+  const fn = job.deps.publisher.handledUrls;
+  if (!fn || job.items.length < 2) return;
+  let handled: Set<string>;
+  try {
+    handled = await fn.call(job.deps.publisher, job.items.map((i) => i.url));
+  } catch (e) {
+    job.deps.log(`handled-items check failed (checking item by item): ${(e as Error).message}`);
+    return;
+  }
+  if (!handled.size) return;
+  const keep = job.items.filter((i) => !handled.has(i.url));
+  const dropped = job.items.length - keep.length;
+  job.stats.skipped += dropped;
+  job.alreadyHandled += dropped;
+  job.items = keep;
 }
 
 /** One candidate item through steps 2-7 of processItems. `known` = the item row when the selection step already recorded it. */
@@ -629,14 +656,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       // is never published. If an AI draft was tried and rejected for it, retrying later would repeat the
       // same result, so the item is closed; if no AI was available, it stays 'new' for a later run.
       stats.skipped++;
-      deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}`);
+      deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}  [${chainNote(r.log)}]`);
       if (r.log.some((l) => /no_figures/.test(l))) await deps.publisher.setItemStatus(row.id, 'skipped', 'no_figures').catch(() => {});
+      else await softRetry(deps, row, 'no_figures', r.log, it.title);
       return;
     }
     if (!r.ai_generated && !templateAllowed(it)) {
       stats.skipped++;
-      // Item status stays 'new' on purpose: a later run with a working AI provider retries it.
-      deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}`);
+      // Item status stays 'new' (a later run with a working AI provider retries it), but only max softRetry.maxFailures times
+      // when AI drafts were tried and rejected: before, one such item re-spent 4 AI calls every hour for ever (R-300).
+      deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}  [${chainNote(r.log)}]`);
+      await softRetry(deps, row, 'template_not_allowed', r.log, it.title);
       return;
     }
     let payload = buildPublishPayload(it, r.draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
@@ -749,6 +779,22 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     deps.log(`failed: ${it.url}: ${(e as Error).message}`);
     await deps.publisher.setItemStatus(row.id, 'failed', (e as Error).message).catch(() => {});
   }
+}
+
+/** Chain log for a skip line: provider outcomes and validator error names, no source text and no keys; cut to 300 characters. */
+function chainNote(log: readonly string[]): string {
+  return log.join(' | ').slice(0, 300);
+}
+
+/**
+ * An item the AI could not turn into a card and that cannot be a template card. Counts a failure only when an AI draft was
+ * actually rejected (aiDraftsRejected); the third failure skips the item for good (src/retry.ts decideSoftRetry).
+ */
+async function softRetry(deps: Deps, row: ItemRow, code: string, chainLog: readonly string[], title: string): Promise<void> {
+  if (!aiDraftsRejected(chainLog)) return;                    // no AI was reachable: stays 'new', costs nothing, not counted
+  const d = decideSoftRetry(row.status_note, code);
+  deps.log(`${code}: failure ${d.failures} of ${config.softRetry.maxFailures}, ${d.status === 'new' ? 'will retry' : 'final'}: ${title.slice(0, 80)}`);
+  await deps.publisher.setItemStatus(row.id, d.status, d.note).catch(() => {});
 }
 
 /**

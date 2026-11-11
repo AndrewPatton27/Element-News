@@ -174,7 +174,7 @@ test('an AI draft without a valid score is rejected (retry, then the template: a
     assert.equal(s.template, 0, 'the 2.02 template card has no figures, so it is never published');
     assert.equal(s.published, 0);
     assert.equal(r.dry.cards.length, 0);
-    assert.ok(r.lines.includes('skip no_figures (earnings card without figures, template): Apple Inc. 8-K'), r.lines.join('\n'));
+    assert.ok(r.lines.some((l) => l.startsWith('skip no_figures (earnings card without figures, template): Apple Inc. 8-K')), r.lines.join('\n'));
   }
 });
 
@@ -193,13 +193,13 @@ test('chain: low score returns at once with low_relevance; no minRelevance = old
 
 // ---- template cards -------------------------------------------------------------------
 
-test('template cards: Fed, BEA and watch-list 2.02/5.02/1.05/4.02/2.05 only; never Federal Register', () => {
+test('template cards: Fed, BEA and watch-list 2.02/5.02/1.05/4.02/2.05/1.01/2.01 only; never Federal Register', () => {
   const sec = (...n: string[]) => ({ source: 'sec_8k', items: items(...n) }) as unknown as RawItem;
   assert.equal(templateAllowed({ source: 'fed_rss' } as RawItem), true);
   assert.equal(templateAllowed({ source: 'bea_rss' } as RawItem), true);
   assert.equal(templateAllowed({ source: 'fedreg' } as RawItem), false);
-  for (const n of ['2.02', '5.02', '1.05', '4.02', '2.05']) assert.equal(templateAllowed(sec(n, '9.01')), true, n);
-  for (const n of ['1.01', '2.01', '1.03']) assert.equal(templateAllowed(sec(n, '9.01')), false, n);
+  for (const n of ['2.02', '5.02', '1.05', '4.02', '2.05', '1.01', '2.01']) assert.equal(templateAllowed(sec(n, '9.01')), true, n);
+  for (const n of ['1.03', '3.01', '4.01']) assert.equal(templateAllowed(sec(n, '9.01')), false, n);
 });
 
 test('pipeline: template-only run publishes no Federal Register card (5 skipped, item status left "new" for a later AI run)', async () => {

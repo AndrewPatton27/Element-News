@@ -65,6 +65,9 @@ export interface PublisherGuardCounts {
   stoppedBy: StopReason;
 }
 
+/** Skip reasons set before any AI call (see guardPublisher). */
+const NO_AI_SKIPS = new Set(['routine_5.02']);
+
 /** Wraps a Publisher so the pipeline stops starting new items at the deadline or the work cap. */
 export function guardPublisher(pub: Publisher, budget: TimeBudget, workCap: number): { publisher: Publisher; counts: PublisherGuardCounts } {
   const counts: PublisherGuardCounts = { itemsNew: 0, deferredTime: 0, deferredCap: 0, stoppedBy: 'done' };
@@ -85,6 +88,12 @@ export function guardPublisher(pub: Publisher, budget: TimeBudget, workCap: numb
       const row = await pub.upsertItem(item);
       if (row.is_new || row.status === 'new') counts.itemsNew++;
       return row;
+    },
+    // An item closed BEFORE any AI call (routine 5.02: director-only change, found after the page fetch) cost one fetch,
+    // not a unit of real work: give its slot back so such filings do not use up the call's work cap (R-300).
+    async setItemStatus(id, status, note) {
+      if (status === 'skipped' && NO_AI_SKIPS.has(note) && counts.itemsNew > 0) counts.itemsNew--;
+      return pub.setItemStatus(id, status, note);
     },
   };
   return { publisher, counts };

@@ -3,7 +3,7 @@
 // Run: npm run test:functions
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleIngestSource, parseIngestOptions, DEFAULT_WORK_CAP } from './handler.ts';
+import { handleIngestSource, parseIngestOptions, DEFAULT_WORK_CAP, defaultWorkCapFor } from './handler.ts';
 import { createTimeBudget } from '../_shared/budget.ts';
 import { memoryUsageStore } from '../_shared/usage.ts';
 import { readFunctionEnv } from '../_shared/env.ts';
@@ -30,6 +30,14 @@ function setup(o: { tick?: number; providers?: Summarizer[]; usage?: Record<stri
     },
   };
 }
+
+test('options: sec gets the higher default work cap (config.workCapBySource); an explicit work_cap still wins; others stay at the default', () => {
+  assert.equal(defaultWorkCapFor('sec'), 10);
+  assert.equal(parseIngestOptions({ source: 'sec' }).workCap, 10);
+  assert.equal(parseIngestOptions({ source: 'sec', work_cap: 4 }).workCap, 4);
+  assert.equal(parseIngestOptions({ source: 'cpsc' }).workCap, DEFAULT_WORK_CAP);
+  assert.ok(defaultWorkCapFor('sec') <= 20);
+});
 
 test('options: source must be known; work_cap 1-20, default 5', () => {
   assert.deepEqual(parseIngestOptions({ source: 'fed' }), { source: 'fed', workCap: DEFAULT_WORK_CAP, finish: false });

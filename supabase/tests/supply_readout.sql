@@ -130,3 +130,13 @@ select count(*) filter (where published_at > now() - interval '24 hours')::int a
        count(*)::int as live_total
   from core.blurbs
  where status = 'published' and superseded_by is null;
+
+-- name: stuck_new_items
+-- Items still 'new' that an hourly run touched more than 2 days after they were first listed, i.e. retried every run without ever
+-- closing (the Best Buy 2.02 case of R-300: 4 AI calls per hour for weeks). After the M9c fix this should be 0 for new rows:
+-- a rejected-draft item is retried 3 times and then skipped. Source, count, oldest published_at, newest touch.
+select i.source, count(*)::int as items, min(i.published_at)::date as oldest_published, max(i.fetched_at) as last_touched
+  from ingest.items i
+ where i.status = 'new' and i.fetched_at > now() - interval '3 days' and i.published_at < now() - interval '2 days'
+ group by 1
+ order by items desc;
