@@ -110,14 +110,17 @@ export function checkGrants(rows) {
       } else if (['core', 'ingest', 'public', 'vault'].includes(r.s) && (r.anon || r.authd)) {
         fail.push(`client role can execute ${fq(r)}`);
       } else if (r.s === 'net' && (r.anon || r.authd || r.authr)) {
-        // pg_net (http_get / http_post) lets a client role make the database call out; fixed by 20261130000000_revoke_pg_net.sql
-        fail.push(`client role can execute ${fq(r)}`);
+        // Accepted exception (D-290): pg_net's grants were made by supabase_admin, which neither the CLI nor the dashboard role
+        // (postgres) can revoke (20261130000000_revoke_pg_net.sql cannot take effect). Only the `api` schema is exposed through
+        // PostgREST, so this needs a direct database login as a client role. A WARN, not a FAIL, until Supabase support revokes it.
+        warn.push(`client role can execute ${fq(r)} (accepted: pg_net grants owned by supabase_admin)`);
       }
     } else if (r.k === 'rel') {
       if (['core', 'ingest', 'public'].includes(r.s) && (r.anon || r.authd)) fail.push(`client role has table privileges on ${r.s}.${r.name}`);
       if (['core', 'ingest'].includes(r.s) && r.args === 'r' && r.rls === false) fail.push(`row level security off on ${r.s}.${r.name}`);
     } else if (r.k === 'schema') {
-      if (['core', 'ingest', 'vault', 'cron', 'net'].includes(r.s) && (r.anon || r.authd || r.authr)) fail.push(`client role has USAGE on schema ${r.s}`);
+      if (['core', 'ingest', 'vault', 'cron'].includes(r.s) && (r.anon || r.authd || r.authr)) fail.push(`client role has USAGE on schema ${r.s}`);
+      else if (r.s === 'net' && (r.anon || r.authd || r.authr)) warn.push(`client role has USAGE on schema net (accepted: pg_net grants owned by supabase_admin)`);
     }
   }
   return { fail, warn };

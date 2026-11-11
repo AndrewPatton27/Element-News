@@ -63,13 +63,13 @@ test('grant check: allowlisted RPCs pass, service-only and core exposure fail', 
     fn('core', 'invoke_function', false, true), fn('api', 'x', false, false, { cfg: '' }), fn('net', 'http_post', true, true),
     { k: 'rel', s: 'core', name: 'user_events', args: 'r', anon: true, authd: false, rls: false }, { k: 'schema', s: 'vault', anon: true, authd: false },
     fn('api', 'search', false, false)]);
-  assert.equal(bad.fail.length, 10);
+  assert.equal(bad.fail.length, 9);
   assert.ok(bad.fail.some((f) => /anon can execute service-only api\.ml_v3_check/.test(f)));
   assert.ok(bad.fail.some((f) => /anon can execute service-only api\.track/.test(f)));
   assert.ok(bad.fail.some((f) => /without pinned search_path/.test(f)));
-  assert.ok(bad.fail.some((f) => /client role can execute net\.http_post/.test(f)));
-  assert.ok(checkGrants([fn('net', 'http_get', false, false, { authr: true })]).fail.length === 1);
-  assert.ok(checkGrants([{ k: 'schema', s: 'net', anon: false, authd: true }]).fail.some((f) => /USAGE on schema net/.test(f)));
+  assert.ok(bad.warn.some((f) => /client role can execute net\.http_post/.test(f)));
+  assert.ok(checkGrants([fn('net', 'http_get', false, false, { authr: true })]).warn.length === 1 && checkGrants([fn('net', 'http_get', false, false, { authr: true })]).fail.length === 0, 'pg_net client grants are an accepted WARN (D-290)');
+  assert.ok(checkGrants([{ k: 'schema', s: 'net', anon: false, authd: true }]).warn.some((f) => /USAGE on schema net/.test(f)));
   assert.deepEqual(checkGrants([fn('net', 'http_post', false, false)]), { fail: [], warn: [] });
   assert.ok(bad.warn.some((w) => /search/.test(w)));
   assert.ok(ANON_API.includes('ops_status'));
