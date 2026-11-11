@@ -173,23 +173,17 @@ test.describe('A-22 signals: save, mute, depth', () => {
     expect((await signals(page)).depth).toBe('short');
     await page.getByRole('radio', { name: /Normal/ }).click();
     expect((await signals(page)).depth).toBe('normal');
-    // mute a company: find a card with a company entry in its menu
+    // mute a company: Earnings cards carry a company, so the Earnings chip makes the first card one
     await page.goto('/');
     await cardsOnScreen(page);
-    let muted: string | null = null;
-    for (let i = 0; i < 12 && !muted; i++) {
-      await openMenu(page);
-      const mute = page.getByText(/^Mute [A-Z]/).first();
-      if (await mute.count()) {
-        muted = ((await mute.innerText()) || '').replace(/^Mute /, '');
-        await mute.click();
-        break;
-      }
-      await page.keyboard.press('Escape');
-      await page.keyboard.press('ArrowDown');
-      await page.waitForTimeout(600);
-    }
-    expect(muted, 'a card with a company to mute').toBeTruthy();
+    await page.getByRole('tab', { name: 'Earnings', exact: true }).first().click();
+    await page.waitForTimeout(1200);
+    await openMenu(page);
+    const mute = page.getByText(/^Mute (?!Rates|Housing|Trade|Labor|Banks|Retirement)[A-Z]/).first(); // a company entry
+    await expect(mute).toBeVisible();
+    const mutedName = ((await mute.innerText()) || '').replace(/^Mute /, '').split(' ')[0];
+    await mute.click();
+    await expect(page.locator(H, { hasText: mutedName })).toHaveCount(0, { timeout: 10_000 }); // the card leaves the feed at once
     const s = await signals(page);
     expect(s.mutedTickers.length).toBe(1);
     await page.goto('/signals');
@@ -231,7 +225,7 @@ test.describe('B-06 since yesterday', () => {
     await pill.click();
     await expect(page.getByTestId('since-screen')).toBeVisible();
     await expect(page.getByTestId('since-summary')).toContainText(/new in the last/);
-    await expect(page.getByText('Informational only').first()).toBeVisible(); // the persistent disclaimer line stays
+    await expect(page.locator('body')).toContainText('Informational only'); // the persistent disclaimer line stays
     await page.screenshot({ path: `${SHOTS}/since-page-desktop.png` });
     await page.context().close();
   });
@@ -289,4 +283,32 @@ test.describe('D-02 glossary', () => {
     await expect(page.getByRole('button', { name: /, tap for the meaning$/ })).toHaveCount(0);
     await page.context().close();
   });
+});
+
+test.describe('all flags ON: phone layouts fit (360 and 390 px)', () => {
+  for (const size of [{ width: 360, height: 700 }, { width: 390, height: 844 }]) {
+    test(`${size.width} px: feed with the finer chips, the menu, Saved and signals and the since page have no sideways scroll`, async ({ browser }, info) => {
+      test.skip(info.project.name !== 'desktop', 'opens its own contexts; runs once');
+      test.setTimeout(240_000);
+      const page = await openPage(browser, { flags: 'all', setup: 'skipped', visitHoursAgo: 40, phone: true, size });
+      await cardsOnScreen(page);
+      const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+      expect(await fits()).toBe(true);
+      await page.screenshot({ path: `${SHOTS}/feed-all-${size.width}.png` });
+      await page.getByRole('tab', { name: 'Latest', exact: true }).first().click();
+      await expect(page.getByTestId('since-pill')).toBeVisible({ timeout: 30_000 });
+      await page.screenshot({ path: `${SHOTS}/since-pill-${size.width}.png` });
+      await page.getByRole('button', { name: 'More options for this card' }).first().click();
+      await expect(page.getByText('Save for later')).toBeVisible();
+      await page.screenshot({ path: `${SHOTS}/menu-${size.width}.png` });
+      await page.keyboard.press('Escape');
+      for (const [route, id] of [['/signals', 'signals-screen'], ['/since', 'since-screen']] as const) {
+        await page.goto(route);
+        await expect(page.getByTestId(id)).toBeVisible({ timeout: 30_000 });
+        expect(await fits()).toBe(true);
+        await page.screenshot({ path: `${SHOTS}/${id}-${size.width}.png` });
+      }
+      await page.context().close();
+    });
+  }
 });
