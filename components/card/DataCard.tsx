@@ -14,6 +14,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts } from '../../lib/theme/theme';
 import { linkProps } from './SourceChip';
+import { SeriesChart } from './SeriesChart';
 
 // Green = generally good for households, red = generally bad, gray = no change
 // or neither (see lib/numberTone.ts). The glyph and word carry the direction.
@@ -21,9 +22,32 @@ export function changeColor(p: Palette, f: Pick<MacroFact, 'series_id' | 'direct
   return changeToneColor(p, f.series_id, f.direction);
 }
 
-export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean }) {
+// The required notices (rule 8: the FRED notice) of a data card. The feed card renders them itself, outside its
+// scrolling middle, so a long card can never clip them (M9c fix #2); everywhere else DataFacts renders them.
+export function DataNotices({ card, config, small }: { card: BlurbCard; config: AppConfig | null; small?: boolean }) {
   const p = usePalette();
-  const notices = cardNotices(card, config);
+  return (
+    <>
+      {cardNotices(card, config).map((n) => (
+        <Text
+          key={n.key}
+          style={[styles.notice, small && styles.noticeSmall, { color: p.muted }]}
+          {...(n.url ? linkProps(n.url) : {})}
+          accessibilityRole={n.url ? 'link' : 'text'}
+          // Still clickable, but not a Tab stop: keyboard readers reach the card's own actions first (the same link is in the Sources sheet).
+          {...({ focusable: false, tabIndex: -1 } as object)}
+        >
+          {n.text}
+        </Text>
+      ))}
+    </>
+  );
+}
+
+// chartH: height of the history chart under the numbers (0 or missing = none; the feed card passes 0 on short phones);
+// `detail` draws the taller detail-sheet chart with its low/high line.
+export function DataFacts({ card, config, compact, dense, hideNotices, chartH = 0, detail }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean; hideNotices?: boolean; chartH?: number; detail?: boolean }) {
+  const p = usePalette();
   // One number gets the design's 64 px. Two short ones sit side by side, smaller, with the change
   // on its own line. Three numbers, or any long value ("10,284.57"), become rows (label and
   // citation left, value and change right), so a number never breaks across lines (break-ui).
@@ -77,22 +101,14 @@ export function DataFacts({ card, config, compact, dense }: { card: BlurbCard; c
         ))}
         </View>
         )}
+        {chartH > 0 ? <SeriesChart card={card} height={chartH} detail={detail} /> : null}
         {sharedCite ? (
           <Text numberOfLines={2} style={[styles.cite, styles.citeMulti, styles.citeShared, { color: p.inkSoft, borderTopColor: p.border }]}>
             {sharedCite}
           </Text>
         ) : null}
       </View>
-      {notices.map((n) => (
-        <Text
-          key={n.key}
-          style={[styles.notice, (compact || dense) && styles.noticeSmall, { color: p.muted }]}
-          {...(n.url ? linkProps(n.url) : {})}
-          accessibilityRole={n.url ? 'link' : 'text'}
-        >
-          {n.text}
-        </Text>
-      ))}
+      {hideNotices ? null : <DataNotices card={card} config={config} small={compact || dense} />}
     </View>
   );
 }

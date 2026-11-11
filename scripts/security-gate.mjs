@@ -29,6 +29,7 @@ export function checkHeaderSet(headers, html = '') {
   const get = (n) => (headers instanceof Map ? headers.get(n) : headers[n]) ?? '';
   const out = [];
   for (const [name, re] of Object.entries(REQUIRED_HEADERS)) if (!re.test(get(name))) out.push(`missing or weak ${name}`);
+  if (get('access-control-allow-origin').trim() === '*') out.push('Access-Control-Allow-Origin: * on the page (detach it in _headers)');
   const csp = get('content-security-policy');
   if (!/frame-ancestors\s+'none'/.test(csp) && !/^deny$/i.test(get('x-frame-options'))) out.push('page can be framed (no frame-ancestors / X-Frame-Options)');
   const full = /script-src/.test(csp) ? csp : get('content-security-policy-report-only');
@@ -48,6 +49,7 @@ export function checkBuildHeaders(headersText, html) {
   const all = rules.find((r) => r.path === '/*');
   if (!all) return ['_headers has no "/*" rule with the security headers'];
   const out = checkHeaderSet(all.headers, html);
+  if (!all.detached?.has('access-control-allow-origin')) out.push('_headers does not detach the default Access-Control-Allow-Origin: *');
   const cache = (p) => rules.find((r) => r.path === p)?.headers.get('cache-control') ?? '';
   if (!/immutable/.test(cache('/_expo/static/*'))) out.push('hashed bundles (/_expo/static/*) are not cached immutable');
   if (!/max-age=0/.test(cache('/'))) out.push('index HTML (/) is not revalidated (max-age=0)');
@@ -88,7 +90,7 @@ function listFiles(dir) {
 // ---- database grants ---------------------------------------------------------------------------------------
 /** api functions anon may execute (public read RPCs and the token-gated brief/ops calls). */
 export const ANON_API = ['card_by_id', 'card_companies', 'companies_directory', 'company_cards', 'confirm_brief', 'daily_brief', 'feed', 'feed_status',
-  'followed_micro', 'following_feed', 'number_trends', 'ops_status', 'related_cards', 'search', 'search_companies', 'sources', 'subscribe_brief',
+  'followed_micro', 'following_feed', 'macro_history', 'number_trends', 'ops_status', 'related_cards', 'report_blurb', 'search', 'search_companies', 'sources', 'subscribe_brief',
   'top_stories', 'unsubscribe_brief', 'update_brief_subscription', 'weekly_brief'];
 /** api functions only signed-in users may execute (in addition to ANON_API). */
 export const AUTH_API = ['delete_account', 'delete_my_data', 'feed_for_you', 'get_prefs', 'my_brief_subscriptions', 'my_categories',
@@ -107,14 +109,18 @@ export function checkGrants(rows) {
         if (!r.anon && ANON_API.includes(r.name)) warn.push(`public RPC not executable by anon: ${fq(r)}`);
       } else if (['core', 'ingest', 'public', 'vault'].includes(r.s) && (r.anon || r.authd)) {
         fail.push(`client role can execute ${fq(r)}`);
-      } else if (r.s === 'net' && (r.anon || r.authd)) {
-        warn.push(`client role holds EXECUTE on ${fq(r)} (safe only while the net schema is not exposed; fixed by 20261118000000_security_fixes.sql)`);
+      } else if (r.s === 'net' && (r.anon || r.authd || r.authr)) {
+        // Accepted exception (D-290): pg_net's grants were made by supabase_admin, which neither the CLI nor the dashboard role
+        // (postgres) can revoke (20261130000000_revoke_pg_net.sql cannot take effect). Only the `api` schema is exposed through
+        // PostgREST, so this needs a direct database login as a client role. A WARN, not a FAIL, until Supabase support revokes it.
+        warn.push(`client role can execute ${fq(r)} (accepted: pg_net grants owned by supabase_admin)`);
       }
     } else if (r.k === 'rel') {
       if (['core', 'ingest', 'public'].includes(r.s) && (r.anon || r.authd)) fail.push(`client role has table privileges on ${r.s}.${r.name}`);
       if (['core', 'ingest'].includes(r.s) && r.args === 'r' && r.rls === false) fail.push(`row level security off on ${r.s}.${r.name}`);
     } else if (r.k === 'schema') {
-      if (['core', 'ingest', 'vault', 'cron'].includes(r.s) && (r.anon || r.authd)) fail.push(`client role has USAGE on schema ${r.s}`);
+      if (['core', 'ingest', 'vault', 'cron'].includes(r.s) && (r.anon || r.authd || r.authr)) fail.push(`client role has USAGE on schema ${r.s}`);
+      else if (r.s === 'net' && (r.anon || r.authd || r.authr)) warn.push(`client role has USAGE on schema net (accepted: pg_net grants owned by supabase_admin)`);
     }
   }
   return { fail, warn };

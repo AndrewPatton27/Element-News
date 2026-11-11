@@ -17,6 +17,8 @@ import type { AppConfig, MacroFact } from '../../contract/types.ts';
 import type { Api } from '../../lib/api/api.ts';
 import { changeText, factA11yLabel } from '../../lib/shared/format';
 import { withToneLabel } from '../../lib/numbers/numberTone';
+import { factWhen } from '../../lib/numbers/numbersUpdated';
+import { tickerEmptyText } from '../../lib/numbers/tickerLogic';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { changeColor } from '../card/DataCard';
@@ -35,7 +37,7 @@ function factLabel(f: MacroFact): string {
 
 export function NumbersTicker({ api }: { api: Api; config: AppConfig | null }) {
   const p = usePalette();
-  const { facts } = useNumbers(api);
+  const { facts, error } = useNumbers(api);
   const router = useRouter();
   const openNumbers = () => router.push('/numbers');
   const [setWidth, setSetWidth] = useState(0);
@@ -103,7 +105,17 @@ export function NumbersTicker({ api }: { api: Api; config: AppConfig | null }) {
     };
   }, [setWidth, reduced, x]);
 
-  if (!facts || facts.length === 0) return null;
+  // Honest empty state: say so when the numbers could not load or there are none, instead of an empty band.
+  // While the first request is still running the band stays blank (no flash of text).
+  if (!facts || facts.length === 0) {
+    const text = tickerEmptyText(facts, error);
+    if (!text) return null;
+    return (
+      <Pressable onPress={openNumbers} accessibilityRole="link" accessibilityLabel={`${text} Opens Numbers to know.`} style={styles.emptyWrap}>
+        <Text style={[styles.emptyText, { color: p.inkSoft }]} numberOfLines={1}>{text}</Text>
+      </Pressable>
+    );
+  }
 
   const content = (f: MacroFact) => (
     <>
@@ -118,6 +130,10 @@ export function NumbersTicker({ api }: { api: Api; config: AppConfig | null }) {
           {changeText(f)}
         </Text>
       ) : null}
+      {/* The date the value is for ("Oct 16" or "Sep 2026"), so a value is never read as live. */}
+      <Text style={[styles.when, { color: p.muted }]} numberOfLines={1}>
+        {factWhen(f)}
+      </Text>
     </>
   );
 
@@ -201,6 +217,9 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.sans, fontSize: MIN_FONT, letterSpacing: 0.4, textTransform: 'uppercase' },
   value: { fontFamily: fonts.serif, fontSize: 18, lineHeight: 22 },
   change: { fontFamily: fonts.sansSemi, fontSize: MIN_FONT },
+  when: { fontFamily: fonts.sans, fontSize: MIN_FONT },
+  emptyWrap: { height: 44, justifyContent: 'center', paddingHorizontal: 16 },
+  emptyText: { fontFamily: fonts.sans, fontSize: MIN_FONT },
   fade: { position: 'absolute', top: 0, bottom: 0, width: 28, flexDirection: 'row' },
   fadeLeft: { left: 0 },
   fadeRight: { right: 0, flexDirection: 'row-reverse' },

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { config } from '../src/config.ts';
+(config as unknown as { secIndex: { rotationPerRun: number } }).secIndex.rotationPerRun = 100_000;   // fixture holds Apple's list only
 import { fixtureFetcher } from '../src/main.ts';
 import { runOnce, type Deps } from '../src/pipeline.ts';
 import { buildPublishPayload, createDryRunPublisher } from '../src/publish.ts';
@@ -141,15 +142,16 @@ test('pipeline: off-list, low-value and routine 5.02 filings are skipped before 
     now: new Date('2026-08-05T12:00:00Z'), log: (s) => lines.push(s),
   };
   const s = await runOnce(deps, { only: ['sec'] });
-  assert.equal(s.skipped, 2, lines.join('\n'));          // low_value (synthetic Apple 8.01) + routine_5.02 (Costco)
+  assert.equal(s.skipped, 2, lines.join('\n'));          // boilerplate_regfd (synthetic Apple 8.01) + routine_5.02 (Costco)
   assert.equal(s.published, 1);                          // REAL Apple 2.02 from the per-company list
   assert.equal(s.ai, 1);
-  assert.ok(lines.some((l) => l === 'skip low_value (items 8.01, 9.01): Apple Inc. 8-K'), lines.join('\n'));
+  // the synthetic Apple 8.01 now passes the gate (config.secRegFd) and is dropped as boilerplate before any AI call
+  assert.ok(lines.includes('skip boilerplate_regfd: Apple Inc. 8-K'), lines.join('\n'));
   assert.ok(lines.includes('skip routine_5.02: Costco Wholesale Corp 8-K'));
-  assert.ok(lines.some((l) => /4 filings \(feed \+ watch list\), 2 card candidates \(not candidates: not_watched 1, low_value 1\)/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /4 filings \(feed \+ watch list\), 3 card candidates \(not candidates: not_watched 1\)/.test(l)), lines.join('\n'));
   assert.equal(aiSaw.length, 1);
   assert.ok(!aiSaw.some((u) => u.includes('9999999') || u.includes('/909832/') || u.includes('/1500435/')), 'no AI call for skipped filings');
-  assert.ok(!requested.some((u) => u.includes('/000999999926000001/') || u.includes('/1500435/')), 'no page fetch for off-list or low-value filings');
+  assert.ok(!requested.some((u) => u.includes('/1500435/')), 'no page fetch for off-list filings (the Reg FD one is read once to judge boilerplate, then dropped before the AI)');
   const [c] = dry.cards;
   assert.equal(`${c.category}/${c.event_type}`, 'earnings/earnings');
   assert.ok(lines.some((l) => l.includes('category deals -> earnings (8-K items)')));

@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, treasury, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa),
+// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, beige, trade, regpress, annual, newsdata_market, newsdata_latest),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
@@ -20,7 +20,9 @@ import { createServiceRpc, type Rpc } from '../_shared/rpc.ts';
 import { buildRunSummary, runLogPayload, startRunLog, type RunSummary } from '../_shared/runSummary.ts';
 import { createUsageTracker, rpcUsageStore, withUsage, type UsageStore } from '../_shared/usage.ts';
 
-export const DEFAULT_WORK_CAP = 5;
+export const DEFAULT_WORK_CAP = config.defaultWorkCap;
+/** Work cap when the request gives none: config.workCapBySource (sec 10) or the default 5. */
+export function defaultWorkCapFor(source: string): number { return config.workCapBySource[source] ?? DEFAULT_WORK_CAP; }
 export const MAX_WORK_CAP = 20;
 
 export interface IngestOptions {
@@ -35,7 +37,7 @@ export interface IngestOptions {
 export function parseIngestOptions(o: Record<string, unknown>): IngestOptions {
   const source = String(o.source ?? '');
   if (!(SOURCE_NAMES as readonly string[]).includes(source)) throw new Error(`source must be one of ${SOURCE_NAMES.join(', ')}`);
-  const cap = o.work_cap === undefined || o.work_cap === '' ? DEFAULT_WORK_CAP : Number(o.work_cap);
+  const cap = o.work_cap === undefined || o.work_cap === '' ? defaultWorkCapFor(source) : Number(o.work_cap);
   if (!Number.isInteger(cap) || cap < 1 || cap > MAX_WORK_CAP) throw new Error(`work_cap must be a whole number from 1 to ${MAX_WORK_CAP}`);
   return { source: source as SourceName, workCap: cap, finish: truthy(o.finish) };
 }
@@ -101,6 +103,15 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       providers,
       counter: tracker.counter,
       fredApiKey: env.fredApiKey,
+      keys: { bls: env.blsApiKey, bea: env.beaApiKey, beaDataEnabled: env.beaDataEnabled, annualEnabled: env.annualEnabled, occEnabled: env.occEnabled },
+      eiaApiKey: env.eiaApiKey,
+      censusApiKey: env.censusApiKey,
+      // NewsData.io credits: one atomic database take per request (core.ai_usage, provider 'newsdata'), cap = the daily credit budget
+      newsdata: {
+        apiKey: env.newsdataApiKey,
+        enabled: env.newsdataEnabled,
+        takeCredit: async () => { try { await tracker.take('newsdata', config.newsdata.dailyCreditCap); return true; } catch { return false; } },
+      },
       now: deps.clock?.() ?? new Date(startedAt),
       log: say,
       reportCard: env.reportCard ? { enabled: true, scorerMaxGroqUsed: config.reportCard.cloudScorerMaxGroqUsed, scorerMaxPerRun: config.reportCard.scorerMaxPerRun } : undefined,
@@ -127,7 +138,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
   }
   const run = buildRunSummary({
     source: opts.source, startedAt, finishedAt: now(), stats, guard: guarded.counts,
-    aiCalls: tracker.totalTaken(), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
+    aiCalls: tracker.totalTaken() - (tracker.taken.newsdata ?? 0), aiDenied: tracker.denied, error, timedOut, modelMissing, log,
   });
   if (!opts.noRunLog) {
     try { await rpc('log_run', { p: runLogPayload(run, runId) }); } catch (e) { console.log(`warning: run log not written: ${(e as Error).message}`); }

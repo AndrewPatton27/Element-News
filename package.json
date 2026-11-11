@@ -43,6 +43,7 @@
     "test:scripts": "node --test \"scripts/__tests__/*.test.mjs\"",
     "test:sql": "node supabase/tests/run-pglite.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
     "release:check": "node scripts/release-check.mjs",
     "security:gate": "node scripts/security-gate.mjs",
     "smoke:prod": "node scripts/prod-smoke.mjs",

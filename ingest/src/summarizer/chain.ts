@@ -11,7 +11,9 @@
 // 5. Everyday relevance (same AI call): an AI draft scored below opts.minRelevance is returned at
 //    once with low_relevance = true (no validation, no retry), so a skipped item costs one AI call.
 //    With opts.requireRelevance, an AI draft without a valid 1-5 score counts as rejected.
-// 6. Safety net: if a draft's only problems are length errors and the headline fits, the
+// 6. sum-v7: an accepted AI draft goes through fixProperNouns (headline, body, detail) after validation; the
+//    sum-v7 validators (style, speculation, relative time, event_type enum, number scale tolerance) run inside validateDraft.
+// 7. Safety net: if a draft's only problems are length errors and the headline fits, the
 //    body is cut after the last whole sentence that fits, then the draft is re-validated.
 // Inputs: SummarizeInput, the provider list, a usage counter and options (caps, cooldown, relevance).
 // Outputs: ChainResult (draft, provider, model, relevance, log lines without text or keys).
@@ -21,6 +23,7 @@ import { dirname } from 'node:path';
 import { aiDailyCap, config } from '../config.ts';
 import { assertSummarizable, checkRelevance, checkShape, requiresFigures, trimBodyToFit, validateDetail, validateDraft, type SourceText } from '../validate.ts';
 import { templateSummarizer } from './template.ts';
+import { fixProperNouns } from '../text.ts';
 import type { SummarizeInput, Summarizer, SummaryDraft } from '../types.ts';
 
 export interface UsageCounter {
@@ -127,11 +130,22 @@ export interface ChainResult {
  * (detail null) and the card is still used: the card is the product, the detail is extra.
  */
 function finishDetail(draft: SummaryDraft, source: SourceText, provider: string, log: string[]): SummaryDraft {
-  if (draft.detail === undefined || draft.detail === null) return { ...draft, detail: null };
-  const v = validateDetail(draft.detail, source, source.category ?? draft.category);
-  if (v.ok) return draft;
+  if (draft.detail === undefined || draft.detail === null) return fixDraft({ ...draft, detail: null });
+  const v = validateDetail(draft.detail, { ...source, headline: draft.headline }, source.category ?? draft.category);
+  if (v.ok) return fixDraft(draft);
   log.push(`${provider}: detail dropped (card kept): ${v.errors.join('; ')}`);
-  return { ...draft, detail: null };
+  return fixDraft({ ...draft, detail: null });
+}
+
+/** Casing fixer on every text field of an accepted AI draft (Nasa -> NASA). Returns the same values when nothing needs fixing. */
+export function fixDraft(draft: SummaryDraft): SummaryDraft {
+  const d = draft.detail;
+  return {
+    ...draft,
+    headline: fixProperNouns(draft.headline),
+    body: draft.body === null || draft.body === undefined ? draft.body : fixProperNouns(draft.body),
+    detail: d ? { paragraphs: d.paragraphs.map(fixProperNouns), key_points: d.key_points.map(fixProperNouns) } : d,
+  };
 }
 
 /**

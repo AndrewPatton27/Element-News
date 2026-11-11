@@ -13,15 +13,18 @@ import { beaItemToItem } from './sources/bea.ts';
 import { cpscToItem, cpscUrl, parseCpscJson, selectRecalls } from './sources/cpsc.ts';
 import { nasaFeedUrl, nasaToItem, parseNasaRss, selectNasaReleases } from './sources/nasa.ts';
 import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
+import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataEndpoint } from './sources/newsdata.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
 import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
 import { runMacro, runTreasury } from './macroRun.ts';
+import { runBeaData, runBls } from './agencyRun.ts';
+import { runAuctions, runBlsCal, runCensus, runEia, runFomc, runMts, runAnnual, runBeige, runRegPress, runTrade } from './agencyRunData.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
-  parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
+  dailyIndexUrls, isBoilerplateRegFd, isRegFdOnly, parseDailyIndex, parseSubmissionsJson, primaryItem, resolveWatchList, rotationSlice, type DailyIndexFiling, type Sec8kEntry, type SecSkipReason, type WatchMap,
 } from './sources/sec.ts';
 import { secFilingPageText } from './sec-text.ts';
 import { createChainState, summarizeWithChain, type ChainState, type UsageCounter } from './summarizer/chain.ts';
@@ -30,9 +33,12 @@ import { hasFigures, requiresFigures, validatePublish } from './validate.ts';
 import { createTopicFilterState, filterTopic, narrowCapReached, recordTopic, type TopicFilterState } from './topicFilter.ts';
 import { baseScore, pickNext, softCap } from './selection.ts';
 import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
+import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
-export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa';
-export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa'];
+export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
+  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'beige' | 'trade' | 'regpress' | 'annual' | 'newsdata_market' | 'newsdata_latest';
+export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata',
+  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'beige', 'trade', 'regpress', 'annual', 'newsdata_market', 'newsdata_latest'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -41,6 +47,13 @@ export interface Deps {
   providers: Summarizer[];
   counter: UsageCounter;
   fredApiKey: string | null;
+  /** BLS / BEA data API keys and the BEA data switch (agencyRun.ts); all optional */
+  keys?: { bls?: string | null; bea?: string | null; beaDataEnabled?: boolean; annualEnabled?: boolean; occEnabled?: boolean };
+  /** EIA open data key (EIA_API_KEY) and optional Census key (CENSUS_API_KEY); null/undefined = that source skips */
+  eiaApiKey?: string | null;
+  censusApiKey?: string | null;
+  /** NewsData.io link-out source (all optional): the key (NEWSDATA_API_KEY), the env switch (NEWSDATA_ENABLED=1) and the credit counter. No key or switch off = the source skips. */
+  newsdata?: { apiKey?: string | null; enabled?: boolean | null; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -134,6 +147,8 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
 
   if (only.has('macro')) await runMacro(deps, stats);
   if (only.has('treasury')) await runTreasury(deps, stats);
+  if (only.has('bls')) await runBls(deps, stats);
+  if (only.has('beadata')) await runBeaData(deps, stats);
   if (only.has('fed')) await runFed(deps, ctx);
   if (only.has('fedspeech')) await runFedSpeech(deps, ctx);
   if (only.has('secpress')) await runSecPress(deps, ctx);
@@ -144,6 +159,18 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('cpsc')) await runCpsc(deps, ctx);
   if (only.has('usgs')) await runUsgs(deps, stats, ctx.guard);
   if (only.has('nasa')) await runNasa(deps, ctx);
+  if (only.has('eia')) await runEia(deps, stats);
+  if (only.has('census')) await runCensus(deps, stats);
+  if (only.has('auctions')) await runAuctions(deps, stats);
+  if (only.has('fomc')) await runFomc(deps, stats);
+  if (only.has('blscal')) await runBlsCal(deps, stats);
+  if (only.has('mts')) await runMts(deps, stats);
+  if (only.has('beige')) await runBeige(deps, stats);
+  if (only.has('trade')) await runTrade(deps, stats);
+  if (only.has('regpress')) await runRegPress(deps, stats);
+  if (only.has('annual')) await runAnnual(deps, stats);
+  if (only.has('newsdata_market')) await runNewsdata(deps, ctx, 'market');
+  if (only.has('newsdata_latest')) await runNewsdata(deps, ctx, 'latest');
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
@@ -312,6 +339,80 @@ async function runNasa(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
   }
 }
 
+/**
+ * NewsData.io link-out cards (rule 7). Three locks: the switch (config.newsdata.enabled or NEWSDATA_ENABLED=1), the key
+ * (NEWSDATA_API_KEY) and, in the database, app_config.linkout_cards. Each run costs ONE credit, counted before the request
+ * against config.newsdata.dailyCreditCap. No AI, no page fetch; only the headline, publisher and link are kept.
+ */
+async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: NewsdataEndpoint): Promise<void> {
+  const nd = deps.newsdata;
+  const c = config.newsdata;
+  const tag = `newsdata ${endpoint}`;
+  if (!(nd?.enabled ?? c.enabled)) { deps.log(`${tag}: switched off, skipping`); return; }
+  const key = nd?.apiKey?.trim();
+  if (!key) { deps.log(`${tag}: NEWSDATA_API_KEY not set, skipping`); return; }
+  // Degrade gracefully: near the daily cap the /latest calls stop first so the /market backbone keeps its credits.
+  if (endpoint === 'latest' && deps.counter.used('newsdata') >= Math.floor(c.dailyCreditCap * c.latestStopFraction)) {
+    deps.log(`${tag}: ${Math.round(c.latestStopFraction * 100)}% of the daily credits used, /latest paused`); return;
+  }
+  const take = nd?.takeCredit ?? (async () => {
+    if (deps.counter.used('newsdata') >= c.dailyCreditCap) return false;
+    deps.counter.add('newsdata');
+    return true;
+  });
+  if (!(await take())) { deps.log(`${tag}: daily credit cap ${c.dailyCreditCap} reached, skipping`); return; }
+  try {
+    const articles = parseNewsdata(await deps.fetchText(newsdataUrl(endpoint, key), 'api', 0));
+    const seen: string[] = [];                       // headlines of this run's new cards (the same story from two publishers)
+    let recent: string[] | null = null;              // headlines of live cards, loaded once and only if a candidate gets that far
+    let fresh = 0;
+    let skipped = 0;
+    // best relevance first, then newest: with a per-run cap and the release queue, the important headlines go first
+    const scored = articles.map((a) => ({ a, s: relevanceScore(a) })).sort((x, y) => y.s - x.s || y.a.pubDate.localeCompare(x.a.pubDate));
+    for (const { a } of scored) {
+      if (fresh >= c.maxPerRun) break;
+      const r = newsdataToItem(a, deps.now);
+      if (!('item' in r)) { skipped++; continue; }
+      const it = r.item;
+      const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
+      const d = guard.check(cand);
+      if (!d.ok) { stats.skipped++; continue; }
+      if (!recent) {
+        try { recent = (await Promise.resolve(deps.publisher.recentHeadlines?.())) ?? []; } catch { recent = []; }
+      }
+      if (isNearDuplicate(it.title, [...seen, ...recent])) { stats.skipped++; deps.log(`skip duplicate_story: ${it.title}`); continue; }
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {
+        stats.failed++;
+        deps.log(`failed: record item: ${redactKey((e as Error).message, key)}`);
+        continue;
+      }
+      if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
+      fresh++;
+      try {
+        const payload = newsdataPayload(it, row.id);
+        const v = validatePublish(payload, { linkOutEnabled: true });
+        if (!v.ok) throw new Error(v.errors.join('; '));
+        const res = await deps.publisher.publishBlurb(payload);
+        stats[res.status === 'published' ? 'published' : res.status]++;
+        if (res.status === 'published') { guard.record(cand); seen.push(it.title); }
+        deps.log(`${res.status} [link_out] ${payload.headline}`);
+      } catch (e) {
+        stats.failed++;
+        const msg = redactKey((e as Error).message, key);
+        deps.log(`failed: ${it.url}: ${msg}`);
+        // Database flag off (linkout_cards false): leave the item 'new' so it publishes once Drew flips the flag.
+        if (!/link_out cards are disabled/.test(msg)) await deps.publisher.setItemStatus(row.id, 'failed', msg).catch(() => {});
+      }
+    }
+    deps.log(`${tag}: ${articles.length} articles, ${skipped} filtered out (not finance, recall/micro, advice, old), ${fresh} new`);
+  } catch (e) {
+    deps.log(`${tag}: request failed: ${redactKey((e as Error).message, key)}`);
+  }
+}
+
 /** USGS significant earthquakes: template cards only (no AI call, no page fetch). */
 async function runUsgs(deps: Deps, stats: RunStats, guard: ReturnType<typeof createGuard>): Promise<void> {
   try {
@@ -369,13 +470,15 @@ async function runSec(
   deps: Deps, stats: RunStats, budget: { left: number }, guard: ReturnType<typeof createGuard>, chain: ChainState,
 ): Promise<void> {
   try {
-    // Watch list: household-name companies only. CIKs come from SEC's ticker list; without it
-    // there is no way to tell which filings are watched, so the SEC source is skipped this run.
+    // Watch list: the household-name directory plus the extended large-cap list (config.secExtraWatch). CIKs come from
+    // SEC's ticker list; without it there is no way to tell which filings are watched, so the SEC source is skipped this run.
+    const base: readonly string[] = config.watchCompanies;
+    const allWatch = [...base, ...config.secExtraWatch.filter((t) => !base.includes(t))];
     let watch: WatchMap;
     try {
-      const w = resolveWatchList(await deps.fetchText(config.secTickersUrl, 'page', config.cacheTtlMinutes));
+      const w = resolveWatchList(await deps.fetchText(config.secTickersUrl, 'page', config.cacheTtlMinutes), allWatch);
       watch = w.map;
-      deps.log(`sec: watch list ${w.map.size} of ${config.watchCompanies.length} companies resolved`
+      deps.log(`sec: watch list ${w.map.size} of ${allWatch.length} companies resolved`
         + (w.missing.length ? `; not in the SEC ticker list (skipped): ${w.missing.join(', ')}` : ''));
     } catch (e) {
       deps.log(`sec: ticker list unavailable, skipping SEC this run (watch list needs CIKs): ${(e as Error).message}`);
@@ -387,16 +490,26 @@ async function runSec(
     } catch (e) {
       deps.log(`sec: current 8-K feed failed (continuing with per-company lists): ${(e as Error).message}`);
     }
-    // Per-company filing lists (data.sec.gov, API host list); the shared limiter keeps us under 5 req/s.
+    // Which companies' own filing lists to read (data.sec.gov, API host list; the shared limiter keeps us under 5 req/s):
+    // the CIKs with a new filing in the EDGAR daily index, plus a rotating safety slice (config.secIndex).
+    const listCiks = new Set<string>();
+    try {
+      for (const cik of await newFilingCiks(deps, watch)) listCiks.add(cik);
+    } catch (e) {
+      deps.log(`sec: daily index step failed (rotation only): ${(e as Error).message}`);
+    }
+    const fromIndex = listCiks.size;
+    for (const cik of rotationSlice([...watch.keys()], deps.now)) listCiks.add(cik);
+    deps.log(`sec: reading ${listCiks.size} company filing lists (${fromIndex} with a new filing in the daily index, rest rotation)`);
     let failedLists = 0;
-    for (const cik of watch.keys()) {
+    for (const cik of listCiks) {
       try {
         lists.push(parseSubmissionsJson(await deps.fetchText(config.secSubmissionsUrl.replace('{cik}', cik), 'api', 0), deps.now));
       } catch {
         failedLists++;
       }
     }
-    if (failedLists) deps.log(`sec: per-company filing list unavailable for ${failedLists} of ${watch.size} companies`);
+    if (failedLists) deps.log(`sec: per-company filing list unavailable for ${failedLists} of ${listCiks.size} companies`);
     const entries = mergeSecEntries(lists);
     const items: RawItem[] = [];
     const notCandidates: Partial<Record<SecSkipReason, number>> = {};
@@ -412,13 +525,47 @@ async function runSec(
     const why = Object.entries(notCandidates).map(([k, n]) => `${k} ${n}`).join(', ');
     deps.log(`sec: ${entries.length} filings (feed + watch list), ${items.length} card candidates${why ? ` (not candidates: ${why})` : ''}`);
     await processItems(items, deps, stats, budget, guard, chain, (it) => secFilingPageText(deps.fetchText, it, deps.log),
-      (it, text) => (isRoutine502(it.items ?? [], text) ? 'routine_5.02' : null));
+      (it, text) => (isRoutine502(it.items ?? [], text) ? 'routine_5.02' : isBoilerplateRegFd(it.items ?? [], text) ? 'boilerplate_regfd' : null),
+      // Reg FD / other-events filings cost AI calls with a low hit rate: at most config.secRegFd.maxPerRun new ones per run.
+      { group: { of: (it) => (isRegFdOnly(it.items ?? []) ? 'regfd' : null), max: config.secRegFd.maxPerRun, skip: 'regfd_cap', label: 'Reg FD filings' } });
   } catch (e) {
     deps.log(`sec: feed failed: ${(e as Error).message}`);
   }
 }
 
-interface ItemRow { id: string; is_new: boolean; status: string }
+/**
+ * CIKs of watched companies that filed an 8-K in the EDGAR daily index (last config.secIndex.days days) which the database
+ * has not handled yet (api.items_handled), newest day first, at most config.secIndex.maxNewCiksPerRun. A missing day (weekend,
+ * holiday, file not published yet) is a 404 and is skipped. No handledUrls on the publisher = every watched filing counts.
+ */
+async function newFilingCiks(deps: Deps, watch: WatchMap): Promise<string[]> {
+  const filings: DailyIndexFiling[] = [];
+  let read = 0;
+  for (const url of dailyIndexUrls(deps.now)) {
+    try {
+      const text = await deps.fetchText(url, 'page', config.secIndex.cacheTtlMinutes);
+      filings.push(...parseDailyIndex(text).filter((f) => watch.has(f.cik)));
+      read++;
+    } catch (e) {
+      deps.log(`sec: daily index not available (${url.slice(-18)}): ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  let fresh = filings;
+  const fn = deps.publisher.handledUrls;
+  if (fn && filings.length) {
+    try {
+      const handled = await fn.call(deps.publisher, filings.map((f) => f.url));
+      fresh = filings.filter((f) => !handled.has(f.url));
+    } catch (e) {
+      deps.log(`sec: handled-items check failed for the daily index (reading all): ${(e as Error).message}`);
+    }
+  }
+  const ciks = [...new Set(fresh.map((f) => f.cik))].slice(0, config.secIndex.maxNewCiksPerRun);
+  deps.log(`sec: daily index ${read} days read, ${filings.length} watched 8-Ks, ${fresh.length} not handled yet, ${ciks.length} companies to read`);
+  return ciks;
+}
+
+interface ItemRow { id: string; is_new: boolean; status: string; status_note?: string | null }
 
 /** One source's candidates plus everything handleItem needs; counters are per job (per source run). */
 interface Job {
@@ -445,6 +592,7 @@ interface Job {
 async function runSelected(jobs: Job[], deps: Deps, ctx: RunCtx, budgetTotal: number): Promise<void> {
   const cands: Array<{ source: string; score: number; job: Job; it: RawItem; row: ItemRow }> = [];
   for (const job of jobs) {
+    await dropHandled(job);
     let newHere = 0;
     const groupNew = new Map<string, number>();
     for (const it of job.items) {
@@ -536,7 +684,8 @@ async function processItems(
   const job: Job = { items, deps, stats, budget, guard, chain, pageText, preCheck, limits, fresh: 0, alreadyHandled: 0, perGroup: new Map() };
   const collector = runState().collector;
   if (collector) { collector.push(job); return { fresh: 0, alreadyHandled: 0 }; }   // candidate selection: spent later by runSelected
-  for (const it of items) {
+  await dropHandled(job);
+  for (const it of job.items) {
     if (budget.left <= 0) { deps.log('limit reached'); break; }
     if (limits.total !== undefined && job.fresh >= limits.total) {
       deps.log(`new-item limit reached (${limits.total} new per run)`);
@@ -546,6 +695,31 @@ async function processItems(
   }
   limits.onDone?.({ fresh: job.fresh, alreadyHandled: job.alreadyHandled });
   return { fresh: job.fresh, alreadyHandled: job.alreadyHandled };
+}
+
+/**
+ * One database call for the whole candidate list (publisher.handledUrls): items an earlier run already finished are
+ * counted as skipped + alreadyHandled and removed from job.items, so they cost no per-item upsert round trip. Before
+ * this an SEC run spent its 100 s time budget on about 340 such upserts and stopped with 180 filings unvisited (R-300).
+ * Same outcome as the per-item check in handleItem, which still runs for everything left. No handledUrls, or a failure
+ * of the call = nothing is dropped (the per-item check decides).
+ */
+async function dropHandled(job: Job): Promise<void> {
+  const fn = job.deps.publisher.handledUrls;
+  if (!fn || job.items.length < 2) return;
+  let handled: Set<string>;
+  try {
+    handled = await fn.call(job.deps.publisher, job.items.map((i) => i.url));
+  } catch (e) {
+    job.deps.log(`handled-items check failed (checking item by item): ${(e as Error).message}`);
+    return;
+  }
+  if (!handled.size) return;
+  const keep = job.items.filter((i) => !handled.has(i.url));
+  const dropped = job.items.length - keep.length;
+  job.stats.skipped += dropped;
+  job.alreadyHandled += dropped;
+  job.items = keep;
 }
 
 /** One candidate item through steps 2-7 of processItems. `known` = the item row when the selection step already recorded it. */
@@ -613,14 +787,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
       // is never published. If an AI draft was tried and rejected for it, retrying later would repeat the
       // same result, so the item is closed; if no AI was available, it stays 'new' for a later run.
       stats.skipped++;
-      deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}`);
+      deps.log(`skip no_figures (earnings card without figures, ${r.ai_generated ? 'AI' : r.provider}): ${it.title}  [${chainNote(r.log)}]`);
       if (r.log.some((l) => /no_figures/.test(l))) await deps.publisher.setItemStatus(row.id, 'skipped', 'no_figures').catch(() => {});
+      else await softRetry(deps, row, 'no_figures', r.log, it.title);
       return;
     }
     if (!r.ai_generated && !templateAllowed(it)) {
       stats.skipped++;
-      // Item status stays 'new' on purpose: a later run with a working AI provider retries it.
-      deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}`);
+      // Item status stays 'new' (a later run with a working AI provider retries it), but only max softRetry.maxFailures times
+      // when AI drafts were tried and rejected: before, one such item re-spent 4 AI calls every hour for ever (R-300).
+      deps.log(`skip template_not_allowed (no AI relevance score): ${it.title}  [${chainNote(r.log)}]`);
+      await softRetry(deps, row, 'template_not_allowed', r.log, it.title);
       return;
     }
     let payload = buildPublishPayload(it, r.draft, { itemId: row.id, aiGenerated: r.ai_generated, model: r.model });
@@ -689,8 +866,17 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
         if (rv.verdict === 'duplicate') stats.report_duplicate++;
         stats.report_abandon++;
         const code = rv.verdict === 'duplicate' ? 'duplicate_story' : rv.verdict === 'abandon' ? 'report_card_abandon' : 'report_card_revise_failed';
-        stats.skipped++; deps.log(`skip ${code}: ${it.title}`);
-        await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
+        stats.skipped++;
+        if (rv.verdict === 'duplicate') {
+          deps.log(`skip ${code}: ${it.title}`);
+          await deps.publisher.setItemStatus(row.id, 'skipped', code).catch(() => {});
+        } else {
+          // ABANDON or a rewrite that failed its checks may be transient: keep the item retryable (status 'new', counter in
+          // status_note), skip it for good only after config.reportCard.maxRetries failures (src/retry.ts).
+          const d = decideReportCardRetry(row.status_note, code);
+          deps.log(`skip ${code} (failure ${d.failures} of ${config.reportCard.maxRetries}, ${d.status === 'new' ? 'will retry' : 'final'}): ${it.title}`);
+          await deps.publisher.setItemStatus(row.id, d.status, d.note).catch(() => {});
+        }
         return;
       } else {
         payload = rv.payload;
@@ -724,6 +910,22 @@ async function handleItem(job: Job, it: RawItem, known: ItemRow | null): Promise
     deps.log(`failed: ${it.url}: ${(e as Error).message}`);
     await deps.publisher.setItemStatus(row.id, 'failed', (e as Error).message).catch(() => {});
   }
+}
+
+/** Chain log for a skip line: provider outcomes and validator error names, no source text and no keys; cut to 300 characters. */
+function chainNote(log: readonly string[]): string {
+  return log.join(' | ').slice(0, 300);
+}
+
+/**
+ * An item the AI could not turn into a card and that cannot be a template card. Counts a failure only when an AI draft was
+ * actually rejected (aiDraftsRejected); the third failure skips the item for good (src/retry.ts decideSoftRetry).
+ */
+async function softRetry(deps: Deps, row: ItemRow, code: string, chainLog: readonly string[], title: string): Promise<void> {
+  if (!aiDraftsRejected(chainLog)) return;                    // no AI was reachable: stays 'new', costs nothing, not counted
+  const d = decideSoftRetry(row.status_note, code);
+  deps.log(`${code}: failure ${d.failures} of ${config.softRetry.maxFailures}, ${d.status === 'new' ? 'will retry' : 'final'}: ${title.slice(0, 80)}`);
+  await deps.publisher.setItemStatus(row.id, d.status, d.note).catch(() => {});
 }
 
 /**

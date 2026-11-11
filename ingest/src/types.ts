@@ -4,11 +4,11 @@
 
 import type { CardDetail, CategorySlug, Exchange, MacroFact, SourceKind } from '../../contract/types.ts';
 
-export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa';
+export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa' | 'link_out';
 
 /** One collected item, ready for summarizing. */
 export interface RawItem {
-  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa';
+  source: 'sec_8k' | 'fed_rss' | 'bea_rss' | 'fed_speech' | 'sec_press' | 'fedreg' | 'wiki_itn' | 'cpsc' | 'usgs' | 'nasa' | 'newsdata';
   external_id: string;
   url: string;                       // the page we cite (and may fetch: allowlisted hosts only)
   title: string;
@@ -42,7 +42,7 @@ export interface SummaryDraft {
   category: string;
   event_type: string | null;
   tickers: string[];
-  /** AI only: 1-5, would a typical young adult notice or be affected? Not part of the card. */
+  /** AI only: 1-5, how much it matters to a reader who follows business, the economy, markets and investing (sum-v7 rubric). Stored on the card, not shown. */
   everyday_relevance?: number | null;
   /** In-depth summary (shown when the card is opened); null = none. */
   detail?: CardDetail | null;
@@ -78,7 +78,9 @@ export interface Summarizer {
 export interface PublishPayload {
   dedupe_key: string;
   item_id?: string;
-  kind: 'summary' | 'data';
+  kind: 'summary' | 'data' | 'link_out';
+  /** The ingest source that built this card (link_out cards are only valid from 'newsdata'). Not stored. */
+  origin?: string;
   headline: string;
   body: string | null;
   category: string;
@@ -92,6 +94,8 @@ export interface PublishPayload {
   prompt_version: string | null;
   attribution: string | null;
   detail?: CardDetail | null;
+  /** AI cards only: the 1-5 relevance score (stored on core.blurbs.everyday_relevance); null for template and data cards. */
+  everyday_relevance?: number | null;
   sources: {
     name: string;
     kind: SourceKind;
@@ -126,7 +130,7 @@ export interface RevisableCard {
 
 /** Payload for api.revise_blurb. */
 export type RevisePayload =
-  | { id: string; action: 'revise'; headline: string; body: string | null; ai_generated: boolean; model: string | null; prompt_version: string; detail: CardDetail | null }
+  | { id: string; action: 'revise'; headline: string; body: string | null; ai_generated: boolean; model: string | null; prompt_version: string; detail: CardDetail | null; everyday_relevance?: number | null }
   | { id: string; action: 'hide'; note: string };
 
 /** Payload for api.upsert_macro. */

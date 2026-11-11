@@ -40,6 +40,53 @@ export function CardSkeleton({ label = 'Loading the feed…', wide }: { label?: 
   );
 }
 
+// A short list loading (Following, Search): a few card-shaped outlines with the same radius as the real tiles, so the
+// screen keeps its shape while data arrives instead of showing a bare spinner. Still, a fixed small count (no
+// per-item work, no extra requests); the label is read by screen readers.
+export function ListSkeleton({ label = 'Loading…', rows = 3 }: { label?: string; rows?: number }) {
+  const p = usePalette();
+  const bar = (w: `${number}%`, h: number) => <View style={{ width: w, height: h, borderRadius: h / 2, backgroundColor: p.surfaceMuted }} />;
+  return (
+    <View style={styles.listSkel} accessibilityLiveRegion="polite" accessibilityLabel={label} testID="list-skeleton">
+      {Array.from({ length: Math.min(rows, 5) }, (_, i) => (
+        <View key={i} style={[styles.listSkelRow, { backgroundColor: p.surface, borderColor: p.border }]}>
+          {bar('24%', 12)}
+          {bar('88%', 18)}
+          {bar('62%', 18)}
+          {bar('40%', 12)}
+        </View>
+      ))}
+      <Text style={[styles.skelText, { color: p.muted }]}>{label}</Text>
+    </View>
+  );
+}
+
+// The Brief while it loads: a lead card with three bullet lines, then two story tiles, in the radius and spacing of the
+// real Brief so nothing jumps when the data lands. Still (no shimmer), label read by screen readers.
+export function BriefSkeleton({ label = 'Loading your brief…' }: { label?: string }) {
+  const p = usePalette();
+  const bar = (w: `${number}%`, h: number) => <View style={{ width: w, height: h, borderRadius: h / 2, backgroundColor: p.surfaceMuted }} />;
+  return (
+    <View style={styles.listSkel} accessibilityLiveRegion="polite" accessibilityLabel={label} testID="brief-skeleton">
+      <View style={[styles.listSkelRow, { backgroundColor: p.surface, borderColor: p.border, gap: 14 }]}>
+        {bar('30%', 14)}
+        {bar('94%', 16)}
+        {bar('82%', 16)}
+        {bar('90%', 16)}
+        {bar('58%', 16)}
+      </View>
+      {[0, 1].map((i) => (
+        <View key={i} style={[styles.listSkelRow, { backgroundColor: p.surface, borderColor: p.border }]}>
+          {bar('24%', 12)}
+          {bar('88%', 18)}
+          {bar('62%', 18)}
+        </View>
+      ))}
+      <Text style={[styles.skelText, { color: p.muted }]}>{label}</Text>
+    </View>
+  );
+}
+
 // Empty: a short serif title saying what happened, one plain line on what to do, and the way out.
 export function EmptyState({ title, message, actionLabel, onAction }: { title?: string; message: string; actionLabel?: string; onAction?: () => void }) {
   const p = usePalette();
@@ -101,6 +148,8 @@ const styles = StyleSheet.create({
   skelMiddle: { flex: 1, justifyContent: 'center', gap: 10 },
   skelGap: { height: 10 },
   skelBar: { borderTopWidth: 1, paddingTop: 16, paddingBottom: 6 },
+  listSkel: { gap: 12, paddingVertical: 4 },
+  listSkelRow: { borderWidth: 1, borderRadius: 20, padding: 18, gap: 10 },
   skelText: { fontFamily: fonts.sans, fontSize: 13, textAlign: 'center' },
   button: { minHeight: 48, paddingHorizontal: 24, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   buttonText: { fontFamily: fonts.sansSemi, fontSize: 16 },

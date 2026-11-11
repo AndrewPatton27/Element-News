@@ -15,6 +15,9 @@ import { useFollows } from '../lib/following/useFollows';
 import { forYouCoversTopics, withoutHidden } from '../lib/account/accountLogic';
 import { favoritesFirst } from '../lib/storage/localPrefs';
 import { rankLocal } from '../lib/feed/localRank';
+import { SKIP_TARGET_ID } from '../lib/shared/focusMain';
+import { rememberFeedTab, startFeedTab } from '../lib/feed/lastTab';
+import { reasonFor as cardReasonFor, reasonText } from '../lib/feed/reasonLine';
 import { confidence, targetAhead } from '../lib/feed/queueLogic';
 import { sourceName, withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { SIGN_IN_AGAIN_MESSAGE } from '../lib/account/session';
@@ -44,6 +47,15 @@ import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
 import { CardSkeleton, EmptyState, ErrorState } from '../components/shell/States';
+import { readFlags } from '../lib/flags/flags';
+import { FINE_NAMES, fineChips, isFineTopic, laneVisible, matchesFine, MACRO_FINE, fineTopicsOf } from '../lib/topics/fineTopics';
+import { useSignals } from '../lib/signals/useSignals';
+import { interestsFirst, isSaved, toggleMutedTicker, toggleMutedTopic, toggleSaved, withoutMuted } from '../lib/signals/signalsLogic';
+import { sinceStart, startVisit, touchVisit } from '../lib/since/sinceLogic';
+import { pickedReason } from '../lib/onboarding/setupLogic';
+import { sincePillText } from '../lib/since/sinceFeed';
+import { useSinceCards } from '../lib/since/useSinceCards';
+import { hasSeenTutorial } from '../lib/tutorial/tutorialLogic';
 
 // Below this window width the right column is dropped.
 const ASIDE_MIN_WIDTH = 1180;
@@ -57,7 +69,10 @@ export default function FeedScreen() {
   const acct = useAccount();
   const followsState = useFollows();
   const signedIn = acct.user !== null;
-  const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string }>();
+  // Wave 2 flags (lib/flags/flags.ts): all off by default; with them off none of the code below changes the feed.
+  const flags = useMemo(() => readFlags(), []);
+  const { signals, update: updateSignals } = useSignals();
+  const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string; dl?: string }>();
   const { width, height: windowHeight } = useWindowDimensions();
   // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
   // nudge stays hidden there (the Me tab and the top bar still offer sign-in).
@@ -65,7 +80,9 @@ export default function FeedScreen() {
   // Landscape phones and 200% zoom (under 520 px tall): the category chips step aside too, so the
   // card keeps enough height to read; categories stay reachable by widening or rotating.
   const tinyHeight = !wide && windowHeight > 0 && windowHeight < 520;
-  const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' ? 'for_you' : 'top');
+  // The bottom Feed tab links to / with no tab: bring back the tab used last this visit (Trending on a fresh launch).
+  const [mode, setMode] = useState<FeedTab>(() => startFeedTab(params.tab));
+  useEffect(() => rememberFeedTab(mode), [mode]);
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
@@ -77,7 +94,8 @@ export default function FeedScreen() {
     | { message: string; label: string; kind: 'source'; previous: string[] }
     | { message: string; label: string; kind: 'follow'; slug: string }
     | { message: string; label: string; kind: 'fewer'; card: BlurbCard }
-    | { message: string; label: string; kind: 'report' };
+    | { message: string; label: string; kind: 'report' }
+    | { message: string; label: string; kind: 'signal'; revert: () => void };
   const [undo, setUndoState] = useState<(FeedUndo & { seq: number }) | null>(null);
   const toastSeq = useRef(0);
   const setUndo = useCallback((u: FeedUndo | null) => setUndoState(u ? { ...u, seq: ++toastSeq.current } : null), []);
@@ -114,9 +132,20 @@ export default function FeedScreen() {
   const sourcesSupported = acct.viewPrefs?.hiddenSources != null;
   // The same filter drives the list on screen and the paging, so "end of feed" and "load
   // more" are decided on what the reader can actually see.
+  const fineSelected = flags.topics && isFineTopic(category) ? category : null;
   const visible = useCallback(
-    (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
-    [hidden, hiddenSources],
+    (cards: BlurbCard[]) => {
+      let out = withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources);
+      if (flags.signals) out = withoutMuted(out, signals); // A-22 muted companies and fine topics
+      if (flags.topics) {
+        out = out.filter((c) => laneVisible(c, mode, signals.optIn)); // A-12 / D-121 opt-in lanes
+        // With the Tech/AI lane on, the plain Tech chip folds into it, so Tech/AI shows both (D-231).
+        const techMerged = fineSelected === 'tech-ai' && signals.optIn.includes('tech-ai');
+        if (fineSelected) out = out.filter((c) => matchesFine(c, fineSelected) || (techMerged && c.category === 'tech'));
+      }
+      return out;
+    },
+    [hidden, hiddenSources, flags, signals, mode, fineSelected],
   );
   const local = acct.localPrefs;
   // For you stays locked until 3 stories have been read or reacted to, or one topic or company is followed (forYouGate.ts).
@@ -143,10 +172,10 @@ export default function FeedScreen() {
     seenTimer.current = setTimeout(() => setSeenList(recordSeen(store, c)), FOR_YOU_SEEN_MS);
   }, []);
   useEffect(() => () => { if (seenTimer.current) clearTimeout(seenTimer.current); }, []);
-  const rankPage = useCallback((cards: BlurbCard[]) => rankLocal(cards, local), [local]);
+  const rankPage = useCallback((cards: BlurbCard[]) => (flags.onboarding ? interestsFirst(rankLocal(cards, local), signals.interests) : rankLocal(cards, local)), [local, flags, signals.interests]);
   const { state, loadMore, retry, rerank } = useFeed(
     api,
-    { mode: locked ? 'top' : mode, category: forYou ? null : category, user: acct.user?.id ?? null },
+    { mode: locked ? 'top' : mode, category: forYou || fineSelected ? null : category, user: acct.user?.id ?? null },
     acct.account,
     visible,
     signedIn ? undefined : rankPage,
@@ -155,7 +184,7 @@ export default function FeedScreen() {
   // Load speed: the extra first-page pulls (tab heads) and the wide side column wait until the first
   // cards are on screen (or the request ended), so the first page gets the connection to itself.
   const firstPaintDone = state.items.length > 0 || state.done || !!state.error;
-  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused && firstPaintDone, mode);
+  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, fineSelected ? null : category, visible, focused && firstPaintDone, mode);
   // What the pager shows right now (after all re-ordering), for the view's slot.
   const shownRef = useRef<BlurbCard[]>([]);
   const surfaceRef = useRef<ShadowSurface | null>(null);
@@ -164,6 +193,12 @@ export default function FeedScreen() {
   const showSources = useCallback((c: BlurbCard) => setSheetCard(c), []);
   const openDetail = useCallback((c: BlurbCard) => setDetailCard(c), []);
 
+  // For you: one muted line per card from the reader's own choices ("Because you follow NWND"). Signed in, the server's
+  // reason on the card wins; signed out the device's follows and likes decide (lib/feed/reasonLine.ts).
+  const forYouReason = useCallback(
+    (c: BlurbCard) => reasonText(cardReasonFor(c, signedIn ? null : local), categories),
+    [signedIn, local, categories],
+  );
   const items = visible(state.items);
   const pagerKey = `${mode}|${category ?? 'all'}`;
   const queuePositions = useRef<Record<string, number>>({});
@@ -188,7 +223,17 @@ export default function FeedScreen() {
       return Object.keys(next).length === Object.keys(current).length ? current : next;
     });
   }, [signedIn, followed, followsState.follows.topics]);
-  const chipCategories = favoritesFirst(withoutHidden(categories, hidden), followed);
+  const baseChips = favoritesFirst(withoutHidden(categories, hidden), followed);
+  const chipCategories = useMemo(() => {
+    if (!flags.topics) return baseChips;
+    // A-12: the six macro topics (and any opted-in lane) follow the categories; the reader's interests come first.
+    const extra = fineChips(signals.optIn).filter((c) => !signals.mutedTopics.includes(c.slug));
+    // Opted in to Tech/AI: that chip covers Tech too, so the two never sit side by side.
+    const base = signals.optIn.includes('tech-ai') ? baseChips.filter((c) => c.slug !== 'tech') : baseChips;
+    return [...base, ...favoritesFirst(extra, signals.interests)];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.topics, categories, hidden, followed.join('|'), signals.optIn, signals.interests, signals.mutedTopics]);
+  const allNames = flags.topics ? [...categories, ...fineChips(['crypto', 'tech-ai'])] : categories;
   useEffect(() => {
     if (category && hidden.includes(category)) setCategory(null);
   }, [category, hidden]);
@@ -248,7 +293,39 @@ export default function FeedScreen() {
     },
     [api, setUndo],
   );
+  // A-22 (flag `signals`): save for later, mute a company, mute a fine topic. Each shows a corner toast with Undo.
+  const signalToast = useCallback(
+    (message: string, label: string, revert: () => void) => {
+      setMenuCard(null);
+      setUndo({ message, label, kind: 'signal', revert });
+    },
+    [setUndo],
+  );
+  const menuSignals = flags.signals
+    ? {
+        saved: menuCard ? isSaved(signals, menuCard.id) : false,
+        onSave: (c: BlurbCard) => {
+          const was = isSaved(signals, c.id);
+          updateSignals((s) => toggleSaved(s, c));
+          signalToast(was ? 'Removed' : 'Saved', was ? 'Removed from saved.' : 'Saved for later. Find it in Account, Saved and signals.', () => updateSignals((s) => toggleSaved(s, c)));
+        },
+        muteTicker: (c: BlurbCard) => (c.tickers[0] ? { symbol: c.tickers[0].symbol, name: c.tickers[0].name || c.tickers[0].symbol } : null),
+        onMuteTicker: (_c: BlurbCard, symbol: string) => {
+          updateSignals((s) => (s.mutedTickers.includes(symbol) ? s : toggleMutedTicker(s, symbol)));
+          signalToast('Muted', `Muted ${symbol}. No more cards about it.`, () => updateSignals((s) => (s.mutedTickers.includes(symbol) ? toggleMutedTicker(s, symbol) : s)));
+        },
+        muteTopic: (c: BlurbCard) => {
+          const t = fineTopicsOf(c).find((x) => (MACRO_FINE as readonly string[]).includes(x));
+          return t ? { slug: t, name: FINE_NAMES[t] } : null;
+        },
+        onMuteTopic: (_c: BlurbCard, slug: string) => {
+          updateSignals((s) => (s.mutedTopics.includes(slug) ? s : toggleMutedTopic(s, slug)));
+          signalToast('Muted', `Muted ${FINE_NAMES[slug as keyof typeof FINE_NAMES] ?? slug}. You can undo it in Saved and signals.`, () => updateSignals((s) => (s.mutedTopics.includes(slug) ? toggleMutedTopic(s, slug) : s)));
+        },
+      }
+    : undefined;
   const undoHide = useCallback(() => {
+    if (undo?.kind === 'signal') undo.revert();
     if (undo?.kind === 'fewer' && acct.reactions[undo.card.id] === 'dislike') acct.react(undo.card, 'dislike'); // pressing again clears it
     if (undo?.kind === 'topic') void acct.restoreTopics(undo.previous).catch(() => undefined);
     if (undo?.kind === 'source') void acct.saveSources(undo.previous).catch(() => undefined);
@@ -322,6 +399,34 @@ export default function FeedScreen() {
     if (forYou && !locked) noteCards(state.items);
   }, [forYou, locked, state.items, noteCards]);
 
+  // ---- B-06 Since yesterday (flag `since`) ----
+  const [visit] = useState(() => (flags.since ? startVisit(store) : null));
+  useEffect(() => {
+    if (!flags.since) return;
+    const t = setInterval(() => touchVisit(store), 5 * 60 * 1000);
+    const onHide = () => touchVisit(store);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('pagehide', onHide);
+    return () => {
+      clearInterval(t);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('pagehide', onHide);
+    };
+  }, [flags.since]);
+  // The pill counts with the same loader and filters as the /since page, so the two numbers are equal.
+  const sinceFrom = useMemo(() => (visit ? sinceStart(visit) : 0), [visit]);
+  const sinceAll = useSinceCards(flags.since && !!visit && mode === 'latest', sinceFrom);
+  const sinceCount = flags.since && visit && mode === 'latest' && sinceAll.done ? sinceAll.items.length : 0;
+
+  // ---- A-17 three-question setup (flag `onboarding`): once, after the tour, skippable ----
+  useEffect(() => {
+    // A feed URL typed or shared on its own (a tab and no t) is never interrupted: setup waits for the next plain visit.
+    // After the tour on such a URL (dl=1) setup runs once and hands the requested tab back (setupNext).
+    const bareDeepLink = !!params.tab && !params.t;
+    if (flags.onboarding && focused && signals.setup === null && hasSeenTutorial(store) && !bareDeepLink) {
+      router.replace((params.dl && params.tab ? `/setup?next=${params.tab}` : '/setup') as never);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.onboarding, focused, signals.setup, params.t]);
+
   const first = items.length === 0;
   let body;
   if (locked) body = <ForYouWarmup progress={gate} onBack={() => setMode('top')} />;
@@ -330,8 +435,8 @@ export default function FeedScreen() {
   else if (first) {
     body = (
       <EmptyState
-        title={forYou ? 'Your topics are quiet' : category ? 'Nothing here yet' : 'No stories yet'}
-        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'No cards in this category yet.' : 'No cards yet. Check back soon.'}
+        title={forYou ? 'Your topics are quiet' : category ? `No ${categoryName(category, allNames)} stories right now` : 'No stories yet'}
+        message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'Nothing new in this topic lately. Try All, or another topic.' : 'No cards yet. Check back soon.'}
         actionLabel={forYou ? 'Show Trending' : category ? 'Show all categories' : undefined}
         onAction={forYou ? () => setMode('top') : category ? () => setCategory(null) : undefined}
       />
@@ -357,6 +462,7 @@ export default function FeedScreen() {
         onQueuePosition={(i) => { queuePosition.current = i; queuePositions.current[pagerKey] = i; }}
         followedTopics={followedTopics}
         onToggleTopicFollow={toggleCardFollow}
+        reasonFor={forYou ? forYouReason : undefined}
         onActiveCard={focused ? onActiveBoth : undefined}
         active={focused && sheetCard === null && detailCard === null && menuCard === null}
         onMore={setMenuCard}
@@ -368,6 +474,20 @@ export default function FeedScreen() {
     items.length > 0 && state.error ? (
       <Pressable onPress={retry} accessibilityRole="button" style={[styles.inlineError, { backgroundColor: p.dataSoft }]}>
         <Text style={{ color: p.dataInk, fontFamily: fonts.sansSemi }}>Could not load more. Tap to retry.</Text>
+      </Pressable>
+    ) : null;
+
+  const sincePill =
+    sinceCount > 0 ? (
+      <Pressable
+        onPress={() => router.navigate('/since' as never)}
+        accessibilityRole="link"
+        testID="since-pill"
+        style={[styles.prompt, styles.promptNarrow, { backgroundColor: p.dataSoft }]}
+      >
+        <Text style={[styles.promptText, styles.sincePillText, { color: p.dataInk }]}>
+          {sincePillText(sinceCount, visit?.prev ?? null, sinceFrom)}
+        </Text>
       </Pressable>
     ) : null;
 
@@ -396,10 +516,12 @@ export default function FeedScreen() {
       </View>
     ) : null;
 
+  // A-17: the topics picked in setup are named here ('Because you picked Rates and Labor'), since the server only knows categories.
+  const pickedLine = flags.onboarding ? pickedReason(signals) : null;
   // For you: the chips don't apply; show what it is built from instead.
   const forYouLine = forYou ? (
     <View style={[styles.forYouLine, !wide && styles.promptNarrow, wide && styles.forYouWide]}>
-      <Text style={[styles.forYouText, wide && { flex: 0 }, { color: p.muted }]} numberOfLines={wide ? 6 : 2}>
+      <Text style={[styles.forYouText, { color: p.muted }]} numberOfLines={wide ? 6 : 3}>
         {!signedIn
           ? followed.length || Object.keys(acct.reactions).length
             ? 'Ranked on this device from your topics and likes.'
@@ -410,14 +532,23 @@ export default function FeedScreen() {
               ? `Tailored to ${followed.map((s) => categoryName(s, categories)).join(', ')} and your likes.`
               : 'Tailored to your likes.'}
       </Text>
-      <Pressable onPress={() => router.navigate('/account' as never)} accessibilityRole="link" hitSlop={8}>
-        <Text style={[styles.forYouEdit, { color: p.accentInk }]}>{followed.length ? 'Edit topics' : 'Pick topics'}</Text>
-      </Pressable>
-      {!signedIn ? (
-        <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" hitSlop={8}>
-          <Text style={[styles.forYouSync, { color: p.muted }]}>Sign in to sync across devices</Text>
-        </Pressable>
+      {pickedLine ? (
+        <Text style={[styles.forYouText, { color: p.muted }]} testID="picked-reason">
+          {pickedLine}
+        </Text>
       ) : null}
+      {/* Own row with 44 px tall links (R-402): on a 360 px phone the old one-line version cut the hint to
+          "Like cards o..." and left two 16-18 px tap targets. */}
+      <View style={styles.forYouLinks}>
+        <Pressable onPress={() => router.navigate((followed.length ? '/account' : flags.onboarding ? '/setup?next=for_you' : '/following') as never)} accessibilityRole="link" style={styles.forYouLink}>
+          <Text style={[styles.forYouEdit, { color: p.accentInk }]}>{followed.length ? 'Edit topics' : 'Pick topics'}</Text>
+        </Pressable>
+        {!signedIn ? (
+          <Pressable onPress={() => router.navigate('/signin' as never)} accessibilityRole="link" style={styles.forYouLink}>
+            <Text style={[styles.forYouSync, { color: p.muted }]}>Sign in to sync across devices</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   ) : null;
 
@@ -491,8 +622,11 @@ export default function FeedScreen() {
       )}
       {/* One page heading for screen readers; each card headline is a level-2 heading under it. */}
       <Text role="heading" aria-level={1} style={styles.srOnly}>{`Element: ${mode === 'latest' ? 'Latest' : forYou ? 'For you' : 'Trending'} stories`}</Text>
+      {/* Above the card on every width, so it is on screen without scrolling the left rail (R-4xx). */}
+      {sincePill}
       {inlineError}
-      <View style={styles.fill}>{body}</View>
+      {/* Target of the "Skip to content" link: the cards (components/shell/SkipLink.tsx). */}
+      <View style={styles.fill} nativeID={SKIP_TARGET_ID}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
       <DetailSheet card={detailCard} config={config} categories={categories} onClose={() => setDetailCard(null)} />
       <CardMenu
@@ -502,13 +636,15 @@ export default function FeedScreen() {
         onFewer={fewerLikeThis}
         onReport={reportCard}
         onHideSource={sourcesSupported ? hideSource : undefined}
+        signals={menuSignals}
         onClose={() => setMenuCard(null)}
       />
       <UndoToast
         message={undo?.message ?? null}
         label={undo?.label}
         token={undo?.seq}
-        placement="corner"
+        // A report confirmation has no Undo: a top bar, so it never hides the source name in the card footer (run 3b).
+        placement={undo?.kind === 'report' ? 'top' : 'corner'}
         wide={wide}
         onUndo={undoHide}
         showUndo={undo?.kind !== 'report'}
@@ -532,9 +668,12 @@ const styles = StyleSheet.create({
   promptMain: { flex: 1, minHeight: 44, justifyContent: 'center' },
   promptText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   promptClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  forYouLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
+  forYouLine: { flexDirection: 'column', alignItems: 'flex-start', gap: 0, minHeight: 36 },
+  forYouLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, alignItems: 'center' },
+  forYouLink: { minHeight: 44, justifyContent: 'center' },
   forYouWide: { flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12 },
-  forYouText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
+  forYouText: { alignSelf: 'stretch', fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
   forYouEdit: { fontFamily: fonts.sansSemi, fontSize: 14 },
+  sincePillText: { flex: 1, paddingVertical: 10 },
   forYouSync: { fontFamily: fonts.sans, fontSize: 13, textDecorationLine: 'underline' },
 });

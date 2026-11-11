@@ -78,6 +78,7 @@ import {
   markCardSwiped,
 } from '../../lib/feed/swipeLogic';
 import { defaultStore } from '../../lib/storage/storage';
+import { isDimmedInLatest } from '../../lib/feed/dimmed';
 import { Card } from '../card/Card';
 import { CardErrorBoundary } from '../shell/ErrorBoundary';
 import type { Feedback } from '../../lib/account/accountLogic';
@@ -105,6 +106,7 @@ interface Props {
   onReact?: (card: BlurbCard, pressed: Feedback) => void;
   followedTopics?: string[];
   onToggleTopicFollow?: (card: BlurbCard) => void;
+  reasonFor?: (card: BlurbCard) => string | null; // For you: the plain "Because you ..." line per card
   onActiveCard?: (card: BlurbCard) => void; // the card now on screen (for view tracking)
   onQueuePosition?: (index: number) => void;
   active?: boolean; // false when another screen or a sheet is on top: keys are left alone
@@ -278,6 +280,7 @@ export function FeedPager({
   onMore,
   followedTopics,
   onToggleTopicFollow,
+  reasonFor,
   timeLabel,
 }: Props) {
   const p = usePalette();
@@ -499,6 +502,8 @@ export function FeedPager({
                   peek={!last}
                   reaction={reactions?.[item.id]}
                   onReact={react}
+                  reason={reasonFor ? reasonFor(item) : null}
+                  dimmed={isDimmedInLatest(timeLabel === 'added', reactions?.[item.id])}
                 />
               </SwipeCard>
             </CardErrorBoundary>
@@ -506,7 +511,7 @@ export function FeedPager({
         </View>
       );
     },
-    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, next, wide, compact, lastIndex, atEnd, reactions, react, swipeOn, reduced, swiped, timeLabel, coach],
+    [height, width, config, categories, onShowSources, onOpenDetail, onMore, followedTopics, onToggleTopicFollow, reasonFor, next, wide, compact, lastIndex, atEnd, reactions, react, swipeOn, reduced, swiped, timeLabel, coach],
   );
 
   return (

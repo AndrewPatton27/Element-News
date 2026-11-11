@@ -70,6 +70,9 @@ export default function RootLayout() {
                 <Stack.Screen name="onboarding" />
                 <Stack.Screen name="reset-password" />
                 <Stack.Screen name="tutorial" />
+                <Stack.Screen name="setup" />
+                <Stack.Screen name="since" />
+                <Stack.Screen name="signals" />
               </Stack>
               {/* First-run tour over every screen, once per device (also at /tutorial). */}
               {/* Its own boundary: if the tour cannot load, the app still works without it. */}

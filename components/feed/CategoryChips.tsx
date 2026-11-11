@@ -1,6 +1,7 @@
 // Category filter: "All" plus the categories from api.categories. Scrolls
 // sideways on phones, wraps on the wide web layout.
 
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Category, CategorySlug } from '../../contract/types.ts';
 import { usePalette } from '../../lib/theme/useTheme';
@@ -57,16 +58,42 @@ export function CategoryChips({ categories, selected, onSelect, wide, onEdit }: 
       </View>
     );
   }
+  return <ChipScroller>{chips}</ChipScroller>;
+}
+
+// Edge fade bands (page colour, most opaque at the very edge): the row is cut off at the screen's edge on
+// phones, so a fade on the side that still has chips says "there is more" (I-03). Hidden once the end is reached.
+const FADE_STEPS = [0.95, 0.7, 0.45, 0.2];
+
+function ChipScroller({ children }: { children: React.ReactNode }) {
+  const p = usePalette();
+  const [m, setM] = useState({ x: 0, w: 0, content: 0 });
+  const more = m.content > m.w + 1 && m.x + m.w < m.content - 4;
+  const before = m.x > 4;
+  const fade = (side: 'left' | 'right') => (
+    <View pointerEvents="none" testID={`chips-fade-${side}`} style={[styles.fade, side === 'left' ? styles.fadeLeft : styles.fadeRight]}>
+      {FADE_STEPS.map((o) => (
+        <View key={o} style={{ flex: 1, backgroundColor: p.bg, opacity: o }} />
+      ))}
+    </View>
+  );
   return (
-    <ScrollView
-      horizontal
-      style={styles.scroller}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-      accessibilityRole="tablist"
-    >
-      {chips}
-    </ScrollView>
+    <View style={styles.scroller}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+        accessibilityRole="tablist"
+        scrollEventThrottle={64}
+        onLayout={(e) => setM((o) => ({ ...o, w: e.nativeEvent.layout.width }))}
+        onContentSizeChange={(w) => setM((o) => ({ ...o, content: w }))}
+        onScroll={(e) => setM((o) => ({ ...o, x: e.nativeEvent.contentOffset.x }))}
+      >
+        {children}
+      </ScrollView>
+      {before ? fade('left') : null}
+      {more ? fade('right') : null}
+    </View>
   );
 }
 
@@ -75,6 +102,9 @@ const styles = StyleSheet.create({
   // Mobile-Final: 44 px pills (full touch target), 16 px page padding.
   row: { gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fade: { position: 'absolute', top: 0, bottom: 0, width: 28, flexDirection: 'row' },
+  fadeLeft: { left: 0 },
+  fadeRight: { right: 0, flexDirection: 'row-reverse' },
   chip: { height: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1, justifyContent: 'center' },
   text: { fontSize: 14 },
 });

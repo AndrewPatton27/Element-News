@@ -5,9 +5,10 @@
 // `alwaysAiNotice` shows the AI notice even when a card does not say it was AI-generated (the share page).
 // The headline is a level-2 heading by default (the page or sheet title is level 1).
 
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
-import { NO_DETAIL_MESSAGE, cardDetail, detailParagraphs } from '../../lib/shared/detail';
+import { NO_DETAIL_MESSAGE, dataMeasures, detailKeyPoints, detailParagraphs, showNoDetailNote } from '../../lib/shared/detail';
 import { clampHeadline } from '../../lib/shared/format';
 import { aiNoticeText, cardLabels, primarySource, shareAlikeCredit } from '../../lib/shared/labels';
 import { openUrl } from '../../lib/shared/openUrl';
@@ -18,6 +19,9 @@ import { fonts } from '../../lib/theme/theme';
 import { AiLabel, Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceList } from './SourceList';
 import { DataFacts } from './DataCard';
+import { DefineSheet, GlossText, GlossaryWords } from './GlossText';
+import { flagOn } from '../../lib/flags/flags';
+import type { GlossaryTerm } from '../../lib/glossary/glossary';
 
 interface Props {
   card: BlurbCard;
@@ -29,8 +33,13 @@ interface Props {
 export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = false }: Props) {
   const p = usePalette();
   const wide = useWide();
-  const detail = cardDetail(card);
-  const { paragraphs, fallback } = detailParagraphs(card);
+  // D-02: with the `glossary` flag on, jargon in the key points and paragraphs is tap-to-define.
+  const gloss = flagOn('glossary');
+  const [term, setTerm] = useState<GlossaryTerm | null>(null);
+  const keyPoints = detailKeyPoints(card);
+  const { paragraphs } = detailParagraphs(card);
+  const noDetail = showNoDetailNote(card);
+  const measures = dataMeasures(card);
   const labels = cardLabels(card, config);
   const aiLabel = labels.aiLabel ?? (alwaysAiNotice ? aiNoticeText(config) : null);
   const credit = shareAlikeCredit(card, config);
@@ -48,28 +57,46 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
         </View>
       ) : null}
 
-      {detail && detail.key_points.length ? (
+      {keyPoints.length ? (
         <View style={[styles.points, { backgroundColor: p.surfaceMuted }]}>
           <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>
             Key points
           </Text>
-          {detail.key_points.map((k, i) => (
+          {keyPoints.map((k, i) => (
             <View key={i} style={styles.point}>
               <Text style={[styles.bullet, { color: p.inkSoft }]}>•</Text>
-              <Text style={[styles.pointText, { color: p.inkSoft }]}>{k}</Text>
+              {gloss ? <GlossText text={k} style={[styles.pointText, { color: p.inkSoft }]} onTerm={setTerm} /> : <Text style={[styles.pointText, { color: p.inkSoft }]}>{k}</Text>}
             </View>
           ))}
         </View>
       ) : null}
 
-      {card.kind === 'data' ? <DataFacts card={card} config={config} /> : null}
+      {card.kind === 'data' ? <DataFacts card={card} config={config} chartH={170} detail /> : null}
 
-      {paragraphs.map((t, i) => (
-        <Text key={i} style={[styles.para, { color: p.inkSoft }]}>
-          {t}
-        </Text>
-      ))}
-      {fallback ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
+      {paragraphs.map((t, i) =>
+        gloss ? (
+          <GlossText key={i} text={t} style={[styles.para, { color: p.inkSoft }]} onTerm={setTerm} />
+        ) : (
+          <Text key={i} style={[styles.para, { color: p.inkSoft }]}>
+            {t}
+          </Text>
+        ),
+      )}
+      {gloss ? <GlossaryWords texts={[...keyPoints, ...paragraphs]} onTerm={setTerm} /> : null}
+      {measures.length ? (
+        <View style={styles.sources}>
+          <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>
+            What this number measures
+          </Text>
+          {measures.map((m) => (
+            <Text key={m.label} style={[styles.pointText, { color: p.inkSoft }]}>
+              <Text style={{ fontFamily: fonts.sansSemi, color: p.ink }}>{m.label}: </Text>
+              {m.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      {noDetail ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
 
       <View style={styles.sources}>
         <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>
@@ -83,6 +110,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
         {aiLabel ? <AiLabel text={aiLabel} /> : null}
         <Disclaimer text={labels.disclaimer} />
       </View>
+      {gloss ? <DefineSheet term={term} onClose={() => setTerm(null)} /> : null}
     </>
   );
 }

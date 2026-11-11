@@ -31,6 +31,19 @@ function agencyIntro(it: RawItem): string {
   }
 }
 
+/** One short sentence on what the agency is (first sentence of agencyIntro, without its closing full stop). */
+function agencyRole(it: RawItem): string {
+  switch (it.source) {
+    case 'fed_rss': case 'fed_speech': return 'The Federal Reserve is the U.S. central bank';
+    case 'sec_press': return 'The SEC oversees public companies and the markets';
+    case 'bea_rss': return 'The BEA measures the U.S. economy, such as GDP and trade';
+    case 'fedreg': return 'The Federal Register is the daily journal of federal rules';
+    case 'nasa': return 'NASA is the U.S. space agency';
+    case 'cpsc': return 'The CPSC watches over the safety of products people buy';
+    default: return 'The full text is on the official site';
+  }
+}
+
 /** Detail for a template card, or null when there is nothing factual to add. */
 export function templateDetail(it: RawItem): CardDetail | null {
   if (it.source === 'sec_8k') {
@@ -69,15 +82,17 @@ export function templateDetail(it: RawItem): CardDetail | null {
   }
   const intro = agencyIntro(it);
   if (!intro) return null;
+  const who = it.agency ?? it.source_name;
+  // Plain sentences, no "From / Published / Title" field dump (the title is already in the first paragraph).
   return {
     paragraphs: [
-      `${it.agency ?? it.source_name} published "${it.title}" on ${day(it.published_at)}.`,
+      `${who} published "${it.title}" on ${day(it.published_at)}.`,
       `${intro} The full text is linked below.`,
     ],
     key_points: [
-      shortPoint(`From: ${it.agency ?? it.source_name}`),
-      `Published: ${day(it.published_at)}`,
-      shortPoint(`Title: ${it.title}`),
+      shortPoint(`Published by ${who} on ${day(it.published_at)}`),
+      agencyRole(it),
+      'The full text is linked below the card',
     ],
   };
 }

@@ -9,13 +9,13 @@ declare
   v_allow jsonb := '{
     "api.card_companies(uuid[])": "a", "api.companies_directory(integer)": "a", "api.company_cards(text,text,integer)": "a",
     "api.confirm_brief(uuid)": "a", "api.daily_brief()": "a", "api.feed(text,text,integer,text)": "a", "api.feed_status()": "a",
-    "api.card_by_id(uuid)": "a", "api.followed_micro(text[],integer)": "a", "api.following_feed(text[],text[],text[],text,integer)": "a", "api.number_trends()": "a",
+    "api.card_by_id(uuid)": "a", "api.followed_micro(text[],integer)": "a", "api.following_feed(text[],text[],text[],text,integer)": "a", "api.number_trends()": "a", "api.macro_history(text[])": "a",
     "api.ops_status(text)": "a", "api.related_cards(uuid,integer)": "a", "api.search(text,text,integer)": "a",
     "api.search_companies(text,integer)": "a", "api.sources()": "a", "api.subscribe_brief(text,text,integer,text)": "a",
     "api.top_stories()": "a", "api.unsubscribe_brief(uuid)": "a", "api.update_brief_subscription(uuid,text,integer,text)": "a",
-    "api.weekly_brief()": "a",
+    "api.weekly_brief()": "a", "api.report_blurb(uuid,text)": "a",
     "api.delete_account()": "u", "api.delete_my_data()": "u", "api.feed_for_you(text,integer)": "u",
-    "api.feed_for_you(text,integer,uuid[])": "u", "api.get_prefs()": "u", "api.my_brief_subscriptions()": "u",
+    "api.feed_for_you(text,integer,uuid[])": "u", "api.feed_for_you(text,integer,uuid[],text[])": "u", "api.get_prefs()": "u", "api.my_brief_subscriptions()": "u",
     "api.my_categories()": "u", "api.set_prefs(text[],text[],text[])": "u", "api.track(uuid,text,integer,uuid,integer,text)": "u",
     "api.unsubscribe_my_brief(text)": "u", "api.update_my_brief_time(text,integer,text)": "u"
   }';

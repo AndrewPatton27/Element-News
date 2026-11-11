@@ -1,0 +1,592 @@
+{
+ "BEAAPI": {
+  "Request": {
+   "RequestParam": [
+    {
+     "ParameterName": "METHOD",
+     "ParameterValue": "GETDATA"
+    },
+    {
+     "ParameterName": "DATASETNAME",
+     "ParameterValue": "NIPA"
+    },
+    {
+     "ParameterName": "TABLENAME",
+     "ParameterValue": "T20804"
+    }
+   ]
+  },
+  "Results": {
+   "Statistic": "NIPA Table",
+   "UTCProductionTime": "2026-11-10T22:05:20.597",
+   "Dimensions": [
+    {
+     "Ordinal": "1",
+     "Name": "TableName",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "2",
+     "Name": "SeriesCode",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "3",
+     "Name": "LineNumber",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "4",
+     "Name": "LineDescription",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "5",
+     "Name": "TimePeriod",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "6",
+     "Name": "CL_UNIT",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "7",
+     "Name": "UNIT_MULT",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "8",
+     "Name": "METRIC_NAME",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "9",
+     "Name": "DataValue",
+     "DataType": "numeric",
+     "IsValue": "1"
+    }
+   ],
+   "Data": [
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M01",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.423",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M02",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.770",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M03",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.869",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M04",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.163",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M05",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.408",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M06",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.730",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M07",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.906",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M08",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.229",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M09",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.601",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M10",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.790",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M11",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "128.045",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2025M12",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "128.455",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M01",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "128.845",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M02",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "129.293",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M03",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "130.105",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M04",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "130.672",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "131.241",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "131.106",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "131.187",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M08",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "131.611",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCERG",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M09",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "132.257",
+     "NoteRef": "T20804"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M01",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "124.609",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M02",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.002",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M03",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.144",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M04",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.524",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M05",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "125.818",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M06",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.133",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M07",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.363",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M08",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.646",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M09",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "126.940",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M10",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.165",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M11",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.363",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2025M12",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "127.765",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M01",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "128.270",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M02",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "128.701",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M03",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "129.030",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M04",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "129.395",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "129.796",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "129.969",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "130.148",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M08",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "130.489",
+     "NoteRef": "T20804,T20804.4"
+    },
+    {
+     "TableName": "T20804",
+     "SeriesCode": "DPCCRG",
+     "LineNumber": "25",
+     "LineDescription": "PCE excluding food and energy",
+     "TimePeriod": "2026M09",
+     "METRIC_NAME": "Fisher Price Index",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "130.902",
+     "NoteRef": "T20804,T20804.4"
+    }
+   ],
+   "Notes": [
+    {
+     "NoteRef": "T20804",
+     "NoteText": "Table 2.8.4. Price Indexes for Personal Consumption Expenditures by Major Type of Product, Monthly [Index numbers, 2017=100; seasonally adjusted] - LastRevised: October 29, 2026"
+    }
+   ]
+  }
+ }
+}

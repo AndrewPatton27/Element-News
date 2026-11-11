@@ -18,12 +18,10 @@ begin
  if not exists(select 1 from api.due_brief_subscriptions('2026-10-19 14:00:00+00') where id=sid) then raise exception 'weekly not due Monday'; end if;
  perform api.unsubscribe_brief(tok); perform api.unsubscribe_brief(tok);
  if exists(select 1 from core.brief_subscriptions where email='nobody@example.com') or not exists(select 1 from core.brief_email_suppressions where email='nobody@example.com') then raise exception 'unsubscribe suppression'; end if;
+ update core.subscribe_attempts set created_at=created_at-interval '30 minutes'; -- the 10-minute per-address window (20261132000000) would otherwise swallow this resubscribe
  r:=api.subscribe_brief('nobody@example.com','daily',7,'America/New_York');
  if r->>'status'<>'pending' or (select status from core.brief_subscriptions where email='nobody@example.com')<>'pending' then raise exception 'resubscribe must reconfirm'; end if;
- for i in 1..3 loop perform api.subscribe_brief('nobody@example.com','daily',7,'America/New_York'); end loop;
- if api.subscribe_brief('nobody@example.com','daily',7,'America/New_York')->>'status'<>'limited' then raise exception 'per-email daily cap'; end if;
- for i in 1..195 loop perform api.subscribe_brief('global'||i||'@example.com','daily',7,'America/New_York'); end loop;
- if api.subscribe_brief('global-cap@example.com','daily',7,'America/New_York')->>'status'<>'limited' then raise exception 'global hourly cap'; end if;
+ -- per-address, per-client and global limits live in subscribe_brief_limits_check.sql
  for i in 1..2 loop
    insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,rank_score)
    values('mail-market:'||i,'summary','Market fixture '||i,'Market test body.','markets','published','[]',now(),now(),now(),2000000-i) returning id into mid;

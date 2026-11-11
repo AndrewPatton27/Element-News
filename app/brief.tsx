@@ -4,7 +4,7 @@
 // the feed. Topics and sources the reader hid stay out, like in the feed. The back end may not
 // have the brief yet (the client then returns an empty one), so empty and error states matter.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { BlurbCard } from '../contract/types.ts';
@@ -16,11 +16,15 @@ import {
   briefDate,
   briefDateLabel,
   briefIsEmpty,
+  briefStatusLine,
   briefView,
   dayLabelShort,
   feedTopicHref,
-  generatedLine,
   headlineLabel,
+  loadLastGoodBrief,
+  resolveBrief,
+  summaryAgeNote,
+  saveLastGoodBrief,
   SECTION_PREVIEW,
   toBriefData,
   tokenParam,
@@ -28,6 +32,7 @@ import {
   type BriefMode,
 } from '../lib/brief/briefLogic';
 import { userMessage } from '../lib/api/errors';
+import { defaultStore } from '../lib/storage/storage';
 import { isRenderableKind, noticesFor } from '../lib/shared/labels';
 import { withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { usePalette, useWide } from '../lib/theme/useTheme';
@@ -38,12 +43,13 @@ import { BriefMovers, BriefNumbers } from '../components/numbers/BriefNumbers';
 import { BriefSignup } from '../components/account/BriefSignup';
 import { BriefManage } from '../components/account/BriefSignupManage';
 import { BriefStories } from '../components/brief/BriefStories';
+import { BriefLead } from '../components/brief/BriefLead';
 import { BriefSummary } from '../components/brief/BriefSummary';
 import { NumbersTicker } from '../components/numbers/NumbersTicker';
 import { DetailSheet } from '../components/card/DetailSheet';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { Shell, Wordmark } from '../components/shell/Shell';
-import { ErrorState, LoadingState } from '../components/shell/States';
+import { BriefSkeleton, ErrorState } from '../components/shell/States';
 
 // A brief older than this is fetched again when the reader comes back to the tab.
 const STALE_MS = 10 * 60_000;
@@ -75,7 +81,11 @@ function useBrief(api: Api, mode: BriefMode) {
       const request = m === 'daily' ? api.dailyBrief() : api.weeklyBrief();
       request
         .then((raw) => {
-          if (alive.current && id === seq.current[m]) setSlots((s) => ({ ...s, [m]: { data: toBriefData(raw), loading: false, error: null, loadedAt: Date.now() } }));
+          if (alive.current && id === seq.current[m]) {
+            const data = toBriefData(raw);
+            saveLastGoodBrief(defaultStore(), m, data); // a brief with stories becomes the saved last good one
+            setSlots((s) => ({ ...s, [m]: { data, loading: false, error: null, loadedAt: Date.now() } }));
+          }
         })
         .catch((e: unknown) => {
           if (alive.current && id === seq.current[m]) {
@@ -118,7 +128,10 @@ export default function BriefScreen() {
   const manageToken = tokenParam(params.manage);
   const [manageOpen, setManageOpen] = useState(true);
   const { slot, refresh } = useBrief(api, mode);
-  const { data, loading, error } = slot;
+  const { loading, error } = slot;
+  // Never empty: when the live brief has no stories (or could not load), the last good brief is shown with its date.
+  const saved = useMemo(() => loadLastGoodBrief(defaultStore(), mode), [mode, slot.loadedAt]);
+  const { data, source } = useMemo(() => resolveBrief(slot.data, saved), [slot.data, saved]);
 
   // The same hidden topics / sources the feed uses.
   const hidden = acct.viewPrefs?.hidden ?? [];
@@ -155,9 +168,7 @@ export default function BriefScreen() {
     body = <ErrorState title="Could not load the brief" message={error} onRetry={refresh} />;
   } else if (!data || !view || !unfiltered) {
     body = (
-      <View style={styles.center}>
-        <LoadingState label={`Loading your ${mode} brief…`} />
-      </View>
+      <BriefSkeleton label={`Loading your ${mode} brief…`} />
     );
   } else if (briefIsEmpty(view)) {
     const hiddenAll = !briefIsEmpty(unfiltered);
@@ -168,10 +179,11 @@ export default function BriefScreen() {
       </>
     );
   } else {
-    const label = headlineLabel(mode, data.window_hours);
+    const label = headlineLabel(mode, data.window_hours, data.window_kind);
     const stories = (
       <>
-        <BriefSummary summary={view.summary} mode={mode} config={config} wide={wide} />
+        <BriefLead cards={view.lead} onOpen={setDetailCard} wide={wide} />
+        <BriefSummary summary={view.summary} mode={mode} config={config} wide={wide} note={summaryAgeNote(view.summary, mode, data.brief_date)} />
         <BriefStories
           label={label}
           right={wide ? undefined : dayLabelShort(briefDate(data))}
@@ -237,7 +249,7 @@ export default function BriefScreen() {
         Could not refresh the brief. Tap to retry.
       </Text>
     ) : null;
-  const meta = data ? <BriefMeta line={generatedLine(data)} refreshing={refreshing} onRefresh={refresh} /> : null;
+  const meta = data ? <BriefMeta line={briefStatusLine(data, source)} refreshing={refreshing} onRefresh={refresh} /> : null;
 
   if (wide) {
     return (
@@ -256,6 +268,8 @@ export default function BriefScreen() {
   return (
     <Shell active="brief" bare notice>
       <View style={[styles.header, { backgroundColor: p.surface, borderBottomColor: p.border }]}>
+        {/* D-214: the phone header has no visible "Brief" title (the Daily / Weekly tabs and the bottom tab name the page), so screen readers get one page heading. */}
+        <Text role="heading" aria-level={1} style={styles.srOnly}>{`Brief: ${mode === 'weekly' ? 'weekly' : 'daily'}`}</Text>
         <View style={styles.brand}>
           <Wordmark size={22} />
         </View>
@@ -282,12 +296,12 @@ export default function BriefScreen() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   fill: { flex: 1 },
   strip: { borderBottomWidth: 1 },
   header: { flexDirection: 'row', alignItems: 'flex-end', height: MOBILE_HEADER_HEIGHT, paddingLeft: 16, paddingRight: 12, borderBottomWidth: 1 },
   brand: { height: MOBILE_HEADER_HEIGHT - 1, justifyContent: 'center', marginRight: 6 },
   scroll: { paddingHorizontal: space.page, paddingTop: 14, paddingBottom: space.md, gap: 18 },
-  center: { minHeight: 260 },
   columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 36 },
   main: { flex: 1, minWidth: 0 },
   aside: { width: 320, gap: 16 },

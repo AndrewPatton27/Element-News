@@ -27,6 +27,7 @@ import { SampleBanner } from './SampleBanner';
 import { DelayedBanner } from './DelayedBanner';
 import { useFeedStatus } from '../../lib/status/useFeedStatus';
 import { SortToggle } from '../feed/SortToggle';
+import { SkipLink } from './SkipLink';
 import { go, TabBar, TopNavLinks, type Tab } from './TabBar';
 import { FeedNotice } from './FeedNotice';
 
@@ -128,6 +129,7 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
   if (wide) {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: p.bg }]}>
+        <SkipLink />
         {api.sample ? <SampleBanner /> : null}
       <DelayedBanner status={feedStatus} />
         <TopBar active={active} p={p} email={user ? user.email : null} signedIn={signedIn} feedTab={feedTab} />
@@ -182,6 +184,7 @@ export function Shell({ active, children, left, aside, scroll, bare, noFab, feed
   const about = notice && active !== 'about' && !noFab;
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: p.bg }]} edges={['top', 'bottom']}>
+      <SkipLink />
       {api.sample ? <SampleBanner /> : null}
       <DelayedBanner status={feedStatus} />
       {content}

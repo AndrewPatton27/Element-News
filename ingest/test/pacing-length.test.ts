@@ -26,8 +26,8 @@ const GOOD: SummaryDraft = {
 
 // Three sentences, 66 words in total; the first two (46 words) fit the 60-word limit.
 const S1 = 'The camera maker told regulators about its latest quarterly results in a 2026-10-16 filing that points readers to an attached press release for the details.';
-const S2 = 'The company also flagged that some earlier financial statements may need another look, which usually means extra review by its auditors.';
-const S3 = 'Readers who follow the company may want to watch for a fuller report and any restated figures later this year.';
+const S2 = 'The company also flagged that some earlier financial statements will need another look, which usually means extra review by its auditors.';
+const S3 = 'Readers who follow the company will want to watch for a fuller report and any restated figures later this year.';
 const LONG_BODY: SummaryDraft = { ...GOOD, body: `${S1} ${S2} ${S3}` };
 const LONG_HEADLINE: SummaryDraft = { ...LONG_BODY, headline: 'GoPro tells regulators about quarterly results and flags that earlier statements may need another careful look' };
 
@@ -46,10 +46,10 @@ function fake(name: string, outputs: (SummaryDraft | Error)[]): Summarizer & { c
 
 // ---- Fix 1: pacing and cooldown ---------------------------------------------------
 
-test('pacing uses the safety factor: Gemini 5 s (12/min, was 4 s = exactly 15/min), Groq floor 30 s', () => {
+test('pacing uses the safety factor: Gemini 5 s (12/min, was 4 s = exactly 15/min), Groq 30.1 s (TPM gap beats the 30 s floor)', () => {
   const { providers } = buildProviders({ geminiApiKey: 'gemini-test-key-not-real', groqApiKey: 'groq-test-key-not-real' });
   assert.equal(providers.find((p) => p.name === 'gemini')!.minIntervalMs, 5000);
-  assert.equal(providers.find((p) => p.name === 'groq')!.minIntervalMs, 30_000);
+  assert.equal(providers.find((p) => p.name === 'groq')!.minIntervalMs, 30_141);
   assert.ok(60_000 / 5000 <= config.gemini.freeRpm * config.rpmSafetyFactor);
 });
 

@@ -4,6 +4,8 @@
 // Outputs: the `config` object, small derived helpers (caps, pacing, Federal Register URLs) and
 // readEnv/describeEnv for the environment (key values are never printed).
 
+import { COMPANIES_EXTRA } from '../../contract/companiesExtra.ts';
+
 export const config = {
   // ---- AI summarizer --------------------------------------------------------
   gemini: {
@@ -35,15 +37,16 @@ export const config = {
     freeRpd: 1000 as number | null,
     freeTpm: 8000 as number | null,
     freeTpd: 200_000 as number | null,
-    // Tokens are the binding limit, so Groq gets less source text than Gemini. About 2.7k tokens per
-    // call since sum-v3 (prompt ~1.9k incl. 6,000 chars of source + ~0.8k output with the detail).
+    // Tokens are the binding limit, so Groq gets less source text than Gemini. 2,700 tokens per call with sum-v6
+    // (an estimate, never measured on Groq). sum-v7 (2026-11-10): the same two live Gemini calls with the same source text
+    // measured +515 prompt tokens (earnings 4,239 -> 4,754, recall 1,914 -> 2,429), so 2,700 + 515 = 3,215.
     sourceTextMaxChars: 6000,
-    estimatedTokensPerCall: 2700,
-    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 25.4 s,
+    estimatedTokensPerCall: 3215,
+    // Pacing: max(60 s / (RPM * rpmSafetyFactor) = 2.5 s, 60 s * tokensPerCall / (TPM * factor) = 30.1 s,
     // this floor). The floor leaves room
     // for reasoning tokens we cannot measure offline.
     minIntervalMsFloor: 30_000,
-    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 74).
+    // Daily cap: min(this, RPD, floor(TPD / tokensPerCall) = 62; was 74 with sum-v6). core.ai_caps holds the live copy (reserve 5 for the brief).
     dailyCapCode: 80,
   },
   // Pacing safety margin for every AI provider: interval = ceil(60 s / (RPM * factor)).
@@ -58,12 +61,15 @@ export const config = {
   // numbers/SKUs/UPCs/lot numbers in the headline or summary, sentence-case headlines.
   // v6 (2026-10-18): flow and no repetition (D-58): the first body sentence continues from the headline
   // instead of restating it, no sentence repeats another, no filler; the validator rejects repetition.
-  promptVersion: 'sum-v6',
+  // v7 (2026-11-10, D-111/D-123): readers who follow business, finance and investing (about 16-50, plain 8th-grade words),
+  // macro-first relevance rubric, defined jargon, one direction word, numerals for dates, no field labels, no speculation or
+  // relative time. Validators: style:, speculation:, relative_time:, event_type enum, extended repetition; fixProperNouns.
+  promptVersion: 'sum-v7',
   // Version stored on template and data cards (no AI). tpl-v2 = plain wording (2026-10-17).
   // `--rewrite` redoes every published card whose prompt_version is neither this nor promptVersion.
   // v4: plain USGS headline+body and plain Federal Register headline. v5: sentence-case template headlines,
   // generic CPSC template (no product codes), figure-less earnings and low-interest quake template cards dropped.
-  templateVersion: 'tpl-v5',
+  templateVersion: 'tpl-v6',     // v6 (M9): bp not pts, no Change/Period bullets, why-it-matters lines, yield-curve card, no From/Published/Title stub
   providerOrder: ['gemini', 'groq', 'template'] as const, // a list on purpose: adding a provider is one entry
 
   // Deterministic editorial gate, before any model call. Per-run narrow-source diversity cap.
@@ -90,6 +96,9 @@ export const config = {
       /\b(revenue|sales|earnings|jobs|workers|cost|price|recall|business|company|market|industry|billion|million|regulator|federal|economy)\b/i,
     ] as readonly RegExp[],
     scorePromptVersion: 'report-card-v1',
+    // A report-card failure (ABANDON, or the one rewrite failing its checks) used to skip the item for good. Now the item
+    // stays 'new' and is retried in a later run; after this many failures it is skipped (src/retry.ts). DUPLICATE is final at once.
+    maxRetries: 3,
     // Edge Functions only (deps.reportCard.scorerMaxGroqUsed): the Groq scorer switches off once Groq's calls
     // today reach this number, so the writer fallback and brief-summary keep Groq calls (cap 74; watchdog design 5.3).
     cloudScorerMaxGroqUsed: 50,
@@ -125,6 +134,9 @@ export const config = {
     // words also appears in it (or it starts with the headline text). Tuned on the fixtures: a normal
     // first sentence reuses the entity and the topic noun (about 0.3 to 0.5), a restatement reuses nearly all.
     headlineOverlapMax: 0.7,
+    // Same test for the detail (paragraph 1 and key point 1 against the headline). Live sum-v7 runs dropped the detail in about 1 of 4
+    // cards for this reason; raise it (for example to 0.85) to keep more details, lower it to be stricter.
+    detailHeadlineOverlapMax: 0.7,
     minHeadlineWords: 3,                       // a headline with fewer content words is only checked for "starts with"
     // (b) two summary sentences are near-duplicates when this share of the shorter one's content words
     // appears in the other.
@@ -156,6 +168,49 @@ export const config = {
   // Everywhere else they stay blocked. Investment words (buy, sell, price target, ...) are never
   // here, so investment advice stays blocked on safety cards too.
   safetyAdviceAllowlist: ['should'],
+  // Blocklist phrases that read as advice ONLY in market talk. "to the moon" is a stock-pump slogan, but also
+  // plain English in "missions to the Moon" (NASA cards were rejected for it, sum-v7 test). The phrase is blocked
+  // only when the same text also has one of these market words.
+  adviceMarketContext: {
+    'to the moon': /\b(stocks?|shares?|prices?|crypto|bitcoin|ethereum|tokens?|coins?|rally|rallies|market|markets|trad(?:e|es|ing|er|ers)|invest(?:or|ors|ing|ment|ments)?|portfolio)\b/i,
+  } as Readonly<Record<string, RegExp>>,
+
+  // sum-v7 validators (AI drafts only). Each word or phrase is an error when it is in the draft but NOT in the source text.
+  speculationWords: ['could', 'might', 'likely', 'is expected to', 'are expected to', 'is set to', 'are set to', 'poised to', 'may'] as readonly string[],
+  relativeTimeWords: ['today', 'yesterday', 'tomorrow', 'this week', 'next week', 'last week', 'this month', 'next month', 'last month', 'days away'] as readonly string[],
+  // Event types the AI may choose (schema enum and checkShape). Code sets world_event, recall, science and so on.
+  aiEventTypes: ['earnings', 'exec_change', 'deal', 'insider', 'macro_release', 'fed'] as readonly string[],
+  // Number tolerance (safety net, audit item 9): a draft figure that has a scale word ("1.5 billion") is also accepted when
+  // the source has the same value one scale step away ("1,500 million"). Percent figures stay exact. Never rounds.
+  numberScaleTolerance: true,
+  // fixProperNouns (text.ts): deterministic casing fixer for AI text, run after validation. Short, reviewed lists.
+  // acronyms: Title-case and lower-case forms become upper case ("Nasa" -> "NASA"). names: any non-upper-case spelling
+  // becomes the canonical one. Anything already correct is never changed.
+  properNounFixes: {
+    acronyms: ['NASA', 'FCC', 'FAA', 'FOMC', 'FDA', 'FDIC', 'CFPB', 'CFTC', 'CPSC', 'USGS', 'OPEC', 'FTC', 'IRS', 'EPA', 'DOJ', 'GDP', 'CPI', 'BLS', 'BEA'] as readonly string[],
+    // "Sec" is a real abbreviation too (seconds, "Sec. 5"), so it is fixed only as a bare word that is not followed by a period.
+    titleCaseOnlyAcronyms: ['SEC'] as readonly string[],
+    names: [
+      'United States', 'Federal Reserve', 'Federal Open Market Committee', 'Social Security', 'Wall Street', 'Medicare', 'Medicaid',
+      'Treasury Department', 'White House', 'Supreme Court', 'Congress',
+    ] as readonly string[],
+    usAbbreviation: true,                      // "u.s." -> "U.S."
+    // Mars and Moon are also common words: fixed only when a space or mission word is near.
+    spaceContext: /\b(nasa|moon|mars|lunar|astronauts?|missions?|rovers?|spacecraft|planets?|orbit|artemis|crew|rocket|rockets)\b/i,
+  },
+  // `--rewrite` stops hiding cards (keeps them) once hidden / selected passes this share (same idea as reportCard.auditHideMaxFraction).
+  rewriteHideMaxFraction: 0.4,
+
+  // M9c yield work (R-300). An item whose AI drafts were all rejected and that could not become a template card used to stay
+  // 'new' for ever, so the same item (Best Buy 2.02, Aug 27) used 2 Gemini + 2 Groq calls EVERY hour (96 calls a day, the
+  // whole Groq cap). Such an item is now retried at most this many times (counter in status_note 'retry:<n>:<code>'), then skipped.
+  // Outcomes where no AI was reachable at all (cap, rate limit) are not counted: they stay 'new' for free.
+  softRetry: { maxFailures: 3 },
+  // Edge Function work cap (new items per call) when the request gives none; MAX_WORK_CAP 20 still applies. 'sec' is higher:
+  // 523 filings are listed per run, earnings season brings dozens of real new ones, and each takes about 10 s (Gemini pacing 5 s
+  // plus 2-3 page fetches) inside the 100 s soft budget. Routine 5.02 skips do not count towards it (guardPublisher refund).
+  workCapBySource: { sec: 10 } as Record<string, number>,
+  defaultWorkCap: 5,
 
   // Candidate selection (run-wide budget): every source's candidates are collected first (no AI call), scored
   // without AI, and the run's budget (default 20 new items) is spent on the best ones. enabled=false = the old
@@ -183,9 +238,17 @@ export const config = {
     'www.federalregister.gov', 'data.sec.gov',
     // Treasury FiscalData JSON API (average interest rates, debt to the penny): numbers only, never pages.
     'api.fiscaldata.treasury.gov',
+    // BLS public data API (series JSON, numbers only) and BEA data API (apps.bea.gov, already listed above for the RSS).
+    'api.bls.gov',
+    // EIA open data API v2 and Census Data API (JSON numbers only, never pages). Keys come from env, never from code.
+    'api.eia.gov', 'api.census.gov',
     // Broad topics (feed/API text only, never pages): Wikipedia REST featured feed, CPSC recalls API,
     // USGS earthquake GeoJSON, NASA news-release RSS.
-    'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov'],
+    'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov',
+    // NewsData.io /latest and /market (JSON headlines only, never article pages). Key from env NEWSDATA_API_KEY. OFF by default (newsdata.enabled).
+    'newsdata.io',
+    // Regulator press-release RSS for the Crypto lane (M9c3): feed text only, never pages.
+    'www.cftc.gov', 'www.occ.gov', 'www.consumerfinance.gov'],
   maxRequestsPerSecond: 5,                     // SEC allows 10/s; we stay at half
   maxRedirects: 3,
   fetchTimeoutMs: 20_000,
@@ -195,7 +258,7 @@ export const config = {
   sourceTextMaxChars: 10_000,                  // about 2.5k tokens sent to the AI
 
   feeds: {
-    sec8k: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=40&output=atom',
+    sec8k: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=100&output=atom',   // 100 newest 8-Ks (EDGAR accepts 100; was 40, M9c R-360): the hourly run sees more of the same-day filings
     fedRss: [
       'https://www.federalreserve.gov/feeds/press_monetary.xml',
       'https://www.federalreserve.gov/feeds/press_all.xml',
@@ -208,12 +271,16 @@ export const config = {
     fredObservations: 'https://api.stlouisfed.org/fred/series/observations',
     treasuryCsv: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv',
   },
-  macroSeries: ['DGS2', 'DGS10', 'DFF', 'CPIAUCSL', 'UNRATE', 'DCOILWTICO',
+  // DFEDTARU/DFEDTARL come first so the fed funds card (DFF) can state the target range from the same run.
+  macroSeries: ['DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'DFF', 'CPIAUCSL', 'UNRATE', 'DCOILWTICO',
     'GASREGW', 'ICSA', 'RSAFS', 'HOUST', 'PAYEMS', 'A191RL1Q225SBEA',
     // Finance and rates (2026-11-08): all Federal Reserve Board H.15 series. SPREAD_10Y2Y is not fetched: it is
     // computed from DGS10 and DGS2 (FRED's own T10Y2Y and SOFR pages carry a copyright flag, so they stay out).
     // Check each series' notes on its FRED page for a "Copyright" line before enabling in production.
-    'DGS3MO', 'DGS5', 'DGS30', 'EFFR', 'DFEDTARU', 'DFEDTARL'],
+    'DGS3MO', 'DGS5', 'DGS30', 'EFFR',
+    // M9c (2026-11-11): 16 more public-domain series (sources/moreSeries.ts). FRED notes checked: no Copyright line.
+    'CCSA', 'CIVPART', 'U6RATE', 'CPILFESL', 'PPIFIS', 'PCEPI', 'PCEPILFE', 'PSAVERT',
+    'INDPRO', 'TCU', 'TOTALSL', 'WALCL', 'M2SL', 'PERMIT', 'HSN1F', 'DGORDER'],
   // Derived series: id -> [minuend, subtrahend] (both must be fetched in the same run).
   derivedSeries: { SPREAD_10Y2Y: ['DGS10', 'DGS2'] } as Record<string, [string, string]>,
   // FRED series that must never be fetched or shown (not public domain). MORTGAGE30US: Freddie Mac copyright.
@@ -222,21 +289,28 @@ export const config = {
   // (daily and weekly series). Monthly and quarterly series (CPI, unemployment, retail sales,
   // housing starts, payrolls, GDP) always get one card per new period.
   dataCardMinMove: {
-    DGS2: 0.05,          // percentage points
-    DGS10: 0.05,
-    DFF: 0.05,
+    // Treasury maturities no longer get a card each: one daily yield-curve card (config.yieldCurve) covers 2/5/10/30-year.
+    DGS2: 99,            // numbers panel only (see yieldCurve)
+    DGS10: 99,
+    DFF: 0.05,           // percentage points
     DCOILWTICO: 2.0,     // percent
     GASREGW: 1.0,        // percent, weekly
     ICSA: 5.0,           // percent, weekly
-    DGS3MO: 0.10,        // percentage points
-    DGS5: 0.10,
-    DGS30: 0.10,
+    DGS3MO: 99,          // numbers only
+    DGS5: 99,
+    DGS30: 99,
     EFFR: 99,            // numbers panel only: DFF already carries the fed funds card
     DFEDTARU: 0.05,      // the rate-range upper limit changes only at FOMC decisions (one card per change)
     DFEDTARL: 99,        // lower limit moves together with the upper one: numbers only
     SPREAD_10Y2Y: 99,    // numbers only
     TREAS_DEBT: 1e9,     // grows every day: numbers only
+    CCSA: 3.0,           // percent, weekly (M9c)
+    WALCL: 0.2,          // percent, weekly (M9c)
   } as Record<string, number>,
+  // One daily Treasury yield-curve card (2, 5, 10, 30-year + 10y-2y gap, moves in bp). Published when the largest
+  // move of the four is at least minMovePoints (percentage points; 0 = every day with a new reading, about 250/year,
+  // and only the newest stays live because core.supersede_series hides the older ones).
+  yieldCurve: { minMovePoints: 0 },
   fredLookbackDays: 500,                       // enough history for CPI year-over-year
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
   backfillPauseMs: 700,                        // --backfill-macro: pause between FRED requests (limit is 120/minute)
@@ -266,6 +340,160 @@ export const config = {
     } as Record<string, string>,
     // Only these series may become data cards (monthly series would otherwise give one card each per month).
     cardSeries: ['TREAS_AVG_NOTES'] as string[],
+  },
+  // BLS public data API (GET, one series per request; v1 needs no key: 25 requests/day, v2 with BLS_API_KEY: 500/day).
+  // Wages, Employment Cost Index and JOLTS: one data card per new period (monthly/quarterly), at most one run's
+  // worth of requests = series count. Both polled twice a day (cron), so about 6 requests/day on v1.
+  bls: {
+    base: 'https://api.bls.gov/publicAPI',
+    series: { CES0500000003: 'BLS_AHE', CIU1010000000000A: 'BLS_ECI', JTS000000000000000JOL: 'BLS_JOLTS',
+      // M9c3 (R-450): CPI components readers asked for (groceries, rent, electricity, medical care), not seasonally adjusted, yearly change
+      CUUR0000SAF11: 'BLS_CPI_FOOD_HOME', CUUR0000SEHA: 'BLS_CPI_RENT', CUUR0000SEHF01: 'BLS_CPI_ELECTRICITY', CUUR0000SAM: 'BLS_CPI_MEDICAL' } as Record<string, string>,
+    attribution: 'Source: U.S. Bureau of Labor Statistics',
+  },
+  // BEA NIPA data API (GET, key = BEA_API_KEY; limits 100 requests, 100 MB, 30 errors per minute). OFF by default:
+  // the BEA API terms are not readable without signing in, so Drew confirms the reuse terms first (set BEA_DATA_ENABLED=1).
+  // One request per table; T20804 (PCE prices, monthly), T20600 (personal income, monthly), T10105 (GDP, quarterly).
+  beaData: {
+    enabled: false,
+    base: 'https://apps.bea.gov/api/data/',
+    tables: [
+      { table: 'T20804', frequency: 'M', yearsBack: 2, series: { DPCERG: 'BEA_PCE_YOY', DPCCRG: 'BEA_CORE_PCE_YOY' } },
+      { table: 'T20600', frequency: 'M', yearsBack: 1, series: { A065RC: 'BEA_PERSONAL_INCOME' } },
+      { table: 'T10105', frequency: 'Q', yearsBack: 1, series: { A191RC: 'BEA_GDP' } },
+    ] as { table: string; frequency: 'M' | 'Q'; yearsBack: number; series: Record<string, string> }[],
+    attribution: 'Source: U.S. Bureau of Economic Analysis',
+  },
+  // ---- Agency data cards (D-113): EIA, Census, Treasury auctions, FOMC calendar. Template cards, no AI. ----
+  // Terms read 2026-11-10: docs/work/sources-eia-census-treasury-fed.md. Each source is bounded per run and
+  // dedupes on its own key (source + series/period), so a rerun or an overlapping window never makes a second card.
+  agency: {
+    // EIA: public domain ("U.S. government publications are in the public domain"); asks for a dated credit.
+    // API key in the URL (EIA_API_KEY). Documented limits are per-second/per-hour with no numbers: 1 request
+    // per series group per run, cron weekdays only.
+    eia: {
+      enabled: true,
+      base: 'https://api.eia.gov/v2',
+      maxCardsPerRun: 4,
+      attribution: 'Source: U.S. Energy Information Administration',
+      // Weekly petroleum status: commercial crude, motor gasoline and distillate stocks, one card for the report.
+      petroleum: { route: '/petroleum/stoc/wstk/data/', series: { crude: 'WCESTUS1', gasoline: 'WGTSTUS1', distillate: 'WDISTUS1' }, enabled: true },
+      // Weekly natural gas storage, Lower 48 working gas in Bcf.
+      gasStorage: { route: '/natural-gas/stor/wkly/data/', series: 'NW2_EPG0_SWO_R48_BCF', enabled: true },
+      // Weekly refinery utilization + crude production, imports and product supplied (M9c): 2 requests, one card.
+      supply: { routeSupply: '/petroleum/sum/sndw/data/', routeUtil: '/petroleum/pnp/wiup/data/', enabled: true,
+        series: { utilization: 'WPULEUS3', production: 'WCRFPUS2', imports: 'WCRIMUS2', productSupplied: 'WRPUPUS2' } },
+      // Weekly retail regular gasoline. OFF by default: FRED GASREGW (the same EIA number) already makes a gas card.
+      gasoline: { route: '/petroleum/pri/gnd/data/', series: 'EMM_EPMR_PTE_NUS_DPG', enabled: false },
+      // Weekly retail on-highway diesel (M9c3): trucking and small-business cost; FRED has no copy of it (GASREGW is gasoline only).
+      diesel: { route: '/petroleum/pri/gnd/data/', series: 'EMD_EPD2D_PTE_NUS_DPG', enabled: true },
+    },
+    // Census: terms require a prominent "not endorsed or certified by the Census Bureau" notice and say nothing
+    // clear on keys or limits, so the source is OFF until Drew confirms (question Q1 in the sources doc).
+    // RSAFS and HOUST already reach the feed through FRED.
+    census: {
+      enabled: false,
+      base: 'https://api.census.gov/data/timeseries/eits',
+      maxCardsPerRun: 2,
+      lookbackMonths: 3,
+      notice: 'This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.',
+      attribution: 'Source: U.S. Census Bureau',
+    },
+    // Treasury auctions via FiscalData (no key; "offered free, without restriction"). Notes and bonds only
+    // (bills auction almost daily and would flood the feed); TIPS skipped. At most 2 new cards per run.
+    auctions: {
+      enabled: true,
+      path: '/v1/accounting/od/auctions_query',
+      pageSize: 40,
+      lookbackDays: 5,
+      maxCardsPerRun: 2,
+      securityTypes: ['Note', 'Bond'] as string[],
+      attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    },
+    // BLS release calendar (M9c): ICS from www.bls.gov (public domain). One template card per major release, published
+    // up to leadDays before it (Eastern days), at most maxCardsPerRun new cards per run.
+    blscal: {
+      enabled: true,
+      url: 'https://www.bls.gov/schedule/news_release/bls.ics',
+      leadDays: 3 as number,
+      maxCardsPerRun: 3,
+      attribution: 'Source: U.S. Bureau of Labor Statistics',
+    },
+    // Treasury Monthly Treasury Statement (M9c): budget deficit or surplus, one card a month (FiscalData, no key).
+    mts: {
+      enabled: true,
+      path: '/v1/accounting/mts/mts_table_1',
+      pageSize: 40,
+      lookbackDays: 75,
+      maxCardsPerRun: 1,
+      attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    },
+    // Fed Beige Book (M9c3, R-450): release dates from federalreserve.gov/monetarypolicy/publications/beige-book-default.htm
+    // (read 2026-11-11; 2027 dates not posted yet, add them when the Fed posts them). A preview card runs previewLeadDays before,
+    // the release card (with up to three sentences quoted from the national summary, each under the 25-word limit, rule 6) from the
+    // release day for releaseDays. Summary page = www.federalreserve.gov (rule 2 domain).
+    beige: {
+      enabled: true,
+      releases: ['2026-11-25'] as string[],
+      previewLeadDays: 3,
+      releaseDays: 4,
+      summaryUrl: 'https://www.federalreserve.gov/monetarypolicy/beigebook{ym}-summary.htm',
+      pageUrl: 'https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm',
+      maxQuoteWords: 25,
+      maxCardsPerRun: 2,
+      attribution: 'Source: Board of Governors of the Federal Reserve System',
+    },
+    // Trade actions from the Federal Register (M9c3): USTR (Section 301/232 tariffs, exclusions), Commerce BIS (export controls)
+    // and Section 232 notices. Template cards from the document title; no abstract, no page download (API JSON only).
+    // OFAC "Notice of OFAC Sanctions Action" titles carry no content, so Treasury/OFAC is not read. ITA antidumping notices
+    // (dozens a day, one product each) are skipped.
+    trade: {
+      enabled: true,
+      endpoint: 'https://www.federalregister.gov/api/v1/documents.json',
+      agencies: ['trade-representative-office-of-united-states', 'industry-and-security-bureau', 'international-trade-administration'] as string[],
+      perPage: 60,
+      lookbackDays: 7,
+      maxCardsPerRun: 3,
+      maxTitleWords: 25,
+      attributionPrefix: 'Source: Federal Register (National Archives)',
+    },
+    // Regulator press releases for the opt-in Crypto/regulation lane (M9c3): CFTC, OCC, CFPB RSS (public domain). Only titles that
+    // match the crypto pattern publish; the lane tag comes from the headline words (core.topic_tags_of). Template card, verbatim
+    // title as the headline (kept under 90 characters), no description text. Treasury has no RSS feed (checked 2026-11-11).
+    regpress: {
+      enabled: true,
+      maxAgeDays: 5,
+      maxCardsPerRun: 2,
+      crypto: '(^|[^a-z])(bitcoin|crypto(currenc(y|ies)|-?assets?)?|ethereum|stablecoins?|digital assets?|tokeniz[a-z]+|blockchain|GENIUS Act)([^a-z]|$)',
+      feeds: [
+        { id: 'cftc', url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml', agency: 'U.S. Commodity Futures Trading Commission', short: 'CFTC', needsFlag: false },
+        { id: 'occ', url: 'https://www.occ.gov/rss/occ_news.xml', agency: 'Office of the Comptroller of the Currency', short: 'OCC', needsFlag: true },   // OFF unless REGPRESS_OCC_ENABLED=1: no OCC reuse statement could be read (its policy pages return 404)
+        { id: 'cfpb', url: 'https://www.consumerfinance.gov/about-us/newsroom/feed/', agency: 'Consumer Financial Protection Bureau', short: 'CFPB', needsFlag: false },
+      ] as { id: string; url: string; agency: string; short: string; needsFlag: boolean }[],
+    },
+    // Annual figures (M9c3): Social Security COLA, Medicare premiums, IRS retirement limits. ssa.gov / cms.gov / irs.gov are not rule-2
+    // domains, so the numbers are copied by hand from the agency announcement into this list (facts, public domain) and a
+    // template card runs once. OFF unless ANNUAL_FIGURES_ENABLED=1: ssa.gov refused the terms-page fetch (403) and the IRS and
+    // CMS pages state no reuse terms, so Drew decides (open question). An entry needs verified numbers and a source URL.
+    annual: {
+      enabled: false,
+      maxAgeDays: 45,
+      maxCardsPerRun: 2,
+    },
+    // FOMC calendar: dates copied from federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-11-10 (2027 tentative).
+    // [first day, last day (decision day), has projections]. A card appears leadDays before the meeting starts.
+    fomc: {
+      enabled: true,
+      leadDays: 7,
+      minutesDelayDays: 21,                     // "released three weeks after the date of the policy decision"
+      calendarUrl: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
+      meetings: [
+        ['2026-12-08', '2026-12-09', true],
+        ['2027-01-26', '2027-01-27', false], ['2027-03-16', '2027-03-17', true], ['2027-04-27', '2027-04-28', false],
+        ['2027-06-08', '2027-06-09', true], ['2027-07-27', '2027-07-28', false], ['2027-09-14', '2027-09-15', true],
+        ['2027-10-26', '2027-10-27', false], ['2027-12-07', '2027-12-08', true],
+      ] as [string, string, boolean][],
+    },
   },
   // Federal Register final rules (JSON API, no key). The AI sees only each document's `abstract`;
   // documents without one are skipped. Reuse permitted (1 CFR 2.6); public-domain copy limit.
@@ -304,7 +532,38 @@ export const config = {
   secTickersUrl: 'https://www.sec.gov/files/company_tickers_exchange.json',
   // Per-company filing list (JSON, data.sec.gov, API host list). {cik} = 10-digit CIK.
   secSubmissionsUrl: 'https://data.sec.gov/submissions/CIK{cik}.json',
-  secLookbackDays: 90,                        // per-company 8-Ks filed within this many days
+  // Per-company 8-Ks filed within this many days. Was 90 (laptop backfill): every hourly run then re-listed ~520 filings, 100 old ones sat
+  // unfinished for weeks and a run could not reach its tail inside the time budget. 21 days keeps the per-company lists useful as a
+  // safety net for the 40-entry current feed without stale quarter-old cards (M9c, R-300).
+  secLookbackDays: 21,
+  // Extended SEC watch list (M9c, R-360): large US-listed companies beyond the household-name directory, from
+  // contract/companiesExtra.ts (generated from SEC's own ticker list). Same 8-K rules as watchCompanies; the directory
+  // test keeps watchCompanies at the household-name list, so this is a second list that runSec adds to it.
+  secExtraWatch: COMPANIES_EXTRA.map((c) => c.ticker) as readonly string[],
+  // How runSec finds filings for ~540 companies inside the Edge Function's ~140 s wall limit (it used to make one
+  // data.sec.gov request per company, 190 of them):
+  //   1. EDGAR daily index on www.sec.gov (one file per business day, ~1 MB, every 8-K of the day with its CIK and
+  //      accession number, no key): the last `days` calendar days are read, the watched CIKs picked out, filings the
+  //      database already handled dropped (api.items_handled) and only the CIKs with a NEW filing get one
+  //      data.sec.gov submissions request (that is where the item numbers are).
+  //   2. A rotating safety slice of `rotationPerRun` watched CIKs, chosen from the clock hour (hour mod slices), so every
+  //      company's own filing list is re-read about every (540 / rotationPerRun) hours even if the index is missing.
+  //   3. The current 8-K Atom feed, as before.
+  // Fair access: the shared limiter (5 requests a second, SEC allows 10) and SEC_USER_AGENT (app name plus contact email).
+  secIndex: {
+    urlTemplate: 'https://www.sec.gov/Archives/edgar/daily-index/{yyyy}/QTR{q}/form.{yyyymmdd}.idx',
+    days: 3,                       // today, yesterday and the day before (weekends and holidays have no file: a 404 is fine)
+    cacheTtlMinutes: 30,
+    maxNewCiksPerRun: 60,          // upper bound on submissions requests caused by index hits in one run
+    rotationPerRun: 30,            // safety slice per run
+  },
+  // Reg FD (7.01) and other-events (8.01) filings (M9c, R-360): they used to be dropped as 'low_value' before any AI call. Now a
+  // watch-list filing whose only card items are 7.01/8.01 may become a card IF the AI scores it relevance 3+ (minEverydayRelevance,
+  // unchanged). Cost control: at most `maxPerRun` such filings are worked on per run (hourly runs, so at most about 24 AI
+  // attempts a day, usually 10 to 20 because most hours have none), pure boilerplate is skipped before any AI call
+  // (conference attendance, slide decks, exhibit-only pointers; see isBoilerplateRegFd), and they never get a template card
+  // (a template cannot judge relevance), so with no AI available they simply wait.
+  secRegFd: { enabled: true, maxPerRun: 1, items: ['7.01', '8.01'] as readonly string[], minWords: 14 },
   // Earnings press release. An Item 2.02 8-K is usually a cover page; the figures sit in the EX-99.1
   // exhibit (a page on www.sec.gov, so the page host list already allows it). For a filing with one of
   // these items the exhibit is fetched through the same limiter and cache and its text goes to the AI
@@ -347,7 +606,7 @@ export const config = {
   topRolePattern: /\b(chief executive officer|chief financial officer|ceo|cfo|chair|chairman|chairwoman|chairperson|(?<!vice )president)\b/i,
   roleChangePattern: /\b(resign\w*|retire\w*|appoint\w*|depart\w*|step(?:s|ped)? down|succeed\w*|successor|named|terminat\w*|separat\w*|transition\w*)\b/i,
   // Template cards (no AI, so no relevance score) only for these items of watch-list companies.
-  templateSecItems: ['2.02', '5.02', '1.05', '4.02', '2.05', '2.03'],
+  templateSecItems: ['2.02', '5.02', '1.05', '4.02', '2.05', '2.03', '1.01', '2.01'],   // 1.01 material agreement, 2.01 completed acquisition or sale (M9c, R-300)
   // AI everyday_relevance score (1-5) below this: the card is not published (logged as low_relevance).
   minEverydayRelevance: 3,
   // Optional boost for watch-list cards. NOT applied: importance is computed only in the ranking SQL
@@ -381,6 +640,44 @@ export const config = {
     // from SEC_USER_AGENT at run time; it is never hard-coded.
     clientName: 'Element/0.1',
     library: 'node-fetch',
+  },
+  // NewsData.io link-out source (D-05, M9 supply, cadence backbone). `enabled` is the code default: ON (cadence, D-270). Three locks
+  // still apply: no NEWSDATA_API_KEY secret = the source makes no call and logs "skipping"; the Edge Function secret NEWSDATA_ENABLED=0
+  // switches it off (=1 on, unset = this default); and a card only publishes when the database flag core.app_config.linkout_cards is true.
+  // Terms (read 2026-11-11, context/data-sources.md): free plan = 200 credits/day, 12 h delay, 1 credit per call, up to 10 articles per call,
+  // no full content. Link-out only: verbatim headline, publisher URL, "via NewsData.io", "Delayed 12 h". No description, image or content.
+  newsdata: {
+    enabled: true as boolean,
+    baseUrl: 'https://newsdata.io/api/1',
+    sourceName: 'NewsData.io',
+    attribution: 'via NewsData.io',
+    delayedHours: 12,
+    headlineMaxChars: 200,                      // rule 7 safety cap
+    dailyCreditCap: 144,                        // a weekday uses 104 (hourly baseline 48 + market-hours /market every 15 min 42 + /latest every 30 min 14); the free plan allows 200
+    latestStopFraction: 0.8,                    // at 80% of the cap /latest calls stop (the /market backbone keeps its credits); the cap itself stops everything
+    minScore: 2,                                // relevance gate (newsdata.ts relevanceScore): headlines below this are skipped as not_finance
+    pageSize: 10,                               // free-plan maximum articles per call (1 credit)
+    maxPerRun: 10,                              // new cards per run
+    maxAgeHours: 72,                            // older articles are skipped
+    language: 'en',
+    country: 'us',
+    category: 'markets',
+    eventType: null as string | null,
+    // Standing content rule: business / macro / markets / investing only. Whole-word, case-insensitive.
+    financePattern: /\b(stocks?|shares?|equit(?:y|ies)|markets?|wall street|s&p|nasdaq|dow|russell|fed|federal reserve|fomc|rates?|inflation|cpi|ppi|gdp|jobs|payrolls?|unemployment|treasur(?:y|ies)|bonds?|yields?|dollar|oil|crude|opec|gold|bitcoin|economy|economic|recession|tariffs?|trade|earnings|revenue|profits?|guidance|ipo|merger|acquisition|acquires?|buyback|dividends?|bank(?:s|ing)?|etf|funds?|investors?|investing|ceo|sec|antitrust|layoffs?|supply chain|housing|mortgage|retail sales)\b/i,
+    // Relevance score, no AI (newsdata.ts relevanceScore). Tiers add up (each tier counts once): macro 3, markets 2, corporate 2,
+    // generic finance words (financePattern) 1; a trusted outlet +1, a ticker symbol or watch-list company +1/+2, a promotional or
+    // listicle outlet -2, "how to / best / top 10 / things to" style -3. Standing rule: macro first.
+    macroPattern: /\b(fed|federal reserve|fomc|powell|cpi|ppi|pce|inflation|gdp|jobs report|nonfarm|payrolls?|unemployment|jobless claims|treasury (?:yields?|secretary|department)|rate (?:cut|cuts|hike|hikes|decision)|interest rates?|recession|tariffs?|opec|crude|oil prices?|retail sales|housing starts|mortgage rates?|debt ceiling|trade deficit|central bank|ecb|bank of japan|bank of england|stimulus|government shutdown)\b/i,
+    marketPattern: /\b(stocks?|equit(?:y|ies)|wall street|s&p(?: 500)?|nasdaq|dow(?: jones)?|russell 2000|bond market|yields?|dollar|gold prices?|bitcoin|futures|rally|selloff|sell-off|volatility|vix|etfs?|ipo)\b/i,
+    corporatePattern: /\b(earnings|guidance|revenue|profits?|merger|acquisitions?|acquires?|takeover|buyback|dividends?|layoffs?|antitrust|bankruptcy|chapter 11|sec charges|stock split)\b/i,
+    trustedDomains: ['reuters.com', 'bloomberg.com', 'wsj.com', 'ft.com', 'cnbc.com', 'apnews.com', 'barrons.com', 'marketwatch.com', 'economist.com', 'axios.com', 'nytimes.com', 'fortune.com', 'finance.yahoo.com', 'businessinsider.com', 'forbes.com'],
+    lowValueDomains: ['fool.com', 'benzinga.com', 'investorplace.com', 'zerohedge.com', 'seekingalpha.com', 'thestreet.com', 'investorsobserver.com', 'tipranks.com'],
+    softPattern: /\b(how to|best ways?|top \d+|\d+ (?:stocks?|things|ways|reasons)|things to (?:know|watch)|should you|here'?s why|worth (?:buying|it)|what to know|explained|opinion:|sponsored)\b/i,
+    // Recalls and micro-cap noise: skipped unless a watch-list company (config.cpsc.watchNames) is named.
+    microPattern: /\b(recalls?|recalled|penny stocks?|micro-?caps?|otc|pink sheets|nano-?caps?|shell company|press release:|sponsored|giveaway)\b/i,
+    // Never sports, celebrity or gossip.
+    offTopicPattern: /\b(celebrity|actor|actress|singer|nfl|nba|mlb|nhl|touchdown|playoffs?|horoscope|royal family|kardashian)\b/i,
   },
   // CPSC recalls -> safety / recall. JSON API, no key. License PARTLY verified (17 U.S.C. 105;
   // the CPSC policy page could not be read). AI text = Title + Description + Hazards + Remedies.
@@ -465,10 +762,17 @@ export const config = {
     siteUrl: 'https://element-news.pages.dev',
     timezone: 'America/New_York',              // the "day" and "week" of a brief summary; a subscriber's own tz decides when their email is due
     defaultSendHour: 7,
+    // Daily brief window (D-119): 24 h; Monday 72 h, labelled "since Friday". Mirrors core.brief_window_hours (migration 20261125000000).
+    dailyWindowHours: 24,
+    mondayWindowHours: 72,
+    fallbackMaxHours: 720,                     // never-empty brief: reach back at most this far for the last good cards
     // Brief summary (one AI call per brief per day/week): 3-5 sentences, at most this many words.
     summaryMinSentences: 8,
     summaryMaxSentences: 26,
     summaryMaxWords: 290, summaryMinWords: 200, summaryTargetWords: 250, summaryParagraphs: [3, 4] as readonly number[],
+    // Topic sections with these categories are left out of the text the AI summarizes (recalls and space or science items belong
+    // in the summary only when they are TOP STORIES: sum-v7 brief rule; the model ignored the written rule in 3 of 3 live runs).
+    summarySkipSectionCategories: ['safety', 'science'] as readonly string[],
     summaryCopyLimitWords: 10,                 // longest run copied from the brief's own cards (they are already short rewrites)
     summaryMaxTokens: 3000,                     // includes Groq reasoning tokens
     // Email provider. 'outbox' writes files; 'resend' needs RESEND_API_KEY + EMAIL_FROM + the --send flag.

@@ -88,12 +88,22 @@ export interface FeedForYouParams {
   /** Ids of the stories the reader follows (kept on the device): exempt from seen-card exclusion. Optional, at most
    *  200 (extra ones are ignored). Sent only when there are some; needs migration 20261113000000. */
   p_followed?: string[];
+  /** Followed tickers (kept on the device): their cards get a bounded boost and the reason "Because you follow X".
+   *  Optional, at most 100. Sent only when there are some; needs migration 20261126000000 (4-argument form). */
+  p_tickers?: string[];
 }
 
 /** A card in the For you feed: a normal BlurbCard plus the user's reaction. */
 export interface ForYouCard extends BlurbCard {
   my_reaction: Reaction | null;
+  /** Why this card is here, from the reader's own follows and signals only (migration 20261126000000). Render with
+   *  lib/feed/reasonLine.ts reasonText(); older servers omit it. */
+  reason?: { code: ForYouReasonCode; arg: string | null };
 }
+
+export type ForYouReasonCode =
+  | 'follow_company' | 'follow_topic' | 'liked_company' | 'liked_topic'
+  | 'key_release' | 'authority' | 'new_topic' | 'top_story';
 
 /** Response of api.feed_for_you. Same paging rules as FeedPage. */
 export interface ForYouPage extends Omit<FeedPage, 'items'> {

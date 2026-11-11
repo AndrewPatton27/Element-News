@@ -135,7 +135,7 @@ test('new mock endpoints provide searchable, related, following and brief data',
   assert.ok(followed.items[0]?.follow_reason);
   assert.ok((await api.followingFeed({ topics: [], sources: [], tickers: [] })).items.length > 0);
   const daily = await api.dailyBrief();
-  assert.ok([48, 72].includes(daily.window_hours), 'thin supply widens the daily window');
+  assert.ok(daily.window_hours >= 24, 'the daily window is 24 h (72 h on Monday), or wider only as the never-empty fallback');
   assert.ok(daily.headline_cards.length > 0);
   assert.equal(new Set(daily.headline_cards.map((c) => c.category)).size, daily.headline_cards.length, 'brief headlines cover different topics');
   assert.equal((await api.weeklyBrief()).window_hours, 168);

@@ -17,7 +17,7 @@ function SparkIcon({ color, size = 14 }: { color: string; size?: number }) {
   );
 }
 
-export function BriefSummary({ summary, mode, config, wide }: { summary: BriefSummaryData | null; mode: BriefMode; config: AppConfig | null; wide: boolean }) {
+export function BriefSummary({ summary, mode, config, wide, note }: { summary: BriefSummaryData | null; mode: BriefMode; config: AppConfig | null; wide: boolean; note?: string | null }) {
   const p = usePalette();
   if (!summary) return null;
   const title = summaryTitle(mode);
@@ -34,7 +34,7 @@ export function BriefSummary({ summary, mode, config, wide }: { summary: BriefSu
           {para.trim()}
         </Text>
       ))}
-      <Text style={[styles.label, { color: p.muted }]}>{summaryFooter()}</Text>
+      <Text style={[styles.label, { color: p.muted }]}>{note ? `${note} · ${summaryFooter()}` : summaryFooter()}</Text>
     </View>
   );
 }

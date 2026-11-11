@@ -12,6 +12,7 @@ import type { Feedback } from '../../lib/account/accountLogic';
 import { usePalette } from '../../lib/theme/useTheme';
 import { fonts } from '../../lib/theme/theme';
 import { SearchResultCard } from './SearchResultCard';
+import { ListSkeleton } from '../shell/States';
 
 export interface SearchResultsProps {
   items: BlurbCard[]; // already filtered for hidden topics and sources
@@ -50,12 +51,7 @@ export function SearchResults({ items, state, config, categories, columns = 1, r
     );
   }
   if (first && (state.loading || !state.done)) {
-    return (
-      <View style={styles.note} accessibilityLiveRegion="polite">
-        <ActivityIndicator color={p.accent} />
-        <Text style={[styles.noteText, { color: p.muted }]}>Loading…</Text>
-      </View>
-    );
+    return <ListSkeleton label="Loading…" />;
   }
   if (first) return <>{empty ?? null}</>;
 

@@ -13,7 +13,7 @@ count as CPU.
 | Function | What it does | Body (JSON) | Schedule |
 |---|---|---|---|
 | `brief-summary` | The AI summary at the top of the daily and weekly Brief, once per period (`ingest/src/briefSummary.ts`): reads `api.daily_brief` / `api.weekly_brief`, skips a period that already has its summary, Gemini then Groq then a template, each AI draft validated (numbers in the brief, copy limit, no advice words, length), writes with `api.put_brief_summary`. | `{"kind":"daily"\|"weekly"\|"both"}` (default both), optional `"force":true`, `"dry_run":true` (writes nothing), `"no_ai":true` | 10:30 UTC daily |
-| `ingest-source` | ONE ingest source per call: `macro`, `treasury`, `fed`, `fedspeech`, `secpress`, `bea`, `fedreg`, `sec`, `wiki`, `cpsc`, `usgs` or `nasa`. Runs `runOnce({ only: [source] })` from `ingest/src/pipeline.ts`: allowlisted fetchers and parsers, topic filter, license gate, Gemini then Groq then template with the validator, the report-card scorer when `REPORT_CARD_PROTOCOL=1`, publishing through the service-role RPCs. | `{"source":"fed"}`, optional `"work_cap":1-20` (default 5), `"finish":true` (afterwards refresh Trending and purge old ML rows) | the original nine sources once an hour, 6 minutes apart; `fedspeech` and `secpress` hourly at :18 and :24; `treasury` once a day (migration `20261111000000_finance_sources_cron.sql`) |
+| `ingest-source` | ONE ingest source per call: `macro`, `treasury`, `fed`, `fedspeech`, `secpress`, `bea`, `fedreg`, `sec`, `wiki`, `cpsc`, `usgs`, `nasa`, `eia`, `census`, `auctions`, `fomc`, `newsdata_market` or `newsdata_latest` (the last four: agency data cards, template only, see `ingest/ingest.md`). Runs `runOnce({ only: [source] })` from `ingest/src/pipeline.ts`: allowlisted fetchers and parsers, topic filter, license gate, Gemini then Groq then template with the validator, the report-card scorer when `REPORT_CARD_PROTOCOL=1`, publishing through the service-role RPCs. | `{"source":"fed"}`, optional `"work_cap":1-20` (default 5), `"finish":true` (afterwards refresh Trending and purge old ML rows) | the original nine sources once an hour, 6 minutes apart; `fedspeech` and `secpress` hourly at :18 and :24; `treasury` once a day (migration `20261111000000_finance_sources_cron.sql`); `eia`, `auctions`, `fomc` per `20261128000000_agency_sources_cron.sql` (not applied yet) |
 
 Each call writes one row to `ingest.run_log` (`api.log_run`) and returns the same summary as JSON:
 `source, ok, started_at, finished_at, duration_ms, items_new, published, skipped, failed, ai_calls,
@@ -22,7 +22,7 @@ lines; never keys or source text).
 
 ### Limits inside one call (`_shared/budget.ts`, `_shared/usage.ts`)
 
-- **Work cap:** at most `work_cap` (5) new items per call. Items over the cap are not recorded, so the next
+- **Work cap:** at most `work_cap` new items per call (default 5; `sec` 10 from `config.workCapBySource`; a routine 5.02 skip gives its slot back). Items over the cap are not recorded, so the next
   call picks them up.
 - **Time budget:** no new item starts after 100 s; no AI call starts if its pacing wait plus the 20 s
   request timeout would end after 140 s (the chain then falls back to the next provider or the template,
@@ -75,6 +75,9 @@ Custom secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets s
 | `GEMINI_API_KEY` | both | Gemini is skipped (Groq, then the template) |
 | `GROQ_API_KEY` | both | Groq is skipped; the report-card scorer is off |
 | `FRED_API_KEY` | `ingest-source` macro | macro numbers are skipped |
+| `BEA_API_KEY`, `BEA_DATA_ENABLED=1` | `ingest-source` beadata | the BEA data source logs "disabled" / "key not set" and does nothing (off by default) |
+| `NEWSDATA_API_KEY`, `NEWSDATA_ENABLED=1` | `ingest-source` newsdata_market, newsdata_latest | the link-out source logs "switched off" / "key not set" and does nothing (off by default; also needs `app_config.linkout_cards`) |
+| `BLS_API_KEY` | `ingest-source` bls, optional | BLS runs on API v1 (25 requests a day, 6 used) |
 | `SEC_USER_AGENT` | `ingest-source` sec and wiki (`"Element <contact email>"`) | those sources fail with a clear error |
 | `CRON_SECRET` | the watchdog Worker (re-triggers `ingest-source`) | the Worker's re-trigger gets HTTP 401 |
 | `REPORT_CARD_PROTOCOL` | `ingest-source`, optional | `1` = Groq scores each AI card before publishing (as in `ingest/run-ingest.cmd`) |

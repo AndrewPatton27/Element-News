@@ -18,6 +18,8 @@ export function buildSteps({ e2e = false, prod = false, exists = existsSync, pyt
   const sqlRunner = env.RELEASE_SQL_RUNNER || 'supabase/tests/run-pglite.mjs';
   const steps = [
     { name: 'no private files tracked', cmd: process.execPath, args: ['scripts/private-files-check.mjs'] },
+    // D-129: no AI Co-Authored-By trailer on any commit reachable from HEAD; no mojibake in tracked source
+    { name: 'commit guard', cmd: process.execPath, args: ['scripts/commit-guard.mjs'] },
     { name: 'tsc app', cmd: npx, args: ['tsc', '--noEmit'] },
     { name: 'tsc ingest', cmd: npx, args: ['tsc', '--noEmit', '-p', 'ingest/tsconfig.json'] },
     { name: 'tsc functions', cmd: npx, args: ['tsc', '--noEmit', '-p', 'supabase/functions/tsconfig.json'] },

@@ -1,0 +1,7 @@
+{"data":[
+{"record_date":"2026-11-10","cusip":"91282CPA1","security_type":"Note","security_term":"10-Year","auction_date":"2026-11-10","high_yield":"4.215","bid_to_cover_ratio":"2.61","offering_amt":"42000000000","inflation_index_security":"No"},
+{"record_date":"2026-11-10","cusip":"91282CPB9","security_type":"Bond","security_term":"30-Year","auction_date":"2026-11-12","high_yield":"null","bid_to_cover_ratio":"null","offering_amt":"25000000000","inflation_index_security":"No"},
+{"record_date":"2026-11-09","cusip":"91282CPC7","security_type":"Note","security_term":"3-Year","auction_date":"2026-11-09","high_yield":"3.98","bid_to_cover_ratio":"2.55","offering_amt":"58000000000","inflation_index_security":"No"},
+{"record_date":"2026-11-09","cusip":"912797AA1","security_type":"Bill","security_term":"13-Week","auction_date":"2026-11-09","high_yield":"null","bid_to_cover_ratio":"3.1","offering_amt":"90000000000","inflation_index_security":"No"},
+{"record_date":"2026-11-05","cusip":"91282CPD5","security_type":"Note","security_term":"10-Year","auction_date":"2026-11-05","high_yield":"4.10","bid_to_cover_ratio":"2.4","offering_amt":"39000000000","inflation_index_security":"Yes"},
+{"record_date":"2026-11-04","cusip":"91282CPE3","security_type":"Bond","security_term":"20-Year","auction_date":"2026-11-04","high_yield":"4.60","bid_to_cover_ratio":"2.5","offering_amt":"13000000000","inflation_index_security":"No"}]}

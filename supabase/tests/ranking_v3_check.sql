@@ -155,7 +155,7 @@ begin
     perform set_config('role', 'authenticated', true);
     r := api.feed_for_you(cur, 10);
     perform set_config('role', 'none', true);
-    r2 := core.feed_for_you_v5(cur2, 10);
+    r2 := core.fy_post(core.feed_for_you_v5(cur2, 10), ua) - '_perm';
     if split_part(r ->> 'next_cursor', '|', 9) not in ('3', '') then raise exception 'FAIL: cold mode 3 cursor %', r ->> 'next_cursor'; end if;
     seen := seen || array(select x ->> 'id' from jsonb_array_elements(r -> 'items') x);
     seen5 := seen5 || array(select x ->> 'id' from jsonb_array_elements(r2 -> 'items') x);
@@ -188,7 +188,7 @@ begin
     update core.rank_params set value = n where key = 'foryou_ml_mode';
     perform set_config('role', 'authenticated', true);
     r := api.feed_for_you(c0, 10);
-    perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10);
+    perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm';
     if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: mode % differs from v5', n; end if;
     if r ->> 'next_cursor' is distinct from (r2 ->> 'next_cursor') || '||1|' || least(n, 1) then
       raise exception 'FAIL: mode % cursor %', n, r ->> 'next_cursor';
@@ -229,7 +229,7 @@ begin
     raise exception 'FAIL: same cursor gave a different page';
   end if;
   perform set_config('role', 'none', true);
-  r2 := core.feed_for_you_v7(cur, 10);
+  r2 := core.fy_post(core.feed_for_you_v7(cur, 10), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: wrapper page 2 differs from v7'; end if;
   -- a full scroll: no repeats, every eligible card once (35 = 36 minus the disliked one), reactions mid-scroll change nothing
   perform set_config('role', 'authenticated', true);
@@ -274,7 +274,7 @@ begin
     perform set_config('role', 'authenticated', true);
     r := api.feed_for_you(cur, 10);
     perform set_config('role', 'none', true);
-    r2 := core.feed_for_you_v7(cur, 10);
+    r2 := core.fy_post(core.feed_for_you_v7(cur, 10), ua) - '_perm';
     if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '3' then
       raise exception 'FAIL: mode % did not keep the v3 scroll (cursor %)', n, r ->> 'next_cursor';
     end if;
@@ -289,7 +289,7 @@ begin
   update core.rank_params set value = 1 where key = 'v3_max_candidates';
   perform set_config('role', 'authenticated', true);
   r := api.feed_for_you(null, 10);                                     -- new scrolls from here on (would be v3)
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(null, 10);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(null, 10), ua) - '_perm';
   if r -> 'items' is distinct from r2 -> 'items' or split_part(r ->> 'next_cursor', '|', 9) <> '1' then raise exception 'FAIL: candidate guard'; end if;
   update core.rank_params set value = 3000 where key = 'v3_max_candidates';
   alter table core.card_features rename to card_features_gone;

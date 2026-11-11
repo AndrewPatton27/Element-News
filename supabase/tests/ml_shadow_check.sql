@@ -52,7 +52,7 @@ begin
   select string_agg(key || '=' || value::text, ',' order by key) into got from core.rank_params
    where key in ('foryou_ml_mode', 'trending_ml_mode', 'ml_log_retention_days', 'ml_keep_runs',
                  'ml_pages_max_per_hour', 'ml_purge_events_days', 'ml_db_stop_mb');
-  if got is distinct from 'foryou_ml_mode=0,ml_db_stop_mb=400,ml_keep_runs=3,ml_log_retention_days=21,ml_pages_max_per_hour=60,ml_purge_events_days=0,trending_ml_mode=0' then
+  if got is distinct from 'foryou_ml_mode=0,ml_db_stop_mb=400,ml_keep_runs=3,ml_log_retention_days=21,ml_pages_max_per_hour=60,ml_purge_events_days=60,trending_ml_mode=0' then
     raise exception 'FAIL: rank_params defaults are %', got;
   end if;
 
@@ -136,7 +136,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
   c0 := '1e12|ffffffff-ffff-ffff-ffff-ffffffffffff||' || to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '||';
   r  := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: For you wrapper differs from core in mode 0'; end if;
   if r ? 'page_id' then raise exception 'FAIL: page_id in mode 0'; end if;
   if r ->> 'next_cursor' is distinct from (r2 ->> 'next_cursor') || '||1|0' then
@@ -156,7 +156,7 @@ begin
   update core.rank_params set value = 1 where key in ('foryou_ml_mode', 'trending_ml_mode');
   perform set_config('role', 'authenticated', true);
   r  := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: For you wrapper differs from core in mode 1'; end if;
   if not r ? 'page_id' then raise exception 'FAIL: no page_id in mode 1'; end if;
   pg := (r ->> 'page_id')::uuid;
@@ -176,7 +176,7 @@ begin
   -- page 2 with the new cursor
   perform set_config('role', 'authenticated', true);
   r  := api.feed_for_you(cur, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(cur, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(cur, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: For you page 2 wrapper differs from core'; end if;
   if r ->> 'next_cursor' is distinct from (r2 ->> 'next_cursor') || '||2|1' then raise exception 'FAIL: For you page 2 cursor %', r ->> 'next_cursor'; end if;
   perform set_config('role', 'none', true);
@@ -185,7 +185,7 @@ begin
   perform set_config('role', 'authenticated', true);
   perform set_config('role', 'none', true); cur := core.feed_for_you_v5(c0, 10) ->> 'next_cursor'; perform set_config('role', 'authenticated', true);
   r  := api.feed_for_you(cur, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(cur, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(cur, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: old For you cursor gives a different page'; end if;
   if r ->> 'next_cursor' is distinct from (r2 ->> 'next_cursor') || '||1|1' then raise exception 'FAIL: old For you cursor tail'; end if;
   perform set_config('role', 'none', true);
@@ -243,7 +243,7 @@ begin
   perform set_config('role', 'authenticated', true);
   perform set_config('request.jwt.claims', json_build_object('sub', ua, 'role', 'authenticated')::text, true);
   r  := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' then raise exception 'FAIL: mode 2 changed For you'; end if;
   if split_part(r ->> 'next_cursor', '|', 9) <> '1' then raise exception 'FAIL: mode 2 not stored as 1 in the cursor'; end if;
   pg := (r ->> 'page_id')::uuid;
@@ -267,7 +267,7 @@ begin
   alter table core.ml_pages add constraint ml_pages_force_fail check (false) not valid;
   perform set_config('role', 'authenticated', true);
   r  := api.feed_for_you(c0, 10);
-  perform set_config('role', 'none', true); r2 := core.feed_for_you_v5(c0, 10); perform set_config('role', 'authenticated', true);
+  perform set_config('role', 'none', true); r2 := core.fy_post(core.feed_for_you_v5(c0, 10), ua) - '_perm'; perform set_config('role', 'authenticated', true);
   if r -> 'items' is distinct from r2 -> 'items' or r ? 'page_id' then raise exception 'FAIL: For you with a failing insert'; end if;
   r  := api.feed('top', null, 10, null);
   perform set_config('role', 'none', true); r2 := core.feed_top('top', null, 10, null); perform set_config('role', 'authenticated', true);
@@ -373,6 +373,7 @@ begin
     (ub, cards[30], 'view', now() - interval '61 days'), (ub, cards[31], 'view', now() - interval '20 days');
   delete from core.ml_runs;
   for i in 1 .. 5 loop perform api.ml_begin_run('shadow', 'test-' || i); end loop;
+  update core.rank_params set value = 0 where key = 'ml_purge_events_days';   -- ships 60 since D-117; this step checks the off case
   r := api.ml_purge();
   if exists (select 1 from core.ml_pages where ranker = 'old22') or not exists (select 1 from core.ml_pages where ranker = 'old20')
      or exists (select 1 from core.ml_shadow where model_version = 'test-old') then

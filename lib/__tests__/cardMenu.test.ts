@@ -49,7 +49,7 @@ test('supabase reportBlurb: POSTs rpc report_blurb with p_id and p_reason, anon 
 test('supabase reportBlurb: 404 is "unavailable", other failures "error", bad input never sends', async () => {
   const rec: { url?: string } = {};
   assert.deepEqual(await createSupabaseApi({ url: 'https://x.supabase.co', key: 'k', fetchFn: fake(404, rec) }).reportBlurb('a1', 'other'), { ok: false, status: 'unavailable' });
-  assert.deepEqual(await createSupabaseApi({ url: 'https://x.supabase.co', key: 'k', fetchFn: fake(429, rec) }).reportBlurb('a1', 'other'), { ok: false, status: 'error' });
+  assert.deepEqual(await createSupabaseApi({ url: 'https://x.supabase.co', key: 'k', fetchFn: fake(429, rec) }).reportBlurb('a1', 'other'), { ok: false, status: 'rate_limited' });
   const none: { url?: string } = {};
   assert.deepEqual(await createSupabaseApi({ url: 'https://x.supabase.co', key: 'k', fetchFn: fake(200, none) }).reportBlurb('a1', 'nope' as never), { ok: false, status: 'invalid' });
   assert.equal(none.url, undefined);

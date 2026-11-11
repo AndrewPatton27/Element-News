@@ -1,0 +1,340 @@
+{
+ "BEAAPI": {
+  "Request": {
+   "RequestParam": [
+    {
+     "ParameterName": "METHOD",
+     "ParameterValue": "GETDATA"
+    },
+    {
+     "ParameterName": "DATASETNAME",
+     "ParameterValue": "NIPA"
+    },
+    {
+     "ParameterName": "TABLENAME",
+     "ParameterValue": "T20600"
+    }
+   ]
+  },
+  "Results": {
+   "Statistic": "NIPA Table",
+   "UTCProductionTime": "2026-11-10T22:22:43.720",
+   "Dimensions": [
+    {
+     "Ordinal": "1",
+     "Name": "TableName",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "2",
+     "Name": "SeriesCode",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "3",
+     "Name": "LineNumber",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "4",
+     "Name": "LineDescription",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "5",
+     "Name": "TimePeriod",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "6",
+     "Name": "CL_UNIT",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "7",
+     "Name": "UNIT_MULT",
+     "DataType": "numeric",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "8",
+     "Name": "METRIC_NAME",
+     "DataType": "string",
+     "IsValue": "0"
+    },
+    {
+     "Ordinal": "9",
+     "Name": "DataValue",
+     "DataType": "numeric",
+     "IsValue": "1"
+    }
+   ],
+   "Data": [
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M01",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "25,740,463",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M02",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "25,834,846",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M03",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,030,395",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M04",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,248,413",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,164,303",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,256,917",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,383,058",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M08",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,495,067",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M09",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,604,910",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M10",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,627,710",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M11",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,731,371",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2025M12",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,813,567",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M01",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "26,973,497",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M02",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,009,938",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M03",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,188,124",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M04",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,219,334",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,417,104",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,479,311",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,570,024",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M08",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,653,372",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "A065RC",
+     "LineNumber": "1",
+     "LineDescription": "Personal income",
+     "TimePeriod": "2026M09",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "6",
+     "DataValue": "27,707,845",
+     "NoteRef": "T20600"
+    }
+   ],
+   "Notes": [
+    {
+     "NoteRef": "T20600",
+     "NoteText": "Table 2.6. Personal Income and Its Disposition, Monthly [Billions of dollars; months are seasonally adjusted at annual rates] - LastRevised: October 29, 2026"
+    }
+   ]
+  }
+ }
+}

@@ -6,13 +6,13 @@ begin
   select id into u from auth.users where email='element-test-a@example.com';
   if u is null then raise exception 'SETUP: create element-test-a@example.com'; end if;
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('storylink:followed','summary','Followed story','Body','markets','published','[]',now(),now(),now(),10) returning id into followed;
+  values ('storylink:followed','summary','Followed story','Body','markets','published','[{"symbol":"SLNK","name":"Slink Corp"}]',now(),now(),now(),10) returning id into followed;
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('storylink:update','summary','Update story','Body','world','published','[]',now(),now(),now(),10) returning id into upd;
+  values ('storylink:update','summary','Update story','Body','world','published','[{"symbol":"SLNK","name":"Slink Corp"}]',now(),now(),now(),10) returning id into upd;
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('storylink:angle','summary','Angle story','Body','world','published','[]',now(),now(),now(),10) returning id into ang;
+  values ('storylink:angle','summary','Angle story','Body','world','published','[{"symbol":"SLNK","name":"Slink Corp"}]',now(),now(),now(),10) returning id into ang;
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('storylink:related','summary','Related story','Body','world','published','[]',now(),now(),now(),10) returning id into rel;
+  values ('storylink:related','summary','Related story','Body','world','published','[{"symbol":"SLNK","name":"Slink Corp"}]',now(),now(),now(),10) returning id into rel;
   insert into core.blurb_sources(blurb_id,name,kind,url,license_class,is_primary)
   select id,'Story link check','news','https://example.com/storylink/'||dedupe_key,'company_filing',true
   from core.blurbs where dedupe_key like 'storylink:%';

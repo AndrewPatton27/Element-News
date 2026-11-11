@@ -7,7 +7,8 @@ const names = (steps) => steps.map((s) => s.name);
 test('step order and optional e2e', () => {
   const base = names(buildSteps({ env: {} }));
   assert.equal(base[0], 'no private files tracked');
-  assert.deepEqual(base.slice(1, 5), ['tsc app', 'tsc ingest', 'tsc functions', 'tsc worker']);
+  assert.equal(base[1], 'commit guard');
+  assert.deepEqual(base.slice(2, 6), ['tsc app', 'tsc ingest', 'tsc functions', 'tsc worker']);
   assert.ok(base.indexOf('test:worker') < base.indexOf('SQL checks (PGlite)'));
   assert.ok(base.indexOf('python tests (ml)') < base.indexOf('secret scan'));
   assert.ok(!base.includes('test:e2e'));

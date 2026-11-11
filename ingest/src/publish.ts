@@ -10,10 +10,12 @@ import { resolveSecClassification } from './sources/sec.ts';
 import type { MacroObservation, PublishPayload, RawItem, RevisableCard, RevisePayload, SummaryDraft } from './types.ts';
 
 export interface Publisher {
-  upsertItem(item: RawItem): Promise<{ id: string; is_new: boolean; status: string }>;
-  setItemStatus(id: string, status: 'skipped' | 'failed', note: string): Promise<void>;
+  upsertItem(item: RawItem): Promise<{ id: string; is_new: boolean; status: string; status_note?: string | null }>;
+  setItemStatus(id: string, status: 'new' | 'skipped' | 'failed', note: string): Promise<void>;   // 'new' + note = retry counter (src/retry.ts)
   publishBlurb(p: PublishPayload): Promise<{ status: 'published' | 'duplicate' | 'ticker_cap'; id: string | null }>;
   upsertMacro(o: MacroObservation): Promise<void>;
+  /** Recent history of one series in one call (api.upsert_macro_batch, max 200 rows) for the data-card charts. Optional; a failure never stops a run. */
+  upsertMacroBatch?(rows: MacroObservation[]): Promise<void>;
   /** --rewrite: published cards whose prompt_version is not in `current` (api.blurbs_to_revise). */
   listToRevise?(current: string[], limit: number): Promise<RevisableCard[]>;
   /** --rewrite: update a card in place or hide it (api.revise_blurb). */
@@ -22,6 +24,10 @@ export interface Publisher {
   refreshTrending?(): Promise<unknown>;
   /** End of a run: purge old ML shadow-log rows and apply the storage stop rule (api.ml_purge). */
   mlPurge?(): Promise<unknown>;
+  /** One call for a whole candidate list: the URLs an earlier run already finished (api.items_handled, status other than 'new'). Optional; a failure means "unknown", never "handled". */
+  handledUrls?(urls: string[]): Promise<Set<string>>;
+  /** Headlines of the newest live cards (one api.feed page), for the near-duplicate check of link-out headlines. */
+  recentHeadlines?(): Promise<string[]>;
   auditCards?(): Promise<RevisableCard[]>;
   setAuditStatus?(id: string, status: string): Promise<void>;
   setStoryLink?(id: string, related: string, kind: string): Promise<void>;
@@ -68,12 +74,32 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
   return {
     upsertItem: (item) => rpc('upsert_item', { p: itemPayload(item) }),
     setItemStatus: async (id, status, note) => { await rpc('set_item_status', { p_id: id, p_status: status, p_note: note }); },
+    async handledUrls(urls) {
+      const out = new Set<string>();
+      for (let i = 0; i < urls.length; i += 500) {           // api.items_handled reads at most 2000 per call; 500 keeps the request small
+        const got = await rpc<string[] | null>('items_handled', { p_urls: urls.slice(i, i + 500) });
+        for (const u of got ?? []) out.add(u);
+      }
+      return out;
+    },
     publishBlurb: (p) => rpc('publish_blurb', { p }),
     upsertMacro: async ({ move: _move, ...o }) => { await rpc('upsert_macro', { p: o }); },   // move is not stored
+    upsertMacroBatch: async (rows) => { if (rows.length) await rpc('upsert_macro_batch', { p: rows.map(({ move: _move, ...o }) => o) }); },
     listToRevise: (current, limit) => rpc('blurbs_to_revise', { p_current: current, p_limit: limit }),
     reviseBlurb: (p) => rpc('revise_blurb', { p }),
     refreshTrending: () => rpc('refresh_trending', {}),
     mlPurge: () => rpc('ml_purge', {}),
+    async recentHeadlines() {
+      // Live AND queued cards (release queue, 20261142000000_release_queue.sql): a held card must still count as a duplicate.
+      // An older database without api.recent_headlines falls back to the public feed page.
+      try {
+        const all = await rpc<unknown>('recent_headlines', { p_limit: 150 });
+        if (Array.isArray(all)) return all.map((h) => String(h ?? '')).filter(Boolean);
+      } catch { /* fall back */ }
+      const page: any = await rpc<any>('feed', { p_mode: 'latest', p_cursor: null, p_limit: 100, p_category: null });
+      const items = Array.isArray(page) ? page : page?.items;
+      return Array.isArray(items) ? items.map((c: { headline?: unknown }) => String(c.headline ?? '')).filter(Boolean) : [];
+    },
     async auditCards() {
       const rows: RevisableCard[] = [];
       // api.feed(mode,cursor,limit,category) is the deployed anon RPC. Follow cursors
@@ -102,6 +128,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
   const items: RawItem[] = [];
   const cards: PublishPayload[] = [];
   const macro: MacroObservation[] = [];
+  const macroHistory: MacroObservation[][] = [];
   const revisions: RevisePayload[] = [];
   const seen = new Set<string>();
   const trending = { refreshes: 0, mlPurges: 0 };
@@ -121,6 +148,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
       return { status: 'published', id: `dry-card-${cards.length}` };
     },
     async upsertMacro(o) { macro.push(o); },
+    async upsertMacroBatch(rows) { macroHistory.push(rows); },
     async listToRevise(current, limit) {
       return toRevise.filter((c) => !c.prompt_version || !current.includes(c.prompt_version)).slice(0, limit);
     },
@@ -133,7 +161,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
     async refreshTrending() { trending.refreshes += 1; return { generation: trending.refreshes, boosted: 0 }; },
     async mlPurge() { trending.mlPurges += 1; return { pages: 0, events: 0, runs: 0, stopped: false }; },
   };
-  return { publisher, items, cards, macro, revisions, trending, categories, materials };
+  return { publisher, items, cards, macro, macroHistory, revisions, trending, categories, materials };
 }
 
 /** Row for api.upsert_item: the item's metadata (page text is never stored). */
@@ -146,7 +174,7 @@ function itemPayload(item: RawItem) {
     body_text: null,                 // page text is not stored; it is re-fetched (cached) when needed
     published_at: item.published_at,
     license_class: item.license_class,
-    use_level: 'full_summarize',
+    use_level: item.license_class === 'link_out' ? 'headline_link_only' : 'full_summarize',
     tickers: item.tickers.map((t) => t.symbol),
     event_type: item.event_type,
   };
@@ -187,6 +215,8 @@ export function buildPublishPayload(
     prompt_version: meta.aiGenerated ? config.promptVersion : config.templateVersion,
     // AI cards: the validated AI detail or null (dropped). Template cards: a factual detail from metadata.
     detail: meta.aiGenerated ? (draft.detail ?? null) : (draft.detail ?? templateDetail(item)),
+    // sum-v7: the AI's 1-5 relevance score goes on the card (template and data cards carry none)
+    everyday_relevance: meta.aiGenerated && Number.isInteger(draft.everyday_relevance) ? draft.everyday_relevance as number : null,
     attribution: item.attribution ?? null,
     sources: [{
       name: item.source_name, kind: item.source_kind, doc_label: item.doc_label, url: item.url,

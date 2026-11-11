@@ -66,7 +66,7 @@ export interface MacroFact {
   series_id: string;                    // "DGS10"
   label: string;                        // "10-yr Treasury"
   value: string;                        // preformatted: "4.12%", "$61.40"
-  change: string | null;                // signed with unit: "+0.05 pts", "-0.8%"
+  change: string | null;                // signed with unit: "+5 bp" (rates), "+0.1 pts", "-0.8%"
   direction: 'up' | 'down' | 'flat' | null;
   period: string | null;                // "Sep 2026" for monthly data, null for daily
   as_of: string;                        // ISO date or datetime
@@ -109,7 +109,8 @@ export interface Source {
 }
 
 /**
- * In-depth summary shown when a card is opened. Plain language (about 8th-grade level):
+ * In-depth summary shown when a card is opened. Plain words for readers who follow business and markets
+ * (about 8th-grade level; uncommon terms are explained in a few words):
  * 2-4 short paragraphs (<= 180 words in total) and 3-5 key points (each <= 15 words).
  * Same rules as the card: facts from the source only, no advice, no predictions.
  */
@@ -190,13 +191,25 @@ export interface Brief {
   summary?: BriefSummary | null;
   /** Market news cards (markets, earnings, deals) + market numbers. Empty cards = hide the section. */
   markets?: BriefMarkets;
+  /** Which span window_hours is: '24h', 'since_friday' (Monday, 72 h) or 'week'. Missing on older servers. */
+  window_kind?: BriefWindowKind;
+  /** The New York calendar date the brief is for (YYYY-MM-DD). Missing on older servers. */
+  brief_date?: string;
+  /** true when no card fell inside the window and the brief shows the last good cards (see as_of). */
+  fallback?: boolean;
+  /** Time of the newest card in the brief (ISO); null/missing = unknown or no cards. */
+  as_of?: string | null;
 }
+
+export type BriefWindowKind = '24h' | 'since_friday' | 'week';
 
 /** Row of core.brief_summaries as returned inside the brief. Show with the AI label. */
 export interface BriefSummary {
   text: string;
   generated_at: string;                 // ISO
   model: string;
+  /** The day (daily) or Monday (weekly) the summary was written for (YYYY-MM-DD); an older date = last good summary. */
+  for_date?: string;
 }
 
 /** "Markets" section of a brief. Never stock prices (rule 9). */

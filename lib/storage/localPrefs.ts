@@ -19,6 +19,8 @@ import { reactionKeys, type ReactionKeys } from '../feed/cardKeys.ts';
 import { TUTORIAL_SEEN_KEY } from '../tutorial/tutorialLogic.ts';
 import { SEEN_KEY } from '../feed/forYouGate.ts';
 import { FOLLOWED_STORIES_KEY } from '../following/followedStories.ts';
+import { SIGNALS_KEY } from '../signals/signalsLogic.ts';
+import { VISIT_KEY } from '../since/sinceLogic.ts';
 import type { KeyValueStore } from './storage.ts';
 
 export const LOCAL_PREFS_KEY = 'element.local-prefs';
@@ -122,7 +124,7 @@ export function asUserPrefs(p: LocalPrefs): UserPrefs {
 // dismissed sign-in prompt. The last two keys are literals: their modules pull in React-side code.
 export const BRIEF_EMAIL_STORE_KEY = 'element.brief-email'; // = BRIEF_EMAIL_KEY in lib/brief/briefLogic.ts
 export const SIGNIN_PROMPT_STORE_KEY = 'element.signin-prompt-dismissed'; // = PROMPT_KEY in app/index.tsx
-export const DEVICE_DATA_KEYS = [LOCAL_PREFS_KEY, FOLLOWS_KEY, RECENT_KEY, TUTORIAL_SEEN_KEY, SEEN_KEY, FOLLOWED_STORIES_KEY, BRIEF_EMAIL_STORE_KEY, SIGNIN_PROMPT_STORE_KEY] as const;
+export const DEVICE_DATA_KEYS = [LOCAL_PREFS_KEY, FOLLOWS_KEY, RECENT_KEY, TUTORIAL_SEEN_KEY, SEEN_KEY, FOLLOWED_STORIES_KEY, BRIEF_EMAIL_STORE_KEY, SIGNIN_PROMPT_STORE_KEY, SIGNALS_KEY, VISIT_KEY] as const;
 
 /** Forgets everything this device saved. Local only: nothing is sent to or removed from the server. */
 export function clearAll(store: KeyValueStore): void {

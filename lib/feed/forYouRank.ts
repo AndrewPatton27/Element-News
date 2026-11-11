@@ -1,6 +1,7 @@
 // For you candidate ranking (device side). Pure and deterministic. Every term is in HOURS of
 // freshness (same unit as feedLogic.mockRankScore: hours + 8 per importance doubling).
-//   score = pulledAt hours + 8*log2(importance)      base (freshness from published_at, like Latest)
+//   score = release hours + 8*log2(importance)      base (releaseAt: the source's time; a data card's release)
+//         - age hours x (8 / half-life - 1)           per-topic half-life (FY_HALF_LIFE, key series FY.keySeriesHalfLife)
 //         + personal taste (localScore minus its base): follows +24, likes +8/+4, dislikes -8/-4
 //         - FY.overlapTop3 / FY.overlapTop10 if the card is one of Trending's top stories (set order = Trending order)
 //         - FY.seenPenalty if seen, - FY.reactedPenalty if the reader reacted
@@ -18,8 +19,8 @@ import type { BlurbCard } from '../../contract/types.ts';
 import { diversifyFeed } from './diversify.ts';
 import { localScore } from './localRank.ts';
 import { mockRankScore } from './feedLogic.ts';
-import { dedupeCards, pulledAt } from './feedOrder.ts';
-import { cardFamily, dislikeIndex, tickerList } from './cardKeys.ts';
+import { dedupeCards } from './feedOrder.ts';
+import { cardFamily, dislikeIndex, isKeySeries, tickerList } from './cardKeys.ts';
 import type { LocalPrefs } from '../storage/localPrefs.ts';
 import { cardSourceKey } from '../sources/sourceKeys.ts';
 
@@ -54,7 +55,10 @@ export function spreadFromTrending(cards: BlurbCard[], trendingTopIds: ReadonlyS
 }
 
 /** Every tunable For you constant, in hours unless noted. */
-export const FY = { seenPenalty: 24, reactedPenalty: 72, authorityBoost: 8, familyCap: 2, familyWindow: 10, companyCap: 1, companyWindow: 3, companyTopSlots: 9, sourNet: -2, offMarketLikes: 2, coldReactions: 3, overlapWindow: 5, overlapMax: 2, overlapTop3: 10, overlapTop10: 6, likeHalfLifeDays: 14, dislikeSpill: 4, spillLast: 3, exploreFirst: 4, exploreEvery: 6, exploreMinReactions: 3, topicCap: 3, topicCapWindow: 10, tasteWeight: 8 } as const;
+export const FY = { seenPenalty: 24, reactedPenalty: 72, authorityBoost: 8, familyCap: 2, familyWindow: 10, companyCap: 1, companyWindow: 3, companyTopSlots: 9, sourNet: -2, offMarketLikes: 2, coldReactions: 3, overlapWindow: 5, overlapMax: 2, overlapTop3: 10, overlapTop10: 6, likeHalfLifeDays: 14, dislikeSpill: 4, spillLast: 3, exploreFirst: 4, exploreEvery: 6, exploreMinReactions: 3, topicCap: 3, topicCapWindow: 10, tasteWeight: 8, halfLife: 8, keySeriesHalfLife: 72 } as const;
+
+/** Per-topic freshness half-life in hours (server: foryou_half_life_<topic>); other topics use FY.halfLife. */
+export const FY_HALF_LIFE: Readonly<Record<string, number>> = { economy: 24 };
 
 /** Source names of the macro authorities whose cards lead a macro-first feed. */
 const AUTHORITY = /bureau of labor statistics|bureau of economic analysis|federal reserve|board of governors|federal open market|department of the treasury|u\.s\. treasury|treasury department|\bBLS\b|\bBEA\b/i;
@@ -95,7 +99,7 @@ export function shapeTop(cards: BlurbCard[], followedTickers?: ReadonlySet<strin
     const co = (c: BlurbCard) => !!followedTickers && pos < FY.companyTopSlots && isCompanyCard(c, followedTickers);
     const okCo = (c: BlurbCard) => !co(c) || w3.filter((x) => isCompanyCard(x, followedTickers!)).length < FY.companyCap;
     const last = hist[hist.length - 1];
-    let i = left.findIndex((c) => okFam(c) && okCo(c) && (!last || last.category !== c.category));
+    let i = left.findIndex((c) => okFam(c) && okCo(c) && (!last || forYouTopic(last) !== forYouTopic(c)));
     if (i < 0) i = left.findIndex((c) => okFam(c) && okCo(c));
     if (i < 0) i = left.findIndex(okFam);
     if (i < 0) i = 0;
@@ -106,18 +110,36 @@ export function shapeTop(cards: BlurbCard[], followedTickers?: ReadonlySet<strin
 }
 
 const HOUR_MS = 3_600_000;
-const base = (c: BlurbCard): number => pulledAt(c) / HOUR_MS + 8 * Math.log2(c.importance && c.importance > 0 ? c.importance : 1);
+/** Release time (F7, A-15): a news card's own source time (sort_at, else as_of); a data card's release, i.e. when it
+ *  was published (its sort_at is the period, e.g. Sep 1 for September CPI). Never later than published_at. */
+export function releaseAt(c: Pick<BlurbCard, 'kind' | 'sort_at' | 'as_of' | 'published_at'>): number {
+  const pub = Date.parse(c.published_at);
+  const src = Date.parse(c.sort_at || c.as_of || c.published_at);
+  if (c.kind === 'data') return Number.isFinite(pub) ? pub : src;
+  return Number.isFinite(src) ? (Number.isFinite(pub) ? Math.min(src, pub) : src) : pub;
+}
+/** Base score: release hours + importance, with the topic's half-life (key series fade slowest). */
+export function freshBase(c: BlurbCard, now: number): number {
+  const at = releaseAt(c);
+  const h = isKeySeries(c) ? FY.keySeriesHalfLife : FY_HALF_LIFE[c.category] ?? FY.halfLife;
+  const age = Math.max(0, (now - at) / HOUR_MS);
+  return at / HOUR_MS + 8 * Math.log2(c.importance && c.importance > 0 ? c.importance : 1) - age * (FY.halfLife / h - 1);
+}
 const idDesc = (a: BlurbCard, b: BlurbCard) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 
+/** For you's topic key: a data card's series family (CPI, payrolls and gas are different things to a macro reader;
+ *  every Treasury yield is one family, 'g:rates'), else the category. Trending keeps plain categories. */
+export const forYouTopic = (c: BlurbCard): string => (c.kind === 'data' ? `d:${cardFamily(c) || c.category}` : c.category);
+
 /** At most `cap` cards of one topic among the first `window`; the extra ones move down, order kept. */
-export function capTopics(cards: BlurbCard[], window = FY.topicCapWindow, cap = FY.topicCap): BlurbCard[] {
+export function capTopics(cards: BlurbCard[], window = FY.topicCapWindow, cap = FY.topicCap, topicOf: (c: BlurbCard) => string = (c) => c.category): BlurbCard[] {
   const head: BlurbCard[] = [], held: BlurbCard[] = [], rest: BlurbCard[] = [];
   const n = new Map<string, number>();
   for (const c of cards) {
     if (head.length >= window) { rest.push(c); continue; }
-    const k = n.get(c.category) ?? 0;
+    const t = topicOf(c), k = n.get(t) ?? 0;
     if (k >= cap) { held.push(c); continue; }
-    n.set(c.category, k + 1); head.push(c);
+    n.set(t, k + 1); head.push(c);
   }
   return [...head, ...held, ...rest];
 }
@@ -145,11 +167,12 @@ function spillDelta(card: BlurbCard, prefs: Prefs): number {
  *  Cards before `reached` stay where they are; only the rest is touched. */
 export function finishForYou(cards: BlurbCard[], trendingTopIds: ReadonlySet<string> = new Set(), trendingFirstId: string | null = null, reached = 0, followedTickers?: ReadonlySet<string>): BlurbCard[] {
   const keep = Math.max(0, Math.min(cards.length, reached));
-  let rest = capTopics(cards.slice(keep), FY.topicCapWindow, FY.topicCap);
+  let rest = capTopics(cards.slice(keep), FY.topicCapWindow, FY.topicCap, forYouTopic);
   rest = spreadFromTrending(rest, trendingTopIds, FY.overlapWindow, FY.overlapMax);
   if (keep === 0 && trendingFirstId && rest.length > 1 && rest[0].id === trendingFirstId) rest = [rest[1], rest[0], ...rest.slice(2)];
   const head = cards.slice(0, keep);
-  return [...head, ...shapeTop(diversifyFeed(capTopics(diversifyFeed(rest))), followedTickers, head)];
+  const div = (xs: BlurbCard[]) => diversifyFeed(xs, { topicOf: forYouTopic });
+  return [...head, ...shapeTop(div(capTopics(div(rest), FY.topicCapWindow, FY.topicCap, forYouTopic)), followedTickers, head)];
 }
 
 export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet<string>, trendingFirstId: string | null, trendingTopIds: ReadonlySet<string> = new Set(), now: number = Date.now()): BlurbCard[] {
@@ -171,7 +194,7 @@ export function rankForYou(pool: BlurbCard[], prefs: Prefs, seenIds: ReadonlySet
     const reacted = !!prefs.reactions[c.id];
     const penalty = reacted ? FY.reactedPenalty : seenIds.has(c.id) ? FY.seenPenalty : 0;
     const authority = isAuthorityCard(c) ? FY.authorityBoost : 0;
-    return { c, s: base(c) + (localScore(c, prefs) - mockRankScore(c)) - penalty - overlap + tasteDelta(c, prefs, now) + spillDelta(c, prefs) + authority };
+    return { c, s: freshBase(c, now) + (localScore(c, prefs) - mockRankScore(c)) - penalty - overlap + tasteDelta(c, prefs, now) + spillDelta(c, prefs) + authority };
   }).sort((a, b) => b.s - a.s || idDesc(a.c, b.c));
   const f = prefs.follows;
   const cold = !f.topics.length && !f.sources?.length && !f.tickers?.length && Object.keys(prefs.reactions).length < FY.coldReactions;

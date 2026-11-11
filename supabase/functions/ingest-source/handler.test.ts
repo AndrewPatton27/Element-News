@@ -3,10 +3,11 @@
 // Run: npm run test:functions
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleIngestSource, parseIngestOptions, DEFAULT_WORK_CAP } from './handler.ts';
+import { handleIngestSource, parseIngestOptions, DEFAULT_WORK_CAP, defaultWorkCapFor } from './handler.ts';
 import { createTimeBudget } from '../_shared/budget.ts';
 import { memoryUsageStore } from '../_shared/usage.ts';
-import { readFunctionEnv } from '../_shared/env.ts';
+import { describeFunctionEnv, readFunctionEnv } from '../_shared/env.ts';
+import { readFileSync } from 'node:fs';
 import { createDryRunPublisher, templateSummarizer, type Summarizer } from '../_shared/ingest.ts';
 import { DRY_NOW, fixtureFetcher } from '../../../ingest/src/main.ts';
 
@@ -31,10 +32,18 @@ function setup(o: { tick?: number; providers?: Summarizer[]; usage?: Record<stri
   };
 }
 
+test('options: sec gets the higher default work cap (config.workCapBySource); an explicit work_cap still wins; others stay at the default', () => {
+  assert.equal(defaultWorkCapFor('sec'), 10);
+  assert.equal(parseIngestOptions({ source: 'sec' }).workCap, 10);
+  assert.equal(parseIngestOptions({ source: 'sec', work_cap: 4 }).workCap, 4);
+  assert.equal(parseIngestOptions({ source: 'cpsc' }).workCap, DEFAULT_WORK_CAP);
+  assert.ok(defaultWorkCapFor('sec') <= 20);
+});
+
 test('options: source must be known; work_cap 1-20, default 5', () => {
   assert.deepEqual(parseIngestOptions({ source: 'fed' }), { source: 'fed', workCap: DEFAULT_WORK_CAP, finish: false });
   assert.equal(parseIngestOptions({ source: 'nasa', work_cap: '3', finish: 'true' }).workCap, 3);
-  for (const s of ['treasury', 'fedspeech', 'secpress']) assert.equal(parseIngestOptions({ source: s }).source, s);   // finance sources (2026-11-08)
+  for (const s of ['treasury', 'fedspeech', 'secpress', 'bls', 'beadata']) assert.equal(parseIngestOptions({ source: s }).source, s);   // finance sources (2026-11-08)
   assert.throws(() => parseIngestOptions({ source: 'guardian' }), /source must be one of/);
   assert.throws(() => parseIngestOptions({}), /source must be one of/);
   assert.throws(() => parseIngestOptions({ source: 'sec', work_cap: 0 }), /work_cap/);
@@ -117,4 +126,58 @@ test('candidate selection stays off in the cloud, so the deadline guard sees eve
   const run = await handleIngestSource(s.deps, parseIngestOptions({ source: 'bea', work_cap: 20 }));
   assert.ok(!run.log_tail.some((l) => l.startsWith('selection:')), 'no selection log lines');
   assert.equal(run.stopped_by, 'time');
+});
+
+// ---- NewsData.io link-out source (OFF by default; needs NEWSDATA_API_KEY and NEWSDATA_ENABLED=1) -------------------
+
+test('options: newsdata_market and newsdata_latest are known sources', () => {
+  for (const s of ['newsdata_market', 'newsdata_latest']) assert.equal(parseIngestOptions({ source: s, work_cap: 10 }).source, s);
+});
+
+test('newsdata: no key or switch off = no request, no credit used, no card; the run still logs', async () => {
+  for (const e of [env, { ...env, newsdataApiKey: 'pub_k', newsdataEnabled: false }, { ...env, newsdataApiKey: null, newsdataEnabled: true }]) {
+    const s = setup();
+    let fetched = 0;
+    const run = await handleIngestSource({ ...s.deps, env: e, fetchText: async () => { fetched++; return '{}'; } }, parseIngestOptions({ source: 'newsdata_market', work_cap: 10 }));
+    assert.equal(run.ok, true, run.error ?? '');
+    assert.equal(fetched, 0);
+    assert.equal(s.dry.cards.length, 0);
+    assert.equal(s.store.counts.newsdata ?? 0, 0);
+    assert.equal(s.logged.length, 1);
+  }
+});
+
+test('newsdata on: one database credit per call, link_out cards published, credits are not counted as AI calls, key never in the log', async () => {
+  const body = readFileSync(new URL('../../../ingest/test/fixtures/newsdata-market.json', import.meta.url), 'utf8');
+  const e = { ...env, newsdataApiKey: 'pub_SECRETKEY123456', newsdataEnabled: true };
+  const s = setup();
+  const run = await handleIngestSource({ ...s.deps, env: e, fetchText: async () => body, clock: () => new Date('2026-11-11T08:00:00Z') }, parseIngestOptions({ source: 'newsdata_market', work_cap: 10 }));
+  assert.equal(run.ok, true, run.error ?? '');
+  assert.equal(s.store.counts.newsdata, 1);
+  assert.equal(run.ai_calls, 0);
+  assert.ok(s.dry.cards.length >= 1 && s.dry.cards.every((c) => c.kind === 'link_out' && c.body === null && c.attribution === 'via NewsData.io'));
+  assert.ok(!JSON.stringify([s.logged, run, s.dry.cards]).includes('SECRETKEY'));
+});
+
+test('newsdata credit cap 144: at the cap the database refuses, so no request is made', async () => {
+  const e = { ...env, newsdataApiKey: 'pub_SECRETKEY123456', newsdataEnabled: true };
+  const s = setup({ usage: { newsdata: 144 } });
+  s.store.counts.newsdata = 144;
+  const caps = { newsdata: { cap: 144, reserve: 0 } };
+  const store = memoryUsageStore({ newsdata: 144 }, caps);
+  let fetched = 0;
+  await handleIngestSource({ ...s.deps, env: e, usageStore: store, fetchText: async () => { fetched++; return '{}'; } }, parseIngestOptions({ source: 'newsdata_latest' }));
+  assert.equal(fetched, 0);
+  assert.equal(store.counts.newsdata, 144);
+});
+
+test('env: NEWSDATA_API_KEY and NEWSDATA_ENABLED are read; default is off and keys never print', () => {
+  const base = (k: string) => ({ SUPABASE_URL: 'https://mzfpelilxpbpcgskppxu.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'eyJ-test-service-role-key', NEWSDATA_API_KEY: 'pub_SECRETKEY123456', NEWSDATA_ENABLED: '1' } as Record<string, string>)[k];
+  const on = readFunctionEnv(base);
+  assert.equal(on.newsdataApiKey, 'pub_SECRETKEY123456');
+  assert.equal(on.newsdataEnabled, true);
+  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? undefined : base(k))).newsdataEnabled, null, 'unset = the code default (on)');
+  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? '0' : base(k))).newsdataEnabled, false, '0 switches it off')
+  assert.equal(env.newsdataApiKey, null);
+  assert.ok(!describeFunctionEnv(on).includes('SECRETKEY'));
 });

@@ -13,6 +13,7 @@ import { useAccount } from '../lib/account/accountContext';
 import { withoutHidden } from '../lib/account/accountLogic';
 import { withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { followReasonText, followsKey, hasFollows } from '../lib/following/followingLogic';
+import { withoutGovernmentMisfits } from '../lib/following/followingMisfits';
 import { suggestedTopics } from '../lib/search/searchLogic';
 import { useFollows } from '../lib/following/useFollows';
 import { usePagedCards } from '../lib/feed/usePagedCards';
@@ -25,7 +26,7 @@ import { ScreenShell } from '../components/shell/ScreenShell';
 import { clearStoryUpdates, FollowedStories, useStoryRows } from '../components/following/FollowedStories';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
-import { storiesHeader } from '../lib/following/followedStories';
+import { storiesHeader, withoutShownStories } from '../lib/following/followedStories';
 import { useFollowedStories } from '../lib/following/useFollowedStories';
 import { FollowingFeed } from '../components/following/FollowingFeed';
 import { SourcesSheet } from '../components/card/SourcesSheet';
@@ -62,8 +63,8 @@ export default function FollowingScreen() {
   const hidden = acct.viewPrefs?.hidden ?? [];
   const hiddenSources = acct.viewPrefs?.hiddenSources ?? [];
   const visible = useCallback(
-    (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
-    [hidden, hiddenSources],
+    (cards: BlurbCard[]) => withoutGovernmentMisfits(withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources), follows),
+    [hidden, hiddenSources, follows],
   );
 
   // Wait for the account's topics before asking, so the list does not flash the top
@@ -102,7 +103,7 @@ export default function FollowingScreen() {
     return () => { focused.current = false; if (timer.current) clearTimeout(timer.current); };
   }, [refresh]));
   const rawItems = freshItems ?? state.items;
-  const items = visible(rerankFollowing(rawItems, acct.localPrefs));
+  const items = withoutShownStories(visible(rerankFollowing(rawItems, acct.localPrefs)), followedStories.stories, rows);
 
   const empty = following ? (
     <View style={styles.none} accessibilityLiveRegion="polite">

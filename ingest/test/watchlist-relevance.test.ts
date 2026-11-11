@@ -174,7 +174,7 @@ test('an AI draft without a valid score is rejected (retry, then the template: a
     assert.equal(s.template, 0, 'the 2.02 template card has no figures, so it is never published');
     assert.equal(s.published, 0);
     assert.equal(r.dry.cards.length, 0);
-    assert.ok(r.lines.includes('skip no_figures (earnings card without figures, template): Apple Inc. 8-K'), r.lines.join('\n'));
+    assert.ok(r.lines.some((l) => l.startsWith('skip no_figures (earnings card without figures, template): Apple Inc. 8-K')), r.lines.join('\n'));
   }
 });
 
@@ -193,13 +193,13 @@ test('chain: low score returns at once with low_relevance; no minRelevance = old
 
 // ---- template cards -------------------------------------------------------------------
 
-test('template cards: Fed, BEA and watch-list 2.02/5.02/1.05/4.02/2.05 only; never Federal Register', () => {
+test('template cards: Fed, BEA and watch-list 2.02/5.02/1.05/4.02/2.05/1.01/2.01 only; never Federal Register', () => {
   const sec = (...n: string[]) => ({ source: 'sec_8k', items: items(...n) }) as unknown as RawItem;
   assert.equal(templateAllowed({ source: 'fed_rss' } as RawItem), true);
   assert.equal(templateAllowed({ source: 'bea_rss' } as RawItem), true);
   assert.equal(templateAllowed({ source: 'fedreg' } as RawItem), false);
-  for (const n of ['2.02', '5.02', '1.05', '4.02', '2.05']) assert.equal(templateAllowed(sec(n, '9.01')), true, n);
-  for (const n of ['1.01', '2.01', '1.03']) assert.equal(templateAllowed(sec(n, '9.01')), false, n);
+  for (const n of ['2.02', '5.02', '1.05', '4.02', '2.05', '1.01', '2.01']) assert.equal(templateAllowed(sec(n, '9.01')), true, n);
+  for (const n of ['1.03', '3.01', '4.01']) assert.equal(templateAllowed(sec(n, '9.01')), false, n);
 });
 
 test('pipeline: template-only run publishes no Federal Register card (5 skipped, item status left "new" for a later AI run)', async () => {
@@ -228,19 +228,21 @@ test('template wording is plain (no item numbers or "8-K" in the headline)', () 
 
 // ---- plain-language prompt --------------------------------------------------------------
 
-test('prompt: college-student audience, 8th-grade plain language, explain jargon, what happened first, relevance rubric', () => {
+test('prompt: everyday finance readers (16-50), 8th-grade plain language, defined jargon, subject-first headline, macro-first relevance rubric', () => {
   const it = { source: 'sec_8k', source_name: 'SEC', doc_label: 'Form 8-K', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'earnings', event_type: 'earnings' } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /college students and young adults/);
-  assert.match(p, /8th-grade reading level/);
-  assert.match(p, /short sentences\. No jargon/);
-  assert.match(p, /explain it in a few plain words/);
-  assert.match(p, /The headline says what happened\. Body sentence 1 does NOT say it again/);   // sum-v6: sentence 1 continues the headline
-  assert.match(p, /ONLY if that follows directly from the facts/);
+  assert.match(p, /busy everyday people interested in business, finance, stocks and investing \(about 16 to 50\)/);
+  assert.doesNotMatch(p, /college/i);
+  assert.match(p, /About an 8th-grade reading level/);
+  assert.match(p, /Short sentences, active voice/);
+  assert.match(p, /Define any other technical term in parentheses the first time/);
+  assert.match(p, /Body sentence 1 picks up where the headline stops/);   // sentence 1 continues the headline
+  assert.match(p, /ONLY when the source gives the reason/);
   assert.match(p, /aim for about 60/);
   assert.match(p, /"everyday_relevance": a whole number from 1 to 5/);
-  assert.match(p, /student loans, rent and prices, gas, travel and airfares/);
-  assert.match(p, /1 = institutional or routine paperwork/);
+  assert.match(p, /5 = moves markets or the economy/);
+  assert.match(p, /ordinary product recall: the default for recalls/);
+  assert.match(p, /1 = paperwork with no business effect/);
   assert.match(p, /HARD LIMITS.*headline at most 90 characters/);
   assert.ok(RESPONSE_SCHEMA.required.includes('everyday_relevance'));
   assert.equal(RESPONSE_SCHEMA.properties.everyday_relevance.type, 'INTEGER');

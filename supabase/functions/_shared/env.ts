@@ -2,7 +2,7 @@
 // files pass Deno.env.get in), so Node tests cover it.
 // Env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase into every Edge
 // Function (names starting with SUPABASE_ cannot be set as custom secrets). Custom secrets:
-// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
+// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, EIA_API_KEY, CENSUS_API_KEY (optional), SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
 // Outputs: FunctionEnv (key values are never logged; describe() prints [set]/[missing] only).
 
 export type EnvGet = (name: string) => string | undefined;
@@ -21,6 +21,15 @@ export interface FunctionEnv {
   geminiApiKey: string | null;
   groqApiKey: string | null;
   fredApiKey: string | null;
+  blsApiKey: string | null;        // optional: switches the BLS source to API v2 (500 requests/day)
+  beaApiKey: string | null;
+  beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
+  occEnabled: boolean;             // REGPRESS_OCC_ENABLED=1 turns the OCC press-release feed on (no readable reuse terms)
+  annualEnabled: boolean;          // ANNUAL_FIGURES_ENABLED=1 turns the annual figures source (SSA COLA ...) on
+  eiaApiKey: string | null;
+  censusApiKey: string | null;
+  newsdataApiKey: string | null;   // NEWSDATA_API_KEY: link-out source; none = it does nothing
+  newsdataEnabled: boolean | null; // NEWSDATA_ENABLED: '1' on, '0' off, unset = null = the code default (config.newsdata.enabled, ON; still needs the key and the DB flag app_config.linkout_cards)
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -39,6 +48,15 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     geminiApiKey: clean(get('GEMINI_API_KEY')),
     groqApiKey: clean(get('GROQ_API_KEY')),
     fredApiKey: clean(get('FRED_API_KEY')),
+    blsApiKey: clean(get('BLS_API_KEY')),
+    beaApiKey: clean(get('BEA_API_KEY')),
+    beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
+    occEnabled: (get('REGPRESS_OCC_ENABLED') ?? '').trim() === '1',
+    annualEnabled: (get('ANNUAL_FIGURES_ENABLED') ?? '').trim() === '1',
+    eiaApiKey: clean(get('EIA_API_KEY')),
+    censusApiKey: clean(get('CENSUS_API_KEY')),
+    newsdataApiKey: clean(get('NEWSDATA_API_KEY')),
+    newsdataEnabled: ((v) => (v === '1' ? true : v === '0' ? false : null))((get('NEWSDATA_ENABLED') ?? '').trim()),
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };
@@ -46,7 +64,7 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
 
 export function describeFunctionEnv(e: FunctionEnv): string {
   const s = (v: string | null) => (v ? '[set]' : '[missing]');
-  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
+  return `GEMINI_API_KEY=${s(e.geminiApiKey)} GROQ_API_KEY=${s(e.groqApiKey)} FRED_API_KEY=${s(e.fredApiKey)} BEA_API_KEY=${s(e.beaApiKey)} BLS_API_KEY=${s(e.blsApiKey)} NEWSDATA_API_KEY=${s(e.newsdataApiKey)} NEWSDATA_ENABLED=${e.newsdataEnabled ? 1 : 0} SEC_USER_AGENT=${s(e.secUserAgent)} REPORT_CARD_PROTOCOL=${e.reportCard ? 1 : 0}`;
 }
 
 /** Length-independent string compare (the token is a secret). */

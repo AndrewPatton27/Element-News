@@ -92,7 +92,8 @@ export function fedRegDocToItem(d: FrDoc, now: Date): { item: RawItem } | { skip
       title: tidy(d.title),                                   // input for the template headline only
       published_at: clampedPublishedAt(d, now),
       license_class: 'public_domain',
-      category: config.fedRegister.category,
+      // FAA airworthiness directives are aircraft safety orders: Recalls & Safety (F2), not the generic Federal Register topic
+      category: isAirworthinessDirective(d.title) ? 'safety' : config.fedRegister.category,
       event_type: null,
       tickers: [],
       source_name: 'Federal Register',

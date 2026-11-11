@@ -154,7 +154,7 @@ export default function AboutScreen() {
           <Bullets
             items={[
               'Company filings only for about 150 well-known companies, and only for big events: earnings, CEO or CFO changes, big deals, layoffs, data breaches, restated results and bankruptcies. Routine filings are skipped before any AI is used.',
-              'An AI rates how much a typical person would care, from 1 to 5. Anything below 3 is not published.',
+              'An AI rates, from 1 to 5, how much an item matters to someone who follows business, the economy, markets and investing. Anything below 3 is not published.',
               'Duplicates are removed, and no company gets more than 3 cards a day.',
               'Economic numbers become cards only when the change is big enough to matter.',
             ]}
@@ -165,7 +165,7 @@ export default function AboutScreen() {
           <Bullets
             items={[
               'An AI writes each summary from the source text: Google Gemini (on Google’s free tier today), with Groq as a backup. Some cards use a fixed template and no AI at all.',
-              'Cards are written in plain words, at about an 8th-grade reading level.',
+              'Cards are written for busy people who follow business, finance and investing: plain words at about an 8th-grade reading level, with uncommon terms explained in a few words.',
               'Every AI card is checked automatically: every number must appear in the source, there is no buy, sell or advice language, only short quotes are copied (at most 10 words from filings and Wikipedia, 25 from Fed and BLS text), and the length is limited.',
               'If a draft fails a check it gets one more try. If it still fails, a backup or a plain template card is used instead.',
               `AI cards are marked “${aiNoticeText(config)}”. The “More detail” view is written in the same step and passes the same checks.`,

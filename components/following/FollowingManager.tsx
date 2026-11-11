@@ -12,6 +12,10 @@ import { fonts, radius } from '../../lib/theme/theme';
 import { CloseIcon } from '../shell/Icons';
 import { TopicChip } from '../feed/TopicPicker';
 import { go } from '../shell/TabBar';
+import { readFlags } from '../../lib/flags/flags';
+import { useSignals } from '../../lib/signals/useSignals';
+import { FINE_NAMES, isFineTopic, type FineTopic } from '../../lib/topics/fineTopics';
+import { pickedReason } from '../../lib/onboarding/setupLogic';
 
 export interface FollowingManagerProps {
   categories: Category[]; // topics that can be followed (hidden ones already left out)
@@ -55,7 +59,13 @@ export function FollowingManager({
   const wide = useWide();
   const [draft, setDraft] = useState('');
   const [badTicker, setBadTicker] = useState(false);
-  const count = follows.topics.length + follows.sources.length + follows.tickers.length;
+  // A-17 (flag `onboarding` or `topics`): the fine topics picked in setup show here by their own names, each with
+  // "because you picked", instead of vanishing into their parent category (Rates -> Economy).
+  const { signals, update } = useSignals();
+  const flags = readFlags();
+  const picks = flags.onboarding || flags.topics ? [...signals.interests, ...signals.optIn].filter((t, i, all) => isFineTopic(t) && all.indexOf(t) === i) : [];
+  const dropPick = (t: string) => update((s) => ({ ...s, interests: s.interests.filter((x) => x !== t), optIn: s.optIn.filter((x) => x !== t) }));
+  const count = follows.topics.length + follows.sources.length + follows.tickers.length + picks.length;
 
   const addTicker = () => {
     const t = normalizeTicker(draft);
@@ -92,6 +102,9 @@ export function FollowingManager({
           {follows.topics.map((s) => (
             <RemovableChip key={`t-${s}`} label={topicLabel(s, categories)} onRemove={() => onToggleTopic(s)} />
           ))}
+          {picks.map((t) => (
+            <RemovableChip key={`f-${t}`} label={FINE_NAMES[t as FineTopic]} onRemove={() => dropPick(t)} />
+          ))}
           {follows.tickers.map((s) => (
             <RemovableChip key={`k-${s}`} label={s} onRemove={() => onToggleTicker(s)} />
           ))}
@@ -104,6 +117,12 @@ export function FollowingManager({
           Choose topics, companies or sources. The newest stories about them show up here first.
         </Text>
       )}
+
+      {picks.length > 0 ? (
+        <Text style={[styles.help, { color: p.muted }]} testID="following-picked-reason">
+          {pickedReason(signals)}
+        </Text>
+      ) : null}
 
       {error ? (
         <Text accessibilityRole="alert" style={[styles.help, { color: p.warn }]}>

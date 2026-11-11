@@ -53,10 +53,10 @@ const ai = (draft: Partial<SummaryDraft>, calls: string[] = []): Summarizer => (
 
 // ---- selection ---------------------------------------------------------------------------
 
-test('--rewrite: CLI flag; current versions are sum-v6 and tpl-v5; only older cards are selected', async () => {
+test('--rewrite: CLI flag; current versions are sum-v7 and tpl-v6; only older cards are selected', async () => {
   assert.equal(parseArgs(['--rewrite', '--limit', '5']).rewrite, true);
-  assert.deepEqual(currentVersions(), ['sum-v6', 'tpl-v5']);
-  const fresh = [{ ...byId(1), id: 'a', prompt_version: 'sum-v6' }, { ...byId(3), id: 'b', prompt_version: 'tpl-v5' }];
+  assert.deepEqual(currentVersions(), ['sum-v7', 'tpl-v6']);
+  const fresh = [{ ...byId(1), id: 'a', prompt_version: 'sum-v7' }, { ...byId(3), id: 'b', prompt_version: 'tpl-v6' }];
   const r = rewriteDeps([...fresh, byId(3)], [templateSummarizer]);
   const s = await runRewrite(r.deps, { limit: 10 });
   assert.equal(s.selected, 1, 'only the old data card');
@@ -67,7 +67,7 @@ test('--rewrite: CLI flag; current versions are sum-v6 and tpl-v5; only older ca
 
 // ---- in-place update -------------------------------------------------------------------------
 
-test('AI card: same licensed text (allowlisted page fetch), same chain; updated in place with detail, sum-v6', async () => {
+test('AI card: same licensed text (allowlisted page fetch), same chain; updated in place with detail, sum-v7', async () => {
   const calls: string[] = [];
   const r = rewriteDeps([byId(1)], [ai({}, calls), templateSummarizer]);
   const s = await runRewrite(r.deps);
@@ -81,7 +81,7 @@ test('AI card: same licensed text (allowlisted page fetch), same chain; updated 
   assert.equal(p.id, byId(1).id, 'same card id');
   assert.equal(p.headline, 'The Fed shares a new statement');
   assert.equal(p.ai_generated, true);
-  assert.equal(p.prompt_version, 'sum-v6');
+  assert.equal(p.prompt_version, 'sum-v7');
   assert.deepEqual(p.detail, DETAIL);
   assert.ok(!('sort_at' in p) && !('category' in p), 'order and category are never sent');
 });
@@ -98,10 +98,10 @@ test('template and data cards: regenerated with the plain templates (no AI) plus
   assert.ok(sec.action === 'revise' && data.action === 'revise');
   if (sec.action !== 'revise' || data.action !== 'revise') return;
   assert.equal(sec.headline, 'Federal Reserve issues FOMC statement');
-  assert.equal(sec.prompt_version, 'tpl-v5');
+  assert.equal(sec.prompt_version, 'tpl-v6');
   assert.match(sec.detail!.paragraphs[1], /central bank/);
-  assert.equal(data.body, 'The 10-year Treasury yield, a rate that many mortgage and loan rates follow, was 5.10% on Oct 16, up 0.06 points from the prior day.');
-  assert.match(data.detail!.paragraphs[0], /up 0\.06 points from the prior day, when it was 5\.04%/);
+  assert.equal(data.body, 'The 10-year Treasury yield, the interest rate the U.S. government pays to borrow for 10 years, was 5.10% on Oct 16, up 6 basis points from the prior day. It is a widely used benchmark for long-term interest rates, including mortgage rates.');
+  assert.match(data.detail!.paragraphs[0], /up 6 basis points from the prior day, when it was 5\.04%/);
   for (const d of [sec.detail!, data.detail!]) assert.deepEqual(checkDetailShape(d), []);
 });
 
@@ -122,11 +122,32 @@ test('a draft that fails validation twice keeps the old card unchanged (no revis
   assert.ok(r.lines.some((l) => l.startsWith('kept (no valid AI draft; old card unchanged)') && /numbers not in source: 9\.9/.test(l)));
 });
 
-test('relevance below 3 hides the card instead of rewriting it', async () => {
-  const r = rewriteDeps([byId(1)], [ai({ everyday_relevance: 2 }), templateSummarizer]);
+test('relevance below 3 hides the card instead of rewriting it, until the hide cap (sum-v7) keeps the rest', async () => {
+  const five = [1, 2, 3, 4, 5].map((n) => ({ ...byId(1), id: `low${n}` }));
+  const r = rewriteDeps(five, [ai({ everyday_relevance: 2 }), templateSummarizer]);
   const s = await runRewrite(r.deps);
-  assert.equal(s.hidden, 1);
-  assert.deepEqual(r.dry.revisions, [{ id: byId(1).id, action: 'hide', note: 'low_relevance (2)' }]);
+  assert.equal(s.selected, 5);
+  assert.equal(s.hidden, 2, 'cap 0.4 of 5 selected = 2 hidden');
+  assert.equal(s.kept, 3, 'the other 3 low-relevance cards are kept as they were');
+  assert.deepEqual(r.dry.revisions.map((x) => x.action), ['hide', 'hide']);
+  assert.deepEqual(r.dry.revisions[0], { id: 'low1', action: 'hide', note: 'low_relevance (2)' });
+  assert.ok(r.lines.some((l) => /kept \(hide cap 0\.4 reached/.test(l)));
+  // a cap of 1 hides every low card (the old behaviour); a cap of 0 hides none
+  const cfg = config as unknown as { rewriteHideMaxFraction: number };
+  const saved = cfg.rewriteHideMaxFraction;
+  try {
+    cfg.rewriteHideMaxFraction = 1;
+    assert.equal((await runRewrite(rewriteDeps([byId(1)], [ai({ everyday_relevance: 2 }), templateSummarizer]).deps)).hidden, 1);
+    cfg.rewriteHideMaxFraction = 0;
+    assert.equal((await runRewrite(rewriteDeps([byId(1)], [ai({ everyday_relevance: 2 }), templateSummarizer]).deps)).hidden, 0);
+  } finally { cfg.rewriteHideMaxFraction = saved; }
+});
+
+test('a sum-v7 rewrite sends the relevance score with the revised card; template revises send none', async () => {
+  const r = rewriteDeps([byId(1)], [ai({ everyday_relevance: 4 })]);
+  await runRewrite(r.deps);
+  const [p] = r.dry.revisions;
+  assert.ok(p.action === 'revise' && p.everyday_relevance === 4 && p.prompt_version === 'sum-v7');
 });
 
 test('a source that cannot be re-read fails safely (old card unchanged); unsupported sources are kept', async () => {
@@ -177,14 +198,14 @@ test('chain: a valid card with a bad detail keeps the card and drops the detail'
   assert.ok(r.log.some((l) => /detail dropped \(card kept\)/.test(l)));
 });
 
-test('prompt sum-v6 asks for the detail; Gemini and Groq schemas require it', () => {
-  assert.equal(config.promptVersion, 'sum-v6');
+test('prompt sum-v7 asks for the detail; Gemini and Groq schemas require it', () => {
+  assert.equal(config.promptVersion, 'sum-v7');
   const it = { source: 'fed_rss', source_name: 'Federal Reserve Board', doc_label: 'Press release', published_at: '2026-10-17T00:00:00Z', tickers: [], category: 'policy', event_type: 'fed' } as unknown as RawItem;
   const p = buildPrompt({ item: it, text: 'T' });
-  assert.match(p, /"detail": a longer, still easy version for readers who tap the card/);
+  assert.match(p, /"detail": for readers who tap the card/);
   assert.match(p, /2 to 4 short paragraphs, at most 180 words in total/);
-  assert.match(p, /3 to 5 short points, each at most 15 words/);
-  assert.match(p, /what it means for regular people ONLY if that follows from the source/);
+  assert.match(p, /3 to 5 short sentences of at most 15 words each/);
+  assert.match(p, /Cover what happened, the supporting facts and the context the SOURCE gives/);
   assert.ok(RESPONSE_SCHEMA.required.includes('detail'));
   assert.ok(GROQ_JSON_SCHEMA.schema.required.includes('detail'));
   assert.deepEqual(GROQ_JSON_SCHEMA.schema.properties.detail.required, ['paragraphs', 'key_points']);
@@ -193,7 +214,7 @@ test('prompt sum-v6 asks for the detail; Gemini and Groq schemas require it', ()
 test('new cards: AI detail goes into the publish payload; template and data cards get a factual detail', async () => {
   const dry = createDryRunPublisher();
   const deps: Deps = {
-    fetchText: fixtureFetcher(), publisher: dry.publisher, providers: [ai({ headline: 'The Fed posts a statement' }), templateSummarizer],
+    fetchText: fixtureFetcher(), publisher: dry.publisher, providers: [ai({ headline: 'Federal Reserve issues a monetary policy update' }), templateSummarizer],
     counter: memoryCounter(), fredApiKey: null, now: DRY_NOW, log: () => {},
   };
   await runOnce(deps, { only: ['fed', 'usgs'] });
@@ -203,7 +224,7 @@ test('new cards: AI detail goes into the publish payload; template and data card
   assert.equal(quakes.length, 1, 'only the quakes above the publishing threshold, and at most 1 USGS card per run (narrow-source cap)');
   for (const q of quakes) {
     assert.deepEqual(checkDetailShape(q.detail), [], q.headline);
-    assert.equal(q.prompt_version, 'tpl-v5');
+    assert.equal(q.prompt_version, 'tpl-v6');
   }
   const it = (usgsToItem(parseUsgsGeoJson(fx('usgs-significant-week.geojson'))[0], DRY_NOW) as { item: RawItem }).item;
   assert.deepEqual(templateDetail(it)!.key_points, ['Magnitude 5.7', 'Location: 48 km WNW of Khuzdar, Pakistan', 'Time: 05:06 UTC on Oct 17', 'USGS alert level: yellow']);

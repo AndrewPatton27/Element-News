@@ -111,11 +111,11 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   with src as (select * from core.blurbs where id=p_card_id and status='published'), linked as (
     select sl.related_id id, sl.kind, sl.related_id, target.headline related_headline, 0 ord, sl.created_at
     from src join core.story_links sl on sl.card_id=src.id join core.blurbs target on target.id=sl.related_id
-    where target.status='published'
+    where target.status='published' and (target.kind<>'link_out' or (select linkout_cards from core.app_config where id))
     union all
     select sl.card_id, sl.kind, sl.related_id, target.headline, 0, sl.created_at
     from src join core.story_links sl on sl.related_id=src.id join core.blurbs target on target.id=sl.card_id
-    where target.status='published'
+    where target.status='published' and (target.kind<>'link_out' or (select linkout_cards from core.app_config where id))
   ), src_tk as (
     select upper(x->>'symbol') tk from src, jsonb_array_elements(src.tickers) x where coalesce(x->>'symbol','')<>''
     union
@@ -127,12 +127,12 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   ), cand as (
     select cc.blurb_id id, count(*) score from core.card_companies cc join keys k on k.tk=cc.ticker where cc.confidence>=0.75 group by cc.blurb_id
     union all
-    select b.id, 1 from core.blurbs b, src where b.id<>src.id and b.status='published' and exists(
+    select b.id, 1 from core.blurbs b, src where b.id<>src.id and b.status='published' and (b.kind<>'link_out' or (select linkout_cards from core.app_config where id)) and exists(
       select 1 from jsonb_array_elements(b.tickers) x join keys k on k.tk=upper(x->>'symbol'))
   ), overlap_rows as (
     select b.id,null::text kind,null::uuid related_id,null::text related_headline,1 ord,now() created_at,sum(c.score) score
     from cand c join core.blurbs b on b.id=c.id, src
-    where b.id<>src.id and b.status='published'
+    where b.id<>src.id and b.status='published' and (b.kind<>'link_out' or (select linkout_cards from core.app_config where id))
     group by b.id
   ), allrows as (
     select l.id,l.kind,l.related_id,l.related_headline,l.ord,l.created_at,0 score from linked l where l.id<>p_card_id

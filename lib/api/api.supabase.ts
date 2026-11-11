@@ -2,6 +2,7 @@
 // Only the project URL and the publishable key are used; never a secret key.
 // No React imports, so node --test can run it with a fake fetch.
 
+import { parseMacroHistory } from '../history/seriesHistory.ts';
 import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { isValidReport, type ReportResult } from './report.ts';
@@ -40,8 +41,8 @@ export interface PlannedRequest {
 export function planRequest(
   base: string,
   key: string,
-  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief' | 'feed_status',
-  req?: FeedRequest & { q?: string; cardId?: string; topics?: string[]; sources?: string[]; tickers?: string[] },
+  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief' | 'feed_status' | 'macro_history',
+  req?: FeedRequest & { seriesIds?: string[]; q?: string; cardId?: string; topics?: string[]; sources?: string[]; tickers?: string[] },
   token?: string | null,
 ): PlannedRequest {
   const headers: Record<string, string> = { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api' };
@@ -64,6 +65,10 @@ export function planRequest(
       url: `${base}/rest/v1/rpc/${op}`,
       init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: '{}' },
     };
+  }
+  if (op === 'macro_history') {
+    const ids = [...new Set(req?.seriesIds ?? [])].filter((s) => /^[A-Z0-9_]{1,40}$/.test(s)).slice(0, 6);
+    return { url: `${base}/rest/v1/rpc/macro_history`, init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: JSON.stringify({ p_series: ids }) } };
   }
   if (op === 'search' || op === 'related_cards' || op === 'following_feed' || op === 'daily_brief' || op === 'weekly_brief') {
     const extra = req;
@@ -128,6 +133,10 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       numbers: Array.isArray(row.numbers) ? row.numbers.filter(isMacroFact) : [],
       summary: parseBriefSummary(row.summary),
       markets: parseBriefMarkets(row.markets),
+      window_kind: row.window_kind === '24h' || row.window_kind === 'since_friday' || row.window_kind === 'week' ? row.window_kind : undefined,
+      brief_date: typeof row.brief_date === 'string' ? row.brief_date : undefined,
+      fallback: row.fallback === true,
+      as_of: typeof row.as_of === 'string' ? row.as_of : null,
     };
   }
   // Email-brief RPCs (migration 20261018040000_brief_email.sql). Sent as the anon key only,
@@ -215,6 +224,14 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
         return [];
       }
     },
+    // Chart history is extra: before the migration is applied (404) or on any error the card simply has no chart.
+    async macroHistory(ids) {
+      try {
+        return parseMacroHistory(await call(planRequest(opts.url, opts.key, 'macro_history', { mode: 'top', seriesIds: ids })));
+      } catch {
+        return {};
+      }
+    },
     async search(q, cursor, limit) {
       const x = await optional('search', { mode: 'top', cursor, limit, q });
       try { return x === null ? { items: [], next_cursor: null } : parseFeedPage(x); } catch { return { items: [], next_cursor: null }; }
@@ -246,7 +263,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       const raw = await optional('weekly_brief');
       const brief = parseBrief(raw);
       const movers = raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).movers) ? parseNumberTrends((raw as Record<string, unknown>).movers) : [];
-      return { ...brief, window_hours: 168, movers };
+      return { ...brief, window_hours: Math.max(168, brief.window_hours), window_kind: 'week', movers };
     },
     async reportBlurb(cardId, reason): Promise<ReportResult> {
       if (!isValidReport(cardId, reason)) return { ok: false, status: 'invalid' };
@@ -257,7 +274,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
         // a void RPC answers with an empty body, so read only the status (not call(), which parses JSON)
         const res = await doFetch(`${opts.url}/rest/v1/rpc/report_blurb`, { method: 'POST', headers, body: JSON.stringify({ p_id: cardId, p_reason: reason }) });
         if (res.ok) return { ok: true, status: 'ok' };
-        return { ok: false, status: res.status === 404 ? 'unavailable' : 'error' };
+        return { ok: false, status: res.status === 404 ? 'unavailable' : res.status === 429 ? 'rate_limited' : 'error' };
       } catch {
         return { ok: false, status: 'error' };
       }

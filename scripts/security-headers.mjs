@@ -11,6 +11,9 @@ import { createHash } from 'node:crypto';
 
 export const ENFORCE_FULL_CSP = false;
 
+/** Build-time switch without a code edit: ENFORCE_FULL_CSP=1 npm run export:web enforces the full policy. Default off. */
+export function enforceFullFromEnv(value) { return /^(1|true|yes)$/i.test(String(value ?? '').trim()); }
+
 /** Inline <script> bodies (no src attribute) in an HTML document, in order. */
 export function inlineScripts(html) {
   const out = [];
@@ -55,6 +58,9 @@ export function securityHeaderLines({ html = '', supabaseUrl = '', enforceFull =
     'Referrer-Policy: strict-origin-when-cross-origin',
     'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()',
     'Cross-Origin-Opener-Policy: same-origin',
+    // Cloudflare adds Access-Control-Allow-Origin: * to static responses by default. Nothing cross-origin reads this
+    // site (same-origin app, API calls go to Supabase), so detach it everywhere; add it back per path if ever needed.
+    '! Access-Control-Allow-Origin',
     enforceFull ? `Content-Security-Policy: ${full}` : `Content-Security-Policy: ${BASE_CSP}`,
     ...(enforceFull ? [] : [`Content-Security-Policy-Report-Only: ${full}`]),
   ];
@@ -73,13 +79,14 @@ export function buildHeadersFile(opts = {}) {
   ].join('\n');
 }
 
-/** Parses a Cloudflare _headers file into [{ path, headers: Map(lowercase name -> value) }]. */
+/** Parses a Cloudflare _headers file into [{ path, headers: Map(lowercase name -> value), detached: Set(lowercase names removed with a leading !) }]. */
 export function parseHeadersFile(text) {
   const rules = [];
   let cur = null;
   for (const raw of text.split(/\r?\n/)) {
     if (!raw.trim() || raw.trim().startsWith('#')) continue;
-    if (!/^\s/.test(raw)) { cur = { path: raw.trim(), headers: new Map() }; rules.push(cur); continue; }
+    if (!/^\s/.test(raw)) { cur = { path: raw.trim(), headers: new Map(), detached: new Set() }; rules.push(cur); continue; }
+    if (cur && raw.trim().startsWith('!')) { cur.detached.add(raw.trim().slice(1).trim().toLowerCase()); continue; }
     const i = raw.indexOf(':');
     if (cur && i > 0) cur.headers.set(raw.slice(0, i).trim().toLowerCase(), raw.slice(i + 1).trim());
   }

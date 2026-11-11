@@ -5,7 +5,7 @@
 import type { BlurbCard } from '../../contract/types.ts';
 import type { Api } from '../api/api';
 import { primarySource } from '../shared/labels.ts';
-import { relativeTime } from '../shared/format.ts';
+import { relativeTime, shortDate } from '../shared/format.ts';
 
 export interface FollowedStory {
   id: string;
@@ -141,10 +141,27 @@ export function updatesFor(story: Pick<BlurbCard, 'id' | 'published_at'>, relate
     .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
 }
 
+// A fiscal period named in a headline: "Q4 2026", "Q2 FY2026", "fiscal 2026", "second-quarter 2026".
+const FISCAL_PERIOD = /\b(?:Q[1-4]\s*(?:FY\s?)?'?\d{2,4}|FY\s?\d{4}|fiscal (?:year )?\d{4}|(?:first|second|third|fourth)[- ]quarter(?: of)?(?: fiscal)?(?: year)? \d{4})\b/i;
+
+/**
+ * The period one update covers, so two figures in a thread are never read as the same quarter (G-02):
+ * a number's reporting period ("Sep 2026"), a fiscal period named in the headline ("Q4 2026"), else the date
+ * the source is as of ("As of Oct 16"). Never invented: it comes from the card.
+ */
+export function updatePeriod(card: Pick<BlurbCard, 'macro' | 'headline' | 'as_of'>): string | null {
+  const macro = card.macro?.find((m) => m.period);
+  if (macro?.period) return `Period ${macro.period}`;
+  const fiscal = FISCAL_PERIOD.exec(card.headline);
+  if (fiscal) return `Period ${fiscal[0].replace(/\s+/g, ' ')}`;
+  const t = Date.parse(card.as_of);
+  return Number.isNaN(t) ? null : `As of ${shortDate(card.as_of)}`;
+}
+
 export function updateMeta(card: BlurbCard, now: Date = new Date()): string {
   const src = primarySource(card)?.name;
   const when = relativeTime(card.published_at, now);
-  return [when, src].filter(Boolean).join(' · ');
+  return [updatePeriod(card), when, src].filter(Boolean).join(' · ');
 }
 
 export function storyBadge(updates: BlurbCard[], now: Date = new Date()): string {
@@ -164,4 +181,17 @@ export interface StoryRow {
 export function sortStories(rows: StoryRow[]): StoryRow[] {
   const latest = (r: StoryRow) => (r.updates.length ? Date.parse(r.updates[0].published_at) : -1);
   return rows.map((r, i) => ({ r, i })).sort((a, b) => latest(b.r) - latest(a.r) || a.i - b.i).map((x) => x.r);
+}
+
+/**
+ * "More stories you may like" must not repeat what the stories section above already shows: the followed story
+ * cards and the update cards in their timelines (M9c #4: the CPI card was listed under both).
+ */
+export function withoutShownStories(items: BlurbCard[], followed: readonly { id: string }[], rows: readonly StoryRow[]): BlurbCard[] {
+  const shown = new Set<string>(followed.map((s) => s.id));
+  for (const r of rows) {
+    shown.add(r.story.id);
+    for (const u of r.updates) shown.add(u.id);
+  }
+  return shown.size ? items.filter((c) => !shown.has(c.id)) : items;
 }

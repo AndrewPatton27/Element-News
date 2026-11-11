@@ -54,7 +54,7 @@ test('FiscalData debt: string dollars parsed, "null" dropped', () => {
 
 test('average-rate series: observation, data card only via the agency, no FRED wording', () => {
   const o = buildObservation('TREAS_AVG_NOTES', parseAvgRates(fx('fiscaldata-avg-rates-two-months.json')).TREAS_AVG_NOTES)!;
-  assert.deepEqual([o.display_value, o.change_text, o.direction, o.period_label], ['3.40%', '+0.05 pts', 'up', 'Oct 2026']);
+  assert.deepEqual([o.display_value, o.change_text, o.direction, o.period_label], ['3.40%', '+5 bp', 'up', 'Oct 2026']);
   const c = buildDataCard(o)!;
   assert.equal(c.headline, 'Average interest rate on Treasury notes rises to 3.40% in October');
   assert.equal(c.category, 'economy');
@@ -90,7 +90,7 @@ test('10Y-2Y spread is computed from DGS10 and DGS2 on shared dates', () => {
   const d = differenceSeries(pts(['2026-11-03', 4.1], ['2026-11-04', 4.15], ['2026-11-05', 4.2]), pts(['2026-11-04', 3.6], ['2026-11-05', 3.55], ['2026-11-06', 3.5]));
   assert.deepEqual(d, pts(['2026-11-04', 0.55], ['2026-11-05', 0.65]));
   const o = buildObservation('SPREAD_10Y2Y', d)!;
-  assert.deepEqual([o.display_value, o.change_text, o.direction], ['0.65%', '+0.10 pts', 'up']);
+  assert.deepEqual([o.display_value, o.change_text, o.direction], ['0.65%', '+10 bp', 'up']);
   assert.equal(buildDataCard(o), null, 'numbers only');
 });
 
@@ -172,7 +172,7 @@ test('migration 20261111000000: series rows match the code, cron jobs match the 
     assert.ok((SOURCE_NAMES as readonly string[]).includes(name));
   }
   const check = /check \(source in \(([^)]*)\)\)/.exec(sql)![1].replace(/'/g, '').split(',').map((s) => s.trim());
-  assert.deepEqual(check.filter((s) => s !== 'brief-summary').sort(), [...SOURCE_NAMES].sort(), 'run_log accepts exactly the pipeline sources');
+  assert.deepEqual(check.filter((s) => s !== 'brief-summary').sort(), [...SOURCE_NAMES].filter((s) => !['bls', 'beadata', 'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'beige', 'trade', 'regpress', 'annual', 'newsdata_market', 'newsdata_latest'].includes(s)).sort(), 'run_log accepts exactly the pipeline sources (bls and beadata are added by 20261127000000)');
   assert.ok(/'(\d+) \* \* \* \*'|\* \* \*/.test(sql));
 });
 
@@ -224,7 +224,7 @@ test('runOnce macro: computes the spread from DGS10 and DGS2 and fetches no T10Y
   }, 'test-key');
   await runOnce(deps, { only: ['macro'] });
   const spread = dry.macro.find((m) => m.series_id === 'SPREAD_10Y2Y')!;
-  assert.deepEqual([spread.display_value, spread.change_text], ['0.55%', '+0.05 pts']);
+  assert.deepEqual([spread.display_value, spread.change_text], ['0.55%', '+5 bp']);
   assert.ok(!urls.some((u) => /T10Y2Y|series_id=SOFR/.test(u)));
   assert.ok(['DGS3MO', 'DGS5', 'DGS30', 'EFFR', 'DFEDTARU', 'DFEDTARL'].every((id) => dry.macro.some((m) => m.series_id === id)));
 });

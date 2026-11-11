@@ -10,6 +10,7 @@
 -- Settings: none (a rule, not a tunable).
 
 alter table core.blurbs add column if not exists superseded_by uuid references core.blurbs (id) on delete set null;
+create index if not exists blurbs_data_series_idx on core.blurbs ((split_part(dedupe_key, ':', 1))) where kind = 'data' and status = 'published';
 create index if not exists blurbs_superseded_by_idx on core.blurbs (superseded_by) where superseded_by is not null;
 
 -- Keeps only the newest published reading of one series live. Returns how many cards it hid.

@@ -169,6 +169,51 @@ export function isLowValueFiling(items: { number: string }[]): boolean {
   return !substantive && items.some((i) => low.includes(i.number));
 }
 
+/** True for a filing whose card items are only Reg FD / other-events (7.01, 8.01; 9.01 exhibits do not count). */
+export function isRegFdOnly(items: { number: string }[]): boolean {
+  const w = config.watchItems as readonly string[];
+  const rf = config.secRegFd.items;
+  return items.some((i) => rf.includes(i.number)) && !items.some((i) => w.includes(i.number));
+}
+
+/** A Reg FD / other-events filing that may become a card candidate (feature on, only 7.01/8.01 as card items). */
+export function isRegFdFiling(items: { number: string }[]): boolean {
+  return config.secRegFd.enabled && isRegFdOnly(items);
+}
+
+const LEGAL_SENTENCE = /\b(shall not be deemed|not be deemed (?:to be )?["“]?filed|incorporated by reference|forward[- ]looking statements?|safe harbor|private securities litigation|undue reliance|furnished (?:pursuant|under|in accordance)|(?:is|are) being furnished|signature|pursuant to the requirements|(?:a )?copy (?:of (?:the|which|this)[^.]{0,40} )?is (?:attached|filed|furnished)|(?:attached|filed|furnished) (?:hereto )?as)\b/i;
+const ATTENDANCE = /\b(?:will|to|plans? to|expects? to|scheduled to|intends? to)\s+(?:present|participate|attend|host|webcast|speak|take part)\b/i;
+const EVENT_WORD = /\b(?:conference|investor day|analyst day|fireside|webcast|roadshow|meeting|symposium|summit)\b/i;
+const DECK_WORD = /\b(?:investor presentation|corporate presentation|presentation slides|slide deck|slides|supplemental (?:presentation|information))\b/i;
+
+/**
+ * Pure boilerplate among Reg FD / other-events filings (skipped before any AI call, so no quota is spent): the Item 7.01 / 8.01
+ * text, once the legal "furnished, not filed" and forward-looking sentences and exhibit pointers are removed, is (a) shorter than
+ * config.secRegFd.minWords words, or (b) only about attending a conference or posting slides, with no dollar or percent figure.
+ * Only filings whose card items are all 7.01/8.01 are judged; anything else returns false.
+ */
+export function isBoilerplateRegFd(items: { number: string }[], text: string): boolean {
+  if (!isRegFdOnly(items)) return false;
+  const sections: string[] = [];
+  const re = /Item\s*(?:7\.01|8\.01)\b/gi;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    const sec = /Item\s*(?:7\.01|8\.01)\b[\s\S]*?(?=Item\s*\d\.\d\d\b(?<!7\.01)(?<!8\.01)|SIGNATURES?\b|$)/i.exec(text.slice(m.index));
+    if (sec) { sections.push(sec[0]); re.lastIndex = m.index + sec[0].length; }   // sections never overlap (the title line repeats "Item 7.01")
+  }
+  const raw = (sections.length ? sections.join(' ') : text)
+    .replace(/Item\s*(?:7\.01|8\.01)\b\s*[:.]?\s*(?:Regulation FD Disclosure|Other Events)\.?/gi, ' ')
+    .replace(/\bExhibit\s*\d+\.\d+\b/gi, ' ')
+    .replace(/\bEX-\d+(?:\.\d+)?\b/gi, ' ');
+  const kept = raw.split(/(?<=[.;!?])\s+/).filter((x) => x.trim() && !LEGAL_SENTENCE.test(x));
+  const body = kept.join(' ').replace(/\s+/g, ' ').trim();
+  const words = body.split(/\s+/).filter(Boolean).length;
+  const hasMoney = /\$\s?\d|\d\s?(?:%|percent|million|billion)/i.test(body);
+  if (words < config.secRegFd.minWords && !hasMoney) return true;       // a short note with a figure in it is still news
+  if (!hasMoney && ATTENDANCE.test(body) && EVENT_WORD.test(body)) return true;
+  if (!hasMoney && DECK_WORD.test(body) && words < 60) return true;
+  return false;
+}
+
 /**
  * Feed entry -> RawItem, or the reason it is not a card candidate: amendment, not listed on
  * a major exchange (when a ticker map is given), low value (only 7.01/8.01/9.01), or no
@@ -184,8 +229,9 @@ export function classifySecEntry(
   if (e.form !== '8-K') return { skip: 'amendment' };
   const t = opts.watch?.get(e.cik) ?? tickers?.get(e.cik) ?? null;
   if (tickers && !t) return { skip: 'not_listed' };
-  if (isLowValueFiling(e.items)) return { skip: 'low_value' };
-  if (opts.watch && !hasWatchItem(e.items)) return { skip: 'not_watch_item' };
+  const regFd = !!opts.watch && isRegFdFiling(e.items);          // 7.01/8.01 only: allowed through to the AI relevance gate (config.secRegFd)
+  if (isLowValueFiling(e.items) && !regFd) return { skip: 'low_value' };
+  if (opts.watch && !hasWatchItem(e.items) && !regFd) return { skip: 'not_watch_item' };
   const tracked = e.items.filter((i) => (config.sec8kItems as readonly string[]).includes(i.number));
   if (!primaryItem(tracked)) return { skip: 'no_tracked_item' };
   const cls = classifySecItems(e.items);
@@ -416,4 +462,64 @@ export function findExhibitUrl(indexHtml: string, indexUrl: string, types: reado
     }
   }
   return null;
+}
+
+
+// ---- EDGAR daily index (www.sec.gov) and the rotating safety slice -----------------------------------
+
+export interface DailyIndexFiling {
+  form: '8-K';
+  company_raw: string;               // "APPLE INC"
+  cik: string;                       // 10 digits
+  filed: string;                     // "2026-11-10"
+  accession: string;                 // "0001104659-26-124772"
+  url: string;                       // filing index page (same URL the submissions path builds, so handled-item checks line up)
+}
+
+/** Daily-index file URLs for the last `days` calendar days (UTC), today first. */
+export function dailyIndexUrls(now: Date, days: number = config.secIndex.days): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(now.getTime() - i * 86_400_000);
+    const yyyy = String(d.getUTCFullYear());
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    out.push(config.secIndex.urlTemplate
+      .replace('{yyyy}', yyyy)
+      .replace('{q}', String(Math.floor(d.getUTCMonth() / 3) + 1))
+      .replace('{yyyymmdd}', yyyy + mm + dd));
+  }
+  return out;
+}
+
+/**
+ * Parses one form.YYYYMMDD.idx file: fixed-width lines "8-K   <company>   <cik>   <yyyymmdd>   edgar/data/<cik>/<accession>.txt".
+ * Keeps plain 8-K lines only (8-K/A amendments are not card candidates).
+ */
+export function parseDailyIndex(text: string): DailyIndexFiling[] {
+  const out: DailyIndexFiling[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith('8-K')) continue;
+    const m = /^8-K\s+(.+?)\s+(\d{1,10})\s+(\d{4})(\d{2})(\d{2})\s+edgar\/data\/(\d+)\/(\d{10}-\d{2}-\d{6})\.txt\s*$/.exec(line);
+    if (!m) continue;
+    const cik = m[2].padStart(10, '0');
+    const accession = m[7];
+    out.push({
+      form: '8-K', company_raw: m[1].trim(), cik, filed: `${m[3]}-${m[4]}-${m[5]}`, accession,
+      url: `https://www.sec.gov/Archives/edgar/data/${Number(m[6])}/${accession.replace(/-/g, '')}/${accession}-index.htm`,
+    });
+  }
+  return out;
+}
+
+/**
+ * The rotating slice of `all` for this run: `all` is cut into slices of `perRun`, and the slice number is the UTC hour count
+ * since 1970 modulo the number of slices, so consecutive hours walk through every company and the same hour never repeats
+ * work. Pure (the clock is passed in); an empty list or perRun <= 0 gives an empty slice.
+ */
+export function rotationSlice<T>(all: readonly T[], now: Date, perRun: number = config.secIndex.rotationPerRun): T[] {
+  if (!all.length || perRun <= 0) return [];
+  const slices = Math.ceil(all.length / perRun);
+  const k = Math.floor(now.getTime() / 3_600_000) % slices;
+  return all.slice(k * perRun, (k + 1) * perRun);
 }

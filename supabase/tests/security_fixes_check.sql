@@ -6,9 +6,9 @@ begin
   -- 1. related_cards: a hidden card that links to a published one must not be returned, and a published card
   --    must never appear in its own related list.
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('secfix:src','summary','Source story','Body','world','published','[]',now(),now(),now(),10) returning id into src;
+  values ('secfix:src','summary','Source story','Body','world','published','[{"symbol":"SECX","name":"Secx Corp"}]',now(),now(),now(),10) returning id into src;
   insert into core.blurbs(dedupe_key,kind,headline,body,category,status,tickers,as_of,published_at,sort_at,importance)
-  values ('secfix:tgt','summary','Target story','Body','markets','published','[]',now(),now(),now(),10) returning id into tgt;
+  values ('secfix:tgt','summary','Target story','Body','markets','published','[{"symbol":"SECX","name":"Secx Corp"}]',now(),now(),now(),10) returning id into tgt;
   insert into core.blurb_sources(blurb_id,name,kind,url,license_class,is_primary)
   select id,'Security check','news','https://example.com/secfix/'||dedupe_key,'company_filing',true
   from core.blurbs where dedupe_key like 'secfix:%';
@@ -36,6 +36,7 @@ begin
   perform api.subscribe_brief('secfix-active@example.com','daily',7,'UTC');
   select token into t1 from core.brief_subscriptions where email='secfix-active@example.com' and kind='daily';
   perform api.confirm_brief(t1);
+  update core.subscribe_attempts set created_at=created_at-interval '30 minutes';
   r:=api.subscribe_brief('secfix-active@example.com','daily',9,'UTC');
   if r->>'status'<>'pending' then raise exception 'FAIL: response must stay uniform pending: %',r; end if;
   select status,token into st,t2 from core.brief_subscriptions where email='secfix-active@example.com' and kind='daily';
@@ -48,6 +49,7 @@ begin
   if not exists(select 1 from core.brief_email_suppressions where email='secfix-active@example.com') then
     raise exception 'FAIL: unsubscribe must suppress';
   end if;
+  update core.subscribe_attempts set created_at=created_at-interval '30 minutes';
   perform api.subscribe_brief('secfix-active@example.com','weekly',7,'UTC');
   if not exists(select 1 from core.brief_email_suppressions where email='secfix-active@example.com') then
     raise exception 'FAIL: unverified subscribe lifted the suppression';

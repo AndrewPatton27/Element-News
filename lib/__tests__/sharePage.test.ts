@@ -81,11 +81,14 @@ test('share page: injecting tags keeps every inline script byte for byte (CSP ha
   assert.equal(injectShareMeta('<html><body>no head</body></html>', shareMeta({ headline: 'x', body: '' }, 'https://a.b')), null);
 });
 
+// `! Name` lines only detach Cloudflare's default headers from static files; a Function response has no such default.
+const withoutDetach = (lines: string[]) => lines.filter((l) => !l.startsWith('!'));
+
 test('share page: Function security headers equal scripts/security-headers.mjs for the same index.html', async () => {
   for (const [html, sb] of [[SHELL, SB], ['<html><head></head><body></body></html>', ''], [SHELL, 'not a url']] as const) {
     const ours = (await securityHeaders(html, sb)).map(([n, v]) => `${n}: ${v}`);
-    assert.deepEqual(ours, securityHeaderLines({ html, supabaseUrl: sb }));
-    assert.deepEqual((await securityHeaders(html, sb, true)).map(([n, v]) => `${n}: ${v}`), securityHeaderLines({ html, supabaseUrl: sb, enforceFull: true }));
+    assert.deepEqual(ours, withoutDetach(securityHeaderLines({ html, supabaseUrl: sb })));
+    assert.deepEqual((await securityHeaders(html, sb, true)).map(([n, v]) => `${n}: ${v}`), withoutDetach(securityHeaderLines({ html, supabaseUrl: sb, enforceFull: true })));
   }
 });
 

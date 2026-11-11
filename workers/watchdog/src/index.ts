@@ -9,7 +9,7 @@
 // Inputs: Env (below). Outputs: a JSON summary in the Worker log (counts and kinds only).
 
 import { syncAlerts, type Fetcher } from './alerts.ts';
-import { ALL_KINDS, evaluate, pickSources, retriggerDue, sanitize, type FeedStatus, type Kind, type OpsStatus } from './logic.ts';
+import { ALL_KINDS, DEFAULT_SUPPLY_FLOORS, evaluate, parseFloor, pickSources, retriggerDue, sanitize, type FeedStatus, type Kind, type OpsStatus } from './logic.ts';
 
 export interface Env {
   SUPABASE_URL: string;                 // var: https://<ref>.supabase.co
@@ -18,6 +18,9 @@ export interface Env {
   CRON_SECRET: string;                  // secret: same value as the Edge Function secret CRON_SECRET
   GITHUB_TOKEN: string;                 // secret: fine-grained PAT, Issues read/write on the one private repo
   ALERT_REPO: string;                   // var: "owner/element-ops" (private)
+  SUPPLY_FLOOR_CARDS_24H?: string;      // optional var: cards in 24 h below this opens a 'supply' alert (default 10, 0 = off)
+  SUPPLY_FLOOR_CARDS_MARKET_HOUR?: string;   // optional var: cards in the last hour below this during market hours (default 0 = off)
+  SUPPLY_GAP_MINUTES?: string;          // optional var: no new card for this many minutes during market hours opens a 'supply' alert (default 60, 0 = off)
   HEALTHCHECK_URL?: string;             // optional secret (https://hc-ping.com/<uuid>); when unset the ping is skipped
 }
 
@@ -51,7 +54,12 @@ export async function runWatchdog(env: Env, now: Date, f: Fetcher = (u, i) => fe
   try { feed = await rpc<FeedStatus>(env, f, 'feed_status', {}); } catch (e) { err = (e as Error).message; }
   try { ops = await rpc<OpsStatus>(env, f, 'ops_status', { p_token: env.WATCHDOG_TOKEN }); } catch (e) { err ||= (e as Error).message; }
 
-  const problems = evaluate(feed, ops, now, err);
+  const floors = {
+    cards24h: parseFloor(env.SUPPLY_FLOOR_CARDS_24H, DEFAULT_SUPPLY_FLOORS.cards24h),
+    cardsMarketHour: parseFloor(env.SUPPLY_FLOOR_CARDS_MARKET_HOUR, DEFAULT_SUPPLY_FLOORS.cardsMarketHour),
+    gapMinutes: parseFloor(env.SUPPLY_GAP_MINUTES, DEFAULT_SUPPLY_FLOORS.gapMinutes),
+  };
+  const problems = evaluate(feed, ops, now, err, floors);
   report.problems = problems.map((p) => p.kind);
 
   // Re-trigger a stale pipeline (only when Supabase answered, otherwise the functions cannot work either).
