@@ -1,6 +1,6 @@
 // Deno entry for the ingest-source Edge Function (deploy: supabase functions deploy ingest-source).
 // POST with header Authorization: Bearer <service-role key> and body {"source":"fed"} (one of macro,
-// treasury, bls, beadata, fedspeech, secpress, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa); optional "work_cap" (1-20, default 5) and "finish"
+// treasury, bls, beadata, fedspeech, secpress, fed, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc); optional "work_cap" (1-20, default 5) and "finish"
 // (refresh Trending + ML purge afterwards). This always publishes for real; the offline dry run stays
 // `npm --prefix ingest run dry-run`. Scheduled hourly per source by supabase/migrations/20261019050000_cron_schedule.sql. Logic: handler.ts (tested in Node).
 

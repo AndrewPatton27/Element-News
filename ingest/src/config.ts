@@ -185,6 +185,8 @@ export const config = {
     'api.fiscaldata.treasury.gov',
     // BLS public data API (series JSON, numbers only) and BEA data API (apps.bea.gov, already listed above for the RSS).
     'api.bls.gov',
+    // EIA open data API v2 and Census Data API (JSON numbers only, never pages). Keys come from env, never from code.
+    'api.eia.gov', 'api.census.gov',
     // Broad topics (feed/API text only, never pages): Wikipedia REST featured feed, CPSC recalls API,
     // USGS earthquake GeoJSON, NASA news-release RSS.
     'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov'],
@@ -295,6 +297,62 @@ export const config = {
       { table: 'T10105', frequency: 'Q', yearsBack: 1, series: { A191RC: 'BEA_GDP' } },
     ] as { table: string; frequency: 'M' | 'Q'; yearsBack: number; series: Record<string, string> }[],
     attribution: 'Source: U.S. Bureau of Economic Analysis',
+  },
+  // ---- Agency data cards (D-113): EIA, Census, Treasury auctions, FOMC calendar. Template cards, no AI. ----
+  // Terms read 2026-11-10: docs/work/sources-eia-census-treasury-fed.md. Each source is bounded per run and
+  // dedupes on its own key (source + series/period), so a rerun or an overlapping window never makes a second card.
+  agency: {
+    // EIA: public domain ("U.S. government publications are in the public domain"); asks for a dated credit.
+    // API key in the URL (EIA_API_KEY). Documented limits are per-second/per-hour with no numbers: 1 request
+    // per series group per run, cron weekdays only.
+    eia: {
+      enabled: true,
+      base: 'https://api.eia.gov/v2',
+      maxCardsPerRun: 3,
+      attribution: 'Source: U.S. Energy Information Administration',
+      // Weekly petroleum status: commercial crude, motor gasoline and distillate stocks, one card for the report.
+      petroleum: { route: '/petroleum/stoc/wstk/data/', series: { crude: 'WCESTUS1', gasoline: 'WGTSTUS1', distillate: 'WDISTUS1' }, enabled: true },
+      // Weekly natural gas storage, Lower 48 working gas in Bcf.
+      gasStorage: { route: '/natural-gas/stor/wkly/data/', series: 'NW2_EPG0_SWO_R48_BCF', enabled: true },
+      // Weekly retail regular gasoline. OFF by default: FRED GASREGW (the same EIA number) already makes a gas card.
+      gasoline: { route: '/petroleum/pri/gnd/data/', series: 'EMM_EPMR_PTE_NUS_DPG', enabled: false },
+    },
+    // Census: terms require a prominent "not endorsed or certified by the Census Bureau" notice and say nothing
+    // clear on keys or limits, so the source is OFF until Drew confirms (question Q1 in the sources doc).
+    // RSAFS and HOUST already reach the feed through FRED.
+    census: {
+      enabled: false,
+      base: 'https://api.census.gov/data/timeseries/eits',
+      maxCardsPerRun: 2,
+      lookbackMonths: 3,
+      notice: 'This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.',
+      attribution: 'Source: U.S. Census Bureau',
+    },
+    // Treasury auctions via FiscalData (no key; "offered free, without restriction"). Notes and bonds only
+    // (bills auction almost daily and would flood the feed); TIPS skipped. At most 2 new cards per run.
+    auctions: {
+      enabled: true,
+      path: '/v1/accounting/od/auctions_query',
+      pageSize: 40,
+      lookbackDays: 5,
+      maxCardsPerRun: 2,
+      securityTypes: ['Note', 'Bond'] as string[],
+      attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    },
+    // FOMC calendar: dates copied from federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-11-10 (2027 tentative).
+    // [first day, last day (decision day), has projections]. A card appears leadDays before the meeting starts.
+    fomc: {
+      enabled: true,
+      leadDays: 7,
+      minutesDelayDays: 21,                     // "released three weeks after the date of the policy decision"
+      calendarUrl: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
+      meetings: [
+        ['2026-12-08', '2026-12-09', true],
+        ['2027-01-26', '2027-01-27', false], ['2027-03-16', '2027-03-17', true], ['2027-04-27', '2027-04-28', false],
+        ['2027-06-08', '2027-06-09', true], ['2027-07-27', '2027-07-28', false], ['2027-09-14', '2027-09-15', true],
+        ['2027-10-26', '2027-10-27', false], ['2027-12-07', '2027-12-08', true],
+      ] as [string, string, boolean][],
+    },
   },
   // Federal Register final rules (JSON API, no key). The AI sees only each document's `abstract`;
   // documents without one are skipped. Reuse permitted (1 CFR 2.6); public-domain copy limit.

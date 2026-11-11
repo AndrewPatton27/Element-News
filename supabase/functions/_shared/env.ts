@@ -2,7 +2,7 @@
 // files pass Deno.env.get in), so Node tests cover it.
 // Env vars: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase into every Edge
 // Function (names starting with SUPABASE_ cannot be set as custom secrets). Custom secrets:
-// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
+// GEMINI_API_KEY, GROQ_API_KEY, FRED_API_KEY, EIA_API_KEY, CENSUS_API_KEY (optional), SEC_USER_AGENT; optional REPORT_CARD_PROTOCOL=1.
 // Outputs: FunctionEnv (key values are never logged; describe() prints [set]/[missing] only).
 
 export type EnvGet = (name: string) => string | undefined;
@@ -24,6 +24,8 @@ export interface FunctionEnv {
   blsApiKey: string | null;        // optional: switches the BLS source to API v2 (500 requests/day)
   beaApiKey: string | null;
   beaDataEnabled: boolean;         // BEA_DATA_ENABLED=1 turns the BEA data source on
+  eiaApiKey: string | null;
+  censusApiKey: string | null;
   secUserAgent: string | null;
   reportCard: boolean;
 }
@@ -45,6 +47,8 @@ export function readFunctionEnv(get: EnvGet): FunctionEnv {
     blsApiKey: clean(get('BLS_API_KEY')),
     beaApiKey: clean(get('BEA_API_KEY')),
     beaDataEnabled: (get('BEA_DATA_ENABLED') ?? '').trim() === '1',
+    eiaApiKey: clean(get('EIA_API_KEY')),
+    censusApiKey: clean(get('CENSUS_API_KEY')),
     secUserAgent: ua && /\S+@\S+\.\S+/.test(ua) ? ua : null,
     reportCard: (get('REPORT_CARD_PROTOCOL') ?? '').trim() === '1',
   };
