@@ -90,6 +90,9 @@ export const config = {
       /\b(revenue|sales|earnings|jobs|workers|cost|price|recall|business|company|market|industry|billion|million|regulator|federal|economy)\b/i,
     ] as readonly RegExp[],
     scorePromptVersion: 'report-card-v1',
+    // A report-card failure (ABANDON, or the one rewrite failing its checks) used to skip the item for good. Now the item
+    // stays 'new' and is retried in a later run; after this many failures it is skipped (src/retry.ts). DUPLICATE is final at once.
+    maxRetries: 3,
     // Edge Functions only (deps.reportCard.scorerMaxGroqUsed): the Groq scorer switches off once Groq's calls
     // today reach this number, so the writer fallback and brief-summary keep Groq calls (cap 74; watchdog design 5.3).
     cloudScorerMaxGroqUsed: 50,
@@ -605,6 +608,21 @@ export function groqDailyCap(g: {
   if (g.freeRpd != null) cap = Math.min(cap, g.freeRpd);
   if (g.freeTpd != null) cap = Math.min(cap, Math.floor(g.freeTpd / g.estimatedTokensPerCall));
   return cap;
+}
+
+/**
+ * Groq daily cap from a MEASURED tokens-per-call figure (prompt + source text + output, reasoning tokens included, from
+ * Groq's usage field or the console). For when no cap has been set, or after a prompt change (sum-v7) moves the cost per call:
+ *   cap = min(freeRpd, floor(freeTpd x safety / measuredTokensPerCall))   (the code cap is NOT applied: this is the budget)
+ * The 0.9 safety factor keeps room for retries and the Brief. Returns 0 for a missing or non-positive measurement
+ * (callers keep the existing cap then). Not wired into groqDailyCap(): it is a calculator, the cap itself is set elsewhere.
+ * Example: 200,000 TPD / 2,700 tokens = 74 (the current cap, no safety); 200,000 x 0.9 / 3,200 = 56.
+ */
+export function groqCapFromMeasuredTokens(measuredTokensPerCall: number | null | undefined, g: { freeRpd: number | null; freeTpd: number | null } = config.groq, safety = 0.9): number {
+  if (!measuredTokensPerCall || !Number.isFinite(measuredTokensPerCall) || measuredTokensPerCall <= 0) return 0;
+  let cap = g.freeTpd != null ? Math.floor((g.freeTpd * safety) / measuredTokensPerCall) : Number.POSITIVE_INFINITY;
+  if (g.freeRpd != null) cap = Math.min(cap, g.freeRpd);
+  return Number.isFinite(cap) ? Math.max(0, cap) : 0;
 }
 
 /** Groq pacing in ms: the largest of the RPM gap, the TPM gap for one estimated call, and the floor. */

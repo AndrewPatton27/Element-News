@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runWatchdog, type Env } from '../src/index.ts';
-import { evaluate, pickSources, quietThresholdHours, retriggerDue, sanitize, SOURCES, type FeedStatus, type OpsStatus } from '../src/logic.ts';
+import { evaluate, isMarketHourEt, parseFloor, pickSources, quietThresholdHours, retriggerDue, sanitize, SOURCES, type FeedStatus, type OpsStatus } from '../src/logic.ts';
 
 const ENV: Env = {
   SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_testkey1234567890',
@@ -220,4 +220,68 @@ test('no HEALTHCHECK_URL: runs, alerts through GitHub, and never calls a ping se
   assert.equal(r.pinged, 'none');
   assert.equal(w.pings.length, 0);
   assert.equal(w.seen.some((s) => s.url.includes('hc-ping.com')), false);
+});
+
+// ---- supply floor (M9 workstream 1) ----
+test('supply floor: below the 24 h floor is a problem, at the floor is fine, a missing count (older database) is skipped, 0 turns it off', () => {
+  const k = (ops: OpsStatus, floors?: { cards24h: number; cardsMarketHour: number }) => evaluate(okFeed(), ops, T0, undefined, floors).map((p) => p.kind);
+  assert.deepEqual(k(okOps({ cards_24h: 9, cards_1h: 0 })), ['supply']);
+  assert.deepEqual(k(okOps({ cards_24h: 10, cards_1h: 0 })), []);
+  assert.deepEqual(k(okOps()), [], 'ops_status without cards_24h: no alert');
+  assert.deepEqual(k(okOps({ cards_24h: null })), []);
+  assert.deepEqual(k(okOps({ cards_24h: 0 }), { cards24h: 0, cardsMarketHour: 0 }), []);
+  assert.deepEqual(k(okOps({ cards_24h: 3 }), { cards24h: 5, cardsMarketHour: 0 }), ['supply']);
+  const p = evaluate(okFeed(), okOps({ cards_24h: 4 }), T0)[0]!;
+  assert.match(p.title, /4 cards in 24 hours/);
+  assert.match(p.detail, /supply-readout/);
+});
+
+test('supply floor: the market-hour floor is off by default, and when on it counts only in market hours (ET, DST aware)', () => {
+  const on = { cards24h: 10, cardsMarketHour: 1 };
+  const ops = okOps({ cards_24h: 20, cards_1h: 0 });
+  assert.deepEqual(evaluate(okFeed(), ops, T0).map((p) => p.kind), [], 'default 0: off');
+  assert.deepEqual(evaluate(okFeed(), ops, T0, undefined, on).map((p) => p.kind), [], 'Tue 12:17 UTC is 07:17 ET: not a market hour');
+  const mkt = new Date('2026-11-10T15:17:00Z');   // Tue 10:17 ET
+  assert.deepEqual(evaluate(okFeed({ last_published_at: new Date(mkt.getTime() - 3_600_000).toISOString(), last_ok_run_at: new Date(mkt.getTime() - 600_000).toISOString() }), ops, mkt, undefined, on).map((p) => p.kind), ['supply']);
+  assert.deepEqual(evaluate(okFeed({ last_published_at: new Date(mkt.getTime() - 3_600_000).toISOString(), last_ok_run_at: new Date(mkt.getTime() - 600_000).toISOString() }), okOps({ cards_24h: 20, cards_1h: 1 }), mkt, undefined, on).map((p) => p.kind), []);
+});
+
+test('isMarketHourEt: weekdays 10:00-16:59 ET only; DST both sides; weekend never', () => {
+  assert.equal(isMarketHourEt(new Date('2026-11-10T15:17:00Z')), true);    // Tue 10:17 EST
+  assert.equal(isMarketHourEt(new Date('2026-11-10T14:17:00Z')), false);   // Tue 09:17 EST
+  assert.equal(isMarketHourEt(new Date('2026-11-10T21:59:00Z')), true);    // Tue 16:59 EST
+  assert.equal(isMarketHourEt(new Date('2026-11-10T22:00:00Z')), false);   // Tue 17:00 EST
+  assert.equal(isMarketHourEt(new Date('2026-07-15T14:17:00Z')), true);    // Wed 10:17 EDT
+  assert.equal(isMarketHourEt(new Date('2026-07-15T13:17:00Z')), false);   // Wed 09:17 EDT
+  assert.equal(isMarketHourEt(new Date('2026-11-14T16:17:00Z')), false);   // Saturday
+  assert.equal(isMarketHourEt(new Date('2026-11-15T16:17:00Z')), false);   // Sunday
+});
+
+test('parseFloor: whole numbers only, else the default', () => {
+  assert.equal(parseFloor('12', 10), 12);
+  assert.equal(parseFloor(' 0 ', 10), 0);
+  assert.equal(parseFloor(7, 10), 7);
+  for (const bad of [undefined, '', 'abc', '-3', '1.5', '99999', null, -1, 2.5]) assert.equal(parseFloor(bad, 10), 10, String(bad));
+});
+
+test('supply alert end to end: opens one issue, still one RPC pair per run, closes when supply recovers; Worker var overrides the floor', async () => {
+  let cards = 4;
+  const w = world({ ops: () => okOps({ cards_24h: cards, cards_1h: 0 }) });
+  const r = await w.run();
+  assert.deepEqual(r.problems, ['supply']);
+  assert.equal(w.issues.length, 1);
+  assert.deepEqual(w.issues[0]!.labels, ['wd:supply']);
+  assert.match(w.issues[0]!.title, /Card supply low: 4 cards/);
+  const rpcs = w.seen.filter((x) => x.url.includes('/rest/v1/rpc/')).map((x) => x.url.split('/').pop());
+  assert.deepEqual(rpcs, ['feed_status', 'ops_status'], 'no extra Supabase query for the supply check');
+  cards = 14;
+  const later = new Date(T0.getTime() + 3_600_000);
+  const r2 = await w.run(later);
+  assert.deepEqual(r2.problems, []);
+  assert.equal(w.issues[0]!.state, 'closed');
+  // the var raises the floor: 14 cards is now low
+  const env2: Env = { ...ENV, SUPPLY_FLOOR_CARDS_24H: '20' };
+  const w2 = world({ ops: () => okOps({ cards_24h: 14, cards_1h: 0 }) });
+  const r3 = await runWatchdog(env2, T0, w2.fetchImpl);
+  assert.deepEqual(r3.problems, ['supply']);
 });

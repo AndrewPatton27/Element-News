@@ -63,6 +63,10 @@ Healthchecks.io check would also email when the Worker stops (not enabled).
 Set each secret with `npx wrangler secret put <NAME>` in this folder (type the value there; never put it in a file).
 Thresholds (3 h, 24/48 h, 80 percent, 400 MB, expected 15 jobs: 10 ingest and brief jobs plus fedspeech, secpress, treasury and the two ranking checks; change it whenever a cron job is added or removed) are constants at the top of `src/logic.ts`.
 
+## Supply floor
+
+Kind `supply` (label `wd:supply`): fewer cards published in the last 24 hours than `supply_floor_cards_24h` (default 10, twice the 30-day median of 5 a day). An optional per-hour floor, `supply_floor_cards_market_hour` (default 0 = off), is checked only Monday to Friday 10:00-16:59 ET. Both counts (`cards_24h`, `cards_1h`) come from the same `api.ops_status` call as every other check (migration `20261129000000_supply_ops.sql`), so the Worker still makes two Supabase requests an hour and the database makes one pass over the `published_at` index. If the database does not have the migration yet the counts are missing and the check is skipped. Override the floors with the Worker vars `SUPPLY_FLOOR_CARDS_24H` and `SUPPLY_FLOOR_CARDS_MARKET_HOUR` (whole numbers; 0 turns a check off). The alert text points to `node scripts/supply-readout.mjs`. `EXPECTED_JOBS` and the cron schedule are unchanged. The `wd:supply` label must exist in the alert repo like the others.
+
 ## Commands
 
 ```
