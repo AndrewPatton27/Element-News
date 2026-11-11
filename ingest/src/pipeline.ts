@@ -21,7 +21,7 @@ import { fedSpeechToItem, selectFedSpeeches } from './sources/fedspeech.ts';
 import { secPressToItem, selectSecPress } from './sources/secpress.ts';
 import { runMacro, runTreasury } from './macroRun.ts';
 import { runBeaData, runBls } from './agencyRun.ts';
-import { runAuctions, runBlsCal, runCensus, runEia, runFomc, runMts } from './agencyRunData.ts';
+import { runAuctions, runBlsCal, runCensus, runEia, runFomc, runMts, runAnnual, runBeige, runRegPress, runTrade } from './agencyRunData.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
   dailyIndexUrls, isBoilerplateRegFd, isRegFdOnly, parseDailyIndex, parseSubmissionsJson, primaryItem, resolveWatchList, rotationSlice, type DailyIndexFiling, type Sec8kEntry, type SecSkipReason, type WatchMap,
@@ -36,9 +36,9 @@ import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
-  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'newsdata_market' | 'newsdata_latest';
+  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'beige' | 'trade' | 'regpress' | 'annual' | 'newsdata_market' | 'newsdata_latest';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata',
-  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'newsdata_market', 'newsdata_latest'];
+  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'beige', 'trade', 'regpress', 'annual', 'newsdata_market', 'newsdata_latest'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -48,7 +48,7 @@ export interface Deps {
   counter: UsageCounter;
   fredApiKey: string | null;
   /** BLS / BEA data API keys and the BEA data switch (agencyRun.ts); all optional */
-  keys?: { bls?: string | null; bea?: string | null; beaDataEnabled?: boolean };
+  keys?: { bls?: string | null; bea?: string | null; beaDataEnabled?: boolean; annualEnabled?: boolean; occEnabled?: boolean };
   /** EIA open data key (EIA_API_KEY) and optional Census key (CENSUS_API_KEY); null/undefined = that source skips */
   eiaApiKey?: string | null;
   censusApiKey?: string | null;
@@ -165,6 +165,10 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('fomc')) await runFomc(deps, stats);
   if (only.has('blscal')) await runBlsCal(deps, stats);
   if (only.has('mts')) await runMts(deps, stats);
+  if (only.has('beige')) await runBeige(deps, stats);
+  if (only.has('trade')) await runTrade(deps, stats);
+  if (only.has('regpress')) await runRegPress(deps, stats);
+  if (only.has('annual')) await runAnnual(deps, stats);
   if (only.has('newsdata_market')) await runNewsdata(deps, ctx, 'market');
   if (only.has('newsdata_latest')) await runNewsdata(deps, ctx, 'latest');
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);

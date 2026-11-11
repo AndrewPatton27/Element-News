@@ -121,6 +121,26 @@ export function gasolineCard(rows: EiaRow[]): PublishPayload | null {
   });
 }
 
+/** Weekly U.S. average retail on-highway diesel price (EIA Gasoline and Diesel Fuel Update): what trucking and small businesses pay. */
+export function dieselCard(rows: EiaRow[]): PublishPayload | null {
+  const two = latestTwo(rows, config.agency.eia.diesel.series);
+  if (!two || !two[1]) return null;
+  const [now, prev] = two;
+  const change = now.value - prev!.value;
+  const week = shortDate(now.period);
+  const headline = change === 0 ? `U.S. diesel price holds at $${fmt(now.value, 2)} a gallon in the week of ${week}`
+    : `U.S. diesel price ${change > 0 ? 'rises' : 'falls'} to $${fmt(now.value, 2)} a gallon in the week of ${week}`;
+  const body = `The average U.S. retail price of diesel was $${fmt(now.value, 2)} a gallon in the week of ${week}, `
+    + (change === 0 ? 'unchanged from' : `${change > 0 ? 'up' : 'down'} ${fmt(Math.abs(change) * 100, 0)} cents from`) + ' the prior week, the U.S. Energy Information Administration reported.';
+  return buildAgencyDataCard({
+    dedupeKey: `EIA_DIESEL:${now.period}`, headline, body, category: 'energy', asOf: at(now.period),
+    agencyName: AGENCY, agencyUrl: 'https://www.eia.gov/petroleum/gasdiesel/', docLabel: 'Gasoline and Diesel Fuel Update',
+    attribution: config.agency.eia.attribution,
+    paragraphs: [body, 'What this number measures: what drivers and fleets pay per gallon of No. 2 diesel across the U.S. Trucks, farm equipment and delivery vans run on it, so it feeds into shipping costs.', 'The numbers come from the U.S. Energy Information Administration.'],
+    keyPoints: [`Diesel: $${fmt(now.value, 2)} a gallon`, `Change: ${signed(change, 2)} dollars from the prior week`, `Week of: ${week}`, `Source: ${AGENCY}`],
+  });
+}
+
 /**
  * Weekly refinery use and crude supply (EIA Weekly Petroleum Status Report, supply side): refinery utilization is the
  * headline; crude production, crude imports and total product supplied (a measure of demand) go in the detail.

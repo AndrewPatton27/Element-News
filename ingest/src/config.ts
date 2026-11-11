@@ -246,7 +246,9 @@ export const config = {
     // USGS earthquake GeoJSON, NASA news-release RSS.
     'en.wikipedia.org', 'www.saferproducts.gov', 'earthquake.usgs.gov', 'www.nasa.gov',
     // NewsData.io /latest and /market (JSON headlines only, never article pages). Key from env NEWSDATA_API_KEY. OFF by default (newsdata.enabled).
-    'newsdata.io'],
+    'newsdata.io',
+    // Regulator press-release RSS for the Crypto lane (M9c3): feed text only, never pages.
+    'www.cftc.gov', 'www.occ.gov', 'www.consumerfinance.gov'],
   maxRequestsPerSecond: 5,                     // SEC allows 10/s; we stay at half
   maxRedirects: 3,
   fetchTimeoutMs: 20_000,
@@ -344,7 +346,9 @@ export const config = {
   // worth of requests = series count. Both polled twice a day (cron), so about 6 requests/day on v1.
   bls: {
     base: 'https://api.bls.gov/publicAPI',
-    series: { CES0500000003: 'BLS_AHE', CIU1010000000000A: 'BLS_ECI', JTS000000000000000JOL: 'BLS_JOLTS' } as Record<string, string>,
+    series: { CES0500000003: 'BLS_AHE', CIU1010000000000A: 'BLS_ECI', JTS000000000000000JOL: 'BLS_JOLTS',
+      // M9c3 (R-450): CPI components readers asked for (groceries, rent, electricity, medical care), not seasonally adjusted, yearly change
+      CUUR0000SAF11: 'BLS_CPI_FOOD_HOME', CUUR0000SEHA: 'BLS_CPI_RENT', CUUR0000SEHF01: 'BLS_CPI_ELECTRICITY', CUUR0000SAM: 'BLS_CPI_MEDICAL' } as Record<string, string>,
     attribution: 'Source: U.S. Bureau of Labor Statistics',
   },
   // BEA NIPA data API (GET, key = BEA_API_KEY; limits 100 requests, 100 MB, 30 errors per minute). OFF by default:
@@ -381,6 +385,8 @@ export const config = {
         series: { utilization: 'WPULEUS3', production: 'WCRFPUS2', imports: 'WCRIMUS2', productSupplied: 'WRPUPUS2' } },
       // Weekly retail regular gasoline. OFF by default: FRED GASREGW (the same EIA number) already makes a gas card.
       gasoline: { route: '/petroleum/pri/gnd/data/', series: 'EMM_EPMR_PTE_NUS_DPG', enabled: false },
+      // Weekly retail on-highway diesel (M9c3): trucking and small-business cost; FRED has no copy of it (GASREGW is gasoline only).
+      diesel: { route: '/petroleum/pri/gnd/data/', series: 'EMD_EPD2D_PTE_NUS_DPG', enabled: true },
     },
     // Census: terms require a prominent "not endorsed or certified by the Census Bureau" notice and say nothing
     // clear on keys or limits, so the source is OFF until Drew confirms (question Q1 in the sources doc).
@@ -421,6 +427,58 @@ export const config = {
       lookbackDays: 75,
       maxCardsPerRun: 1,
       attribution: 'Source: U.S. Department of the Treasury, Fiscal Service',
+    },
+    // Fed Beige Book (M9c3, R-450): release dates from federalreserve.gov/monetarypolicy/publications/beige-book-default.htm
+    // (read 2026-11-11; 2027 dates not posted yet, add them when the Fed posts them). A preview card runs previewLeadDays before,
+    // the release card (with up to three sentences quoted from the national summary, each under the 25-word limit, rule 6) from the
+    // release day for releaseDays. Summary page = www.federalreserve.gov (rule 2 domain).
+    beige: {
+      enabled: true,
+      releases: ['2026-11-25'] as string[],
+      previewLeadDays: 3,
+      releaseDays: 4,
+      summaryUrl: 'https://www.federalreserve.gov/monetarypolicy/beigebook{ym}-summary.htm',
+      pageUrl: 'https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm',
+      maxQuoteWords: 25,
+      maxCardsPerRun: 2,
+      attribution: 'Source: Board of Governors of the Federal Reserve System',
+    },
+    // Trade actions from the Federal Register (M9c3): USTR (Section 301/232 tariffs, exclusions), Commerce BIS (export controls)
+    // and Section 232 notices. Template cards from the document title; no abstract, no page download (API JSON only).
+    // OFAC "Notice of OFAC Sanctions Action" titles carry no content, so Treasury/OFAC is not read. ITA antidumping notices
+    // (dozens a day, one product each) are skipped.
+    trade: {
+      enabled: true,
+      endpoint: 'https://www.federalregister.gov/api/v1/documents.json',
+      agencies: ['trade-representative-office-of-united-states', 'industry-and-security-bureau', 'international-trade-administration'] as string[],
+      perPage: 60,
+      lookbackDays: 7,
+      maxCardsPerRun: 3,
+      maxTitleWords: 25,
+      attributionPrefix: 'Source: Federal Register (National Archives)',
+    },
+    // Regulator press releases for the opt-in Crypto/regulation lane (M9c3): CFTC, OCC, CFPB RSS (public domain). Only titles that
+    // match the crypto pattern publish; the lane tag comes from the headline words (core.topic_tags_of). Template card, verbatim
+    // title as the headline (kept under 90 characters), no description text. Treasury has no RSS feed (checked 2026-11-11).
+    regpress: {
+      enabled: true,
+      maxAgeDays: 5,
+      maxCardsPerRun: 2,
+      crypto: '(^|[^a-z])(bitcoin|crypto(currenc(y|ies)|-?assets?)?|ethereum|stablecoins?|digital assets?|tokeniz[a-z]+|blockchain|GENIUS Act)([^a-z]|$)',
+      feeds: [
+        { id: 'cftc', url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml', agency: 'U.S. Commodity Futures Trading Commission', short: 'CFTC', needsFlag: false },
+        { id: 'occ', url: 'https://www.occ.gov/rss/occ_news.xml', agency: 'Office of the Comptroller of the Currency', short: 'OCC', needsFlag: true },   // OFF unless REGPRESS_OCC_ENABLED=1: no OCC reuse statement could be read (its policy pages return 404)
+        { id: 'cfpb', url: 'https://www.consumerfinance.gov/about-us/newsroom/feed/', agency: 'Consumer Financial Protection Bureau', short: 'CFPB', needsFlag: false },
+      ] as { id: string; url: string; agency: string; short: string; needsFlag: boolean }[],
+    },
+    // Annual figures (M9c3): Social Security COLA, Medicare premiums, IRS retirement limits. ssa.gov / cms.gov / irs.gov are not rule-2
+    // domains, so the numbers are copied by hand from the agency announcement into this list (facts, public domain) and a
+    // template card runs once. OFF unless ANNUAL_FIGURES_ENABLED=1: ssa.gov refused the terms-page fetch (403) and the IRS and
+    // CMS pages state no reuse terms, so Drew decides (open question). An entry needs verified numbers and a source URL.
+    annual: {
+      enabled: false,
+      maxAgeDays: 45,
+      maxCardsPerRun: 2,
     },
     // FOMC calendar: dates copied from federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-11-10 (2027 tentative).
     // [first day, last day (decision day), has projections]. A card appears leadDays before the meeting starts.

@@ -10,10 +10,15 @@ import type { Deps, RunStats } from './pipeline.ts';
 import type { PublishPayload } from './types.ts';
 import { validatePublish } from './validate.ts';
 import { censusCard, censusUrl, parseCensus, type CensusSeries } from './sources/census.ts';
-import { eiaUrl, gasolineCard, gasStorageCard, parseEia, petroleumCard, supplyCard } from './sources/eia.ts';
+import { dieselCard, eiaUrl, gasolineCard, gasStorageCard, parseEia, petroleumCard, supplyCard } from './sources/eia.ts';
 import { blsCalendarCard, parseBlsCalendar, upcomingReleases } from './sources/blscal.ts';
 import { mtsCard, mtsUrl, parseMts } from './sources/mts.ts';
 import { fomcCard, upcomingMeetings } from './sources/fomc.ts';
+import { beigeCard, beigeDue, beigeSummaryUrl, parseBeigeSummary } from './sources/beige.ts';
+import { parseRss } from './sources/fed.ts';
+import { regPressCard, selectRegPress } from './sources/regpress.ts';
+import { parseTrade, selectTrade, tradeCard, tradeUrl } from './sources/trade.ts';
+import { annualCard, annualDue } from './sources/annual.ts';
 import { auctionCard, auctionsUrl, parseAuctions } from './sources/treasuryauctions.ts';
 
 /** Publishes up to `max` cards; a card that fails validation is logged and skipped. Returns how many were new. */
@@ -62,6 +67,10 @@ export async function runEia(deps: Deps, stats: RunStats): Promise<void> {
   if (c.gasoline.enabled) {
     try { cards.push(gasolineCard(await fetchRows(c.gasoline.route, [c.gasoline.series]))); }
     catch (e) { deps.log(`eia: gasoline failed: ${(e as Error).message}`); }
+  }
+  if (c.diesel.enabled) {
+    try { cards.push(dieselCard(await fetchRows(c.diesel.route, [c.diesel.series]))); }
+    catch (e) { deps.log(`eia: diesel failed: ${(e as Error).message}`); }
   }
   await publishCards(deps, stats, 'eia', cards, c.maxCardsPerRun);
 }
@@ -122,4 +131,56 @@ export async function runMts(deps: Deps, stats: RunStats): Promise<void> {
   } catch (e) {
     deps.log(`mts: failed: ${(e as Error).message}`);
   }
+}
+
+/** Fed Beige Book: a preview card before each release and a release card with quotes from the national summary (federalreserve.gov, rule 2). */
+export async function runBeige(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.beige;
+  if (!c.enabled) { deps.log('beige: disabled in config'); return; }
+  const due = beigeDue(deps.now);
+  if (!due) { deps.log('beige: no release in the window'); return; }
+  let summary = null;
+  if (due.stage === 'release') {
+    try { summary = parseBeigeSummary(await deps.fetchText(beigeSummaryUrl(due.date), 'page', 0)); }
+    catch (e) { deps.log(`beige: summary page not readable yet (${(e as Error).message}); retrying next run`); return; }
+  }
+  await publishCards(deps, stats, 'beige', [beigeCard(due, summary, deps.now)], c.maxCardsPerRun);
+}
+
+/** Federal Register trade documents (USTR, BIS, ITA Section 232) as template cards. One API request. */
+export async function runTrade(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.trade;
+  if (!c.enabled) { deps.log('trade: disabled in config'); return; }
+  try {
+    const picked = selectTrade(parseTrade(await deps.fetchText(tradeUrl(deps.now), 'api', 0)), deps.now);
+    deps.log(`trade: ${picked.length} material trade documents in the last ${c.lookbackDays} days`);
+    await publishCards(deps, stats, 'trade', picked.map((p) => tradeCard(p.doc, p.verb, deps.now)), c.maxCardsPerRun);
+  } catch (e) {
+    deps.log(`trade: failed: ${(e as Error).message}`);
+  }
+}
+
+/** CFTC, OCC and CFPB press releases that match the crypto pattern (opt-in Crypto/regulation lane). One RSS request per feed. */
+export async function runRegPress(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.regpress;
+  if (!c.enabled) { deps.log('regpress: disabled in config'); return; }
+  const cards: (PublishPayload | null)[] = [];
+  for (const feed of c.feeds) {
+    if (feed.needsFlag && !deps.keys?.occEnabled) { deps.log(`regpress: ${feed.id}: disabled (REGPRESS_OCC_ENABLED not set), skipping`); continue; }
+    try {
+      const items = selectRegPress(parseRss(await deps.fetchText(feed.url, 'api', config.feedCacheTtlMinutes)), deps.now);
+      deps.log(`regpress: ${feed.id}: ${items.length} crypto-related releases in the last ${c.maxAgeDays} days`);
+      for (const i of items) cards.push(regPressCard(i, feed));
+    } catch (e) {
+      deps.log(`regpress: ${feed.id} failed: ${(e as Error).message}`);
+    }
+  }
+  await publishCards(deps, stats, 'regpress', cards, c.maxCardsPerRun);
+}
+
+/** Annual figures (SSA COLA ...) from the hand-verified list. OFF unless ANNUAL_FIGURES_ENABLED=1 (deps.keys.annualEnabled). */
+export async function runAnnual(deps: Deps, stats: RunStats): Promise<void> {
+  const c = config.agency.annual;
+  if (!c.enabled && !deps.keys?.annualEnabled) { deps.log('annual: disabled (ANNUAL_FIGURES_ENABLED not set), skipping'); return; }
+  await publishCards(deps, stats, 'annual', annualDue(deps.now).map(annualCard), c.maxCardsPerRun);
 }

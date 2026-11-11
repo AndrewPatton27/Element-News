@@ -76,18 +76,18 @@ test('runOnce eia: needs a key, never logs it, three cards (gasoline stays off),
   const { dry, lines, deps } = fakeDeps(async (url, kind) => {
     assertAllowed(url, kind);
     seen.push(url);
-    return url.includes('/stoc/wstk/') ? fx('eia-petroleum-stocks.json') : url.includes('/stor/wkly/') ? fx('eia-gas-storage.json') : url.includes('/sndw/') ? fx('eia-supply-weekly.json') : url.includes('/wiup/') ? fx('eia-utilization-weekly.json') : '{}';
+    return url.includes('/stoc/wstk/') ? fx('eia-petroleum-stocks.json') : url.includes('/stor/wkly/') ? fx('eia-gas-storage.json') : url.includes('/sndw/') ? fx('eia-supply-weekly.json') : url.includes('/wiup/') ? fx('eia-utilization-weekly.json') : url.includes('/pri/gnd/') ? fx('eia-diesel.json') : '{}';
   }, { eiaApiKey: KEY });
   const stats = await runOnce(deps, { only: ['eia'] });
-  assert.equal(seen.length, 4, 'one request per report group (supply uses two), gasoline off');
-  assert.equal(dry.cards.length, 3);
-  assert.equal(stats.data_cards, 3);
-  assert.equal(stats.template, 3);
+  assert.equal(seen.length, 5, 'one request per report group (supply uses two), diesel one, gasoline off');
+  assert.equal(dry.cards.length, 4);
+  assert.equal(stats.data_cards, 4);
+  assert.equal(stats.template, 4);
   assert.equal(stats.ai, 0, 'no AI call');
   assert.ok(!JSON.stringify([lines, dry.cards]).includes(KEY), 'the key never reaches cards or logs');
   const again = await runOnce(deps, { only: ['eia'] });
   assert.equal(again.published, 0);
-  assert.equal(dry.cards.length, 3, 'idempotent');
+  assert.equal(dry.cards.length, 4, 'idempotent');
 });
 
 test('runOnce eia: one failing report does not stop the other', async () => {
@@ -208,7 +208,7 @@ test('cron migration: idempotent, mirrors the element-ingest jobs, run_log accep
   }
   assert.ok(!sql.includes('"source":"census"'), 'census has no cron job');
   assert.ok(/cron\.unschedule\(jobname\)/.test(sql));
-  const check = /check \(source in \(([^)]*)\)\)/.exec(sql)![1].replace(/\s|'/g, '').split(',');
-  for (const s of ['eia', 'census', 'auctions', 'fomc', 'macro', 'brief-summary']) assert.ok(check.includes(s), s);
+  const check = /names \|\| array\[([^\]]*)\]/.exec(sql)![1].replace(/\s|'/g, '').split(',');   // the migration reads the live constraint and adds these (review m9c)
+  for (const s of ['eia', 'census', 'auctions', 'fomc', 'brief-summary']) assert.ok(check.includes(s), s);
   for (const s of check.filter((x) => x !== 'brief-summary')) assert.ok((SOURCE_NAMES as readonly string[]).includes(s), s);
 });

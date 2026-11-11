@@ -6,7 +6,7 @@
 //              (--limit = max cards; with --dry-run: the cards in src/fixtures/rewrite-cards.json)
 //   --backfill-macro  one-off: FRED history for the Trends charts via api.upsert_macro (no data cards);
 //              --weeks N = weeks of history (default 16); with --dry-run: DGS10 fixture only
-//   --only     comma-separated subset of sources (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, newsdata_market, newsdata_latest)
+//   --only     comma-separated subset of sources (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, beige, trade, regpress, annual, newsdata_market, newsdata_latest)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
 //   --fix-category <card-id> <slug>   re-file one card (service role; api.set_card_category)
@@ -35,6 +35,7 @@ import { templateSummarizer } from './summarizer/template.ts';
 import { cpscUrl } from './sources/cpsc.ts';
 import { avgRatesUrl, debtUrl } from './sources/fiscaldata.ts';
 import { mtsUrl } from './sources/mts.ts';
+import { tradeUrl } from './sources/trade.ts';
 import { nasaFeedUrl } from './sources/nasa.ts';
 import { wikimediaUserAgent, wikiFeedUrl } from './sources/wiki.ts';
 
@@ -99,6 +100,8 @@ export function fixtureFetcher(): Deps['fetchText'] {
     if (url === debtUrl()) return fixture('fiscaldata-debt.json');
     if (url === config.agency.blscal.url) return fixture('bls-calendar.ics');               // November dates: nothing due in the dry-run window
     if (url === mtsUrl(DRY_NOW)) return '{"data":[]}';                                         // no complete month: no card
+    if (url === tradeUrl(DRY_NOW)) return '{"count":0}';                                    // no trade documents in the dry run
+    if (config.agency.regpress.feeds.some((f) => f.url === url)) return '<rss><channel></channel></rss>';   // no regulator releases in the dry run
     if (url === wikiFeedUrl(DRY_NOW)) return fixture('wiki-featured-2026-10-17.json');
     if (url === wikiFeedUrl(DRY_NOW, 1)) return fixture('wiki-featured-2026-10-16.json');
     if (url === wikiFeedUrl(DRY_NOW, 2)) return '{"tfa":{},"mostread":{}}';          // a past day without a `news` list = no items
@@ -267,7 +270,7 @@ export async function main(argv: string[]): Promise<number> {
     providers,
     counter: fileCounter('state/ai-usage.json'),
     fredApiKey: env.fredApiKey,
-    keys: { bls: process.env.BLS_API_KEY?.trim() || null, bea: process.env.BEA_API_KEY?.trim() || null, beaDataEnabled: process.env.BEA_DATA_ENABLED === '1' },
+    keys: { bls: process.env.BLS_API_KEY?.trim() || null, bea: process.env.BEA_API_KEY?.trim() || null, beaDataEnabled: process.env.BEA_DATA_ENABLED === '1', annualEnabled: process.env.ANNUAL_FIGURES_ENABLED === '1', occEnabled: process.env.REGPRESS_OCC_ENABLED === '1' },
     eiaApiKey: process.env.EIA_API_KEY?.trim() || null,        // optional keys for the agency sources (never logged)
     censusApiKey: process.env.CENSUS_API_KEY?.trim() || null,
     newsdata: { apiKey: process.env.NEWSDATA_API_KEY?.trim() || null, enabled: process.env.NEWSDATA_ENABLED === '1' },   // link-out source, OFF unless both are set

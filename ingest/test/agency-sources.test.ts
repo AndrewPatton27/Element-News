@@ -112,14 +112,14 @@ test('every new series has an agency, provider and a unique sort order', () => {
   const ids = ['BLS_AHE', 'BLS_ECI', 'BLS_JOLTS', 'BEA_PCE_YOY', 'BEA_CORE_PCE_YOY', 'BEA_PERSONAL_INCOME', 'BEA_GDP'];
   assert.equal(new Set(Object.values(SERIES).map((s) => s.sort_order)).size, Object.keys(SERIES).length, 'sort_order is unique');
   for (const id of ids) assert.ok(SERIES[id].provider === 'bls' || SERIES[id].provider === 'bea', id);
-  assert.deepEqual(Object.values(config.bls.series).sort(), ['BLS_AHE', 'BLS_ECI', 'BLS_JOLTS']);
+  assert.deepEqual(Object.values(config.bls.series).sort(), ['BLS_AHE', 'BLS_CPI_ELECTRICITY', 'BLS_CPI_FOOD_HOME', 'BLS_CPI_MEDICAL', 'BLS_CPI_RENT', 'BLS_ECI', 'BLS_JOLTS']);
 });
 
-test('bls run: 3 requests (1 per series), 3 cards and 3 Numbers rows, rerun adds no card; no key in any URL', async () => {
+test('bls run: 7 requests (1 per series), 3 cards (the CPI components have no October card: October 2025 was never published), rerun adds no card; no key in any URL', async () => {
   const seen: string[] = [];
   const { d, dry } = deps(seen);
   const s1 = await runOnce(d, { only: ['bls'] });
-  assert.equal(seen.length, 3);
+  assert.equal(seen.length, 7, '3 labor series plus 4 CPI components');
   assert.ok(seen.every((u) => u.startsWith('https://api.bls.gov/publicAPI/v1/')));
   assert.deepEqual([s1.macro, s1.data_cards], [3, 3]);
   const s2 = await runOnce(d, { only: ['bls'] });
