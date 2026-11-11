@@ -28,6 +28,7 @@ import { Takeaways } from './Takeaways';
 import { AboutChips } from '../companies/AboutChips';
 import { useFollowedStories } from '../../lib/following/useFollowedStories';
 import { linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
+import { followStoryLabel, showFollowLabel } from '../../lib/feed/cardFooterLabels';
 import { shareStory } from '../../lib/shared/useCardActions';
 import { tip } from '../../lib/theme/tooltip';
 import { msSinceSwipeEnd, shouldOpenDetail, wasCardSwiped, type PointerPoint } from '../../lib/feed/swipeLogic';
@@ -47,6 +48,7 @@ interface Props {
   reaction?: Feedback; // signed in: this user's like/dislike
   onReact?: (card: BlurbCard, pressed: Feedback) => void; // signed in only
   followedTopic?: boolean;
+  dimmed?: boolean; // Latest: a card the reader disliked stays in time order but is shown faded (client only)
   onToggleTopicFollow?: (card: BlurbCard) => void;
 }
 
@@ -162,8 +164,17 @@ export function Card(props: Props) {
     // the middle scrolls and a soft fade at its foot says there is more below.
     const over = h > 0 && content + 8 > h + 1 && points <= 1;
     setOverflow((o) => (o === over ? o : over));
+    // A card that has to scroll must not hide "More detail" below its bottom edge (I-06): the button moves out of
+    // the scrolling part into its own row above the bar. Latched per card and size, so it cannot flip back and forth.
+    if (over) setPinned((k) => (k === fitKey ? k : fitKey));
   };
   const [overflow, setOverflow] = useState(false);
+  const [pinned, setPinned] = useState('');
+  const pinMore = pinned === fitKey;
+  // The measures above only run when a layout changes. When dropping a bullet changes nothing that is measured (a card
+  // without bullets, e.g. a dense data card on a short phone) no new layout arrives, so look again after each step.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { checkFit(); }, [points, fitKey, pinMore]);
   const [atEnd, setAtEnd] = useState(false);
   const takeaways = cardTakeaways(card, points);
   const showTakeaways = takeaways.kind !== 'none' && !(denseData && compact);
@@ -196,6 +207,20 @@ export function Card(props: Props) {
     else if (name === 'next') onNext?.();
   };
 
+  const moreDetail = (
+    <Pressable
+      onPress={openDetailFromPress}
+      onPressIn={detailPressIn}
+      onTouchStart={detailPressIn}
+      {...(Platform.OS === 'web' ? { onMouseDown: detailMouseDown } as any : {})}
+      accessibilityRole="button"
+      accessibilityLabel={`More detail. ${OPEN_DETAIL_HINT}`}
+      style={pinMore ? styles.morePinnedBtn : styles.more}
+    >
+      <Text style={[styles.moreText, wide && { fontSize: 15 }, { color: p.accentInk }]}>More detail ›</Text>
+    </Pressable>
+  );
+
   const headline = (
     <Text
       numberOfLines={linkOut ? 6 : compact || denseData ? 3 : 4}
@@ -215,6 +240,8 @@ export function Card(props: Props) {
   // The bottom bar's buttons: 44 px icon buttons, like / dislike / follow / share
   // (D-63: like and dislike on every card). Wide web adds the keyboard hint after them.
   const iconSize = barSize === 'small' ? 20 : 22;
+  // G-04: wide cards say what the pulse follows ("Follow story"); phones keep the icon (no room, see lib/feed/cardFooterLabels.ts).
+  const followLabel = showFollowLabel(box.w) ? followStoryLabel(storyFollowed) : null;
   const actions = (
     <>
       {reactFn ? (
@@ -230,9 +257,10 @@ export function Card(props: Props) {
         {...tip(storyFollowed ? 'Following this story (click to stop)' : 'Follow this story')}
         accessibilityState={{ selected: storyFollowed }}
         aria-pressed={storyFollowed}
-        style={({ pressed }) => [styles.iconBtn, storyFollowed && { backgroundColor: p.accentSoft }, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.iconBtn, followLabel && styles.followBtn, storyFollowed && { backgroundColor: p.accentSoft }, pressed && styles.pressed]}
       >
         <PulseIcon color={storyFollowed ? p.accentInk : p.ink} size={iconSize} />
+        {followLabel ? <Text style={[styles.followText, { color: storyFollowed ? p.accentInk : p.ink }]}>{followLabel}</Text> : null}
       </Pressable>
       {shareable ? (
         <Pressable
@@ -256,7 +284,7 @@ export function Card(props: Props) {
 
   const src = primarySource(card);
   return (
-    <View style={[styles.wrap, tablet && styles.wrapTablet]}>
+    <View style={[styles.wrap, tablet && styles.wrapTablet, props.dimmed && styles.dimmed]} testID={props.dimmed ? 'card-dimmed' : undefined}>
       <View
         onLayout={(e) => {
           const w = Math.round(e.nativeEvent.layout.width);
@@ -355,19 +383,7 @@ export function Card(props: Props) {
                   <AboutChips card={card} wide={wide} />
                 </Pressable>
 
-                {opensDetail ? (
-                  <Pressable
-                    onPress={openDetailFromPress}
-                    onPressIn={detailPressIn}
-                    onTouchStart={detailPressIn}
-                    {...(Platform.OS === 'web' ? { onMouseDown: detailMouseDown } as any : {})}
-                    accessibilityRole="button"
-                    accessibilityLabel={`More detail. ${OPEN_DETAIL_HINT}`}
-                    style={styles.more}
-                  >
-                    <Text style={[styles.moreText, wide && { fontSize: 15 }, { color: p.accentInk }]}>More detail ›</Text>
-                  </Pressable>
-                ) : null}
+                {opensDetail && !pinMore ? moreDetail : null}
               </View>
             </ScrollView>
             {overflow && !atEnd ? (
@@ -378,6 +394,7 @@ export function Card(props: Props) {
               </View>
             ) : null}
             </View>
+            {opensDetail && pinMore ? <View style={styles.morePinned}>{moreDetail}</View> : null}
             {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
           </>
         )}
@@ -462,10 +479,15 @@ const styles = StyleSheet.create({
   middlePressable: { gap: 16 },
   spacer: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 0 },
   more: { alignSelf: 'flex-start', minHeight: 44, marginVertical: -10, justifyContent: 'center' },
+  morePinned: { flexShrink: 0, height: 44, marginVertical: -10 }, // a full 44 px target that takes the same 24 px as the in-scroll button
+  morePinnedBtn: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  dimmed: { opacity: 0.55 },
   moreText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   // Press feedback: a small scale-down on press-in (web: eased by the global CSS transition).
   pressed: { opacity: 0.8, transform: [{ scale: 0.94 }] },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  followBtn: { width: 'auto', flexDirection: 'row', gap: 6, paddingHorizontal: 12 },
+  followText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   react: { flexDirection: 'row', width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 1 },
   reactCheck: { fontFamily: fonts.sansSemi, fontSize: 12 },
   next: { minHeight: 44, flexDirection: 'row', alignItems: 'center', paddingLeft: 14, marginLeft: 4, borderLeftWidth: 1 },
