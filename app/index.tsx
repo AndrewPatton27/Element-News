@@ -15,6 +15,9 @@ import { useFollows } from '../lib/following/useFollows';
 import { forYouCoversTopics, withoutHidden } from '../lib/account/accountLogic';
 import { favoritesFirst } from '../lib/storage/localPrefs';
 import { rankLocal } from '../lib/feed/localRank';
+import { SKIP_TARGET_ID } from '../lib/shared/focusMain';
+import { rememberFeedTab, startFeedTab } from '../lib/feed/lastTab';
+import { reasonFor as cardReasonFor, reasonText } from '../lib/feed/reasonLine';
 import { confidence, targetAhead } from '../lib/feed/queueLogic';
 import { sourceName, withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { SIGN_IN_AGAIN_MESSAGE } from '../lib/account/session';
@@ -77,7 +80,9 @@ export default function FeedScreen() {
   // Landscape phones and 200% zoom (under 520 px tall): the category chips step aside too, so the
   // card keeps enough height to read; categories stay reachable by widening or rotating.
   const tinyHeight = !wide && windowHeight > 0 && windowHeight < 520;
-  const [mode, setMode] = useState<FeedTab>(params.tab === 'for_you' || params.tab === 'latest' ? params.tab : 'top');
+  // The bottom Feed tab links to / with no tab: bring back the tab used last this visit (Trending on a fresh launch).
+  const [mode, setMode] = useState<FeedTab>(() => startFeedTab(params.tab));
+  useEffect(() => rememberFeedTab(mode), [mode]);
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [sheetCard, setSheetCard] = useState<BlurbCard | null>(null);
   const [detailCard, setDetailCard] = useState<BlurbCard | null>(null);
@@ -188,6 +193,12 @@ export default function FeedScreen() {
   const showSources = useCallback((c: BlurbCard) => setSheetCard(c), []);
   const openDetail = useCallback((c: BlurbCard) => setDetailCard(c), []);
 
+  // For you: one muted line per card from the reader's own choices ("Because you follow NWND"). Signed in, the server's
+  // reason on the card wins; signed out the device's follows and likes decide (lib/feed/reasonLine.ts).
+  const forYouReason = useCallback(
+    (c: BlurbCard) => reasonText(cardReasonFor(c, signedIn ? null : local), categories),
+    [signedIn, local, categories],
+  );
   const items = visible(state.items);
   const pagerKey = `${mode}|${category ?? 'all'}`;
   const queuePositions = useRef<Record<string, number>>({});
@@ -451,6 +462,7 @@ export default function FeedScreen() {
         onQueuePosition={(i) => { queuePosition.current = i; queuePositions.current[pagerKey] = i; }}
         followedTopics={followedTopics}
         onToggleTopicFollow={toggleCardFollow}
+        reasonFor={forYou ? forYouReason : undefined}
         onActiveCard={focused ? onActiveBoth : undefined}
         active={focused && sheetCard === null && detailCard === null && menuCard === null}
         onMore={setMenuCard}
@@ -528,7 +540,7 @@ export default function FeedScreen() {
       {/* Own row with 44 px tall links (R-402): on a 360 px phone the old one-line version cut the hint to
           "Like cards o..." and left two 16-18 px tap targets. */}
       <View style={styles.forYouLinks}>
-        <Pressable onPress={() => router.navigate('/account' as never)} accessibilityRole="link" style={styles.forYouLink}>
+        <Pressable onPress={() => router.navigate((followed.length ? '/account' : flags.onboarding ? '/setup?next=for_you' : '/following') as never)} accessibilityRole="link" style={styles.forYouLink}>
           <Text style={[styles.forYouEdit, { color: p.accentInk }]}>{followed.length ? 'Edit topics' : 'Pick topics'}</Text>
         </Pressable>
         {!signedIn ? (
@@ -613,7 +625,8 @@ export default function FeedScreen() {
       {/* Above the card on every width, so it is on screen without scrolling the left rail (R-4xx). */}
       {sincePill}
       {inlineError}
-      <View style={styles.fill}>{body}</View>
+      {/* Target of the "Skip to content" link: the cards (components/shell/SkipLink.tsx). */}
+      <View style={styles.fill} nativeID={SKIP_TARGET_ID}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
       <DetailSheet card={detailCard} config={config} categories={categories} onClose={() => setDetailCard(null)} />
       <CardMenu
@@ -630,7 +643,8 @@ export default function FeedScreen() {
         message={undo?.message ?? null}
         label={undo?.label}
         token={undo?.seq}
-        placement="corner"
+        // A report confirmation has no Undo: a top bar, so it never hides the source name in the card footer (run 3b).
+        placement={undo?.kind === 'report' ? 'top' : 'corner'}
         wide={wide}
         onUndo={undoHide}
         showUndo={undo?.kind !== 'report'}

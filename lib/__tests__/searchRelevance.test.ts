@@ -59,3 +59,35 @@ test('a company query still finds its Form 4 cards (no demotion when a company i
   const r = ids('Tailspin');
   assert.equal(r[0], 'f4a');
 });
+
+// ---- M9c fix3 (persona run 3b): plain questions ----
+const housing: BlurbCard[] = [
+  dataCard({ id: 'rent', headline: 'Rents rise 4.1% from a year ago', body: 'Shelter costs kept climbing.', macro: [fact({ series_id: 'CUSR0000SEHA', label: 'Rent of primary residence', value: '4.1%' })] }),
+  dataCard({ id: 'mort', headline: '30-year mortgage rate edges down to 6.4%', body: 'Home loans got slightly cheaper.', macro: [fact({ series_id: 'MORTGAGE30US', label: '30-yr mortgage', value: '6.4%' })] }),
+];
+const pool2 = [...pool, ...housing];
+const ids2 = (q: string) => rankSearch(pool2, q, () => NOW.getTime() / 3_600_000, { nowHours: NOW.getTime() / 3_600_000 }).map((c) => c.id);
+
+test('"how much is gas" drops the filler and finds the oil card', () => {
+  assert.deepEqual(searchTerms('how much is gas'), ['gas']);
+  assert.equal(ids2('how much is gas')[0], 'oil');
+});
+
+test('"rent and gas costs" finds housing AND energy cards, Form 4 last', () => {
+  assert.deepEqual(searchTerms('rent and gas costs'), ['rent', 'gas']);
+  const r = ids2('rent and gas costs');
+  assert.ok(r.includes('oil') && r.includes('rent'), r.join());
+  assert.ok(['oil', 'rent'].includes(r[0]) && ['oil', 'rent'].includes(r[1]), r.join());
+});
+
+test('"is the economy ok" finds a Fed card that never says "economy" and ranks no company above macro cards', () => {
+  const noWord = card({ id: 'fed2', headline: 'Fed holds rates steady', body: 'Policymakers kept borrowing costs unchanged.', category: 'policy', event_type: 'fed', ...none });
+  const r = rankSearch([...pool2, noWord], 'is the economy ok', () => NOW.getTime() / 3_600_000, { nowHours: NOW.getTime() / 3_600_000 }).map((c) => c.id);
+  assert.ok(r.includes('fed2'), r.join());
+  assert.ok(r.indexOf('coffee') === -1 || (r.indexOf('fed2') < r.indexOf('coffee') && r.indexOf('gdp') < r.indexOf('coffee')), r.join());
+  assert.notEqual(r[0], 'coffee');
+});
+
+test('an alias word beside a real word is not loosened ("gas Tailspin" still needs both)', () => {
+  assert.deepEqual(ids2('gas Tailspin'), []);
+});

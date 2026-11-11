@@ -13,6 +13,7 @@
 // card on step 1 is interactive but saves nothing (components/TutorialPractice.tsx).
 // With reduced motion the practice card, ticker and hint arrow stay still.
 
+import { focusMain } from '../../lib/shared/focusMain';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   AccessibilityInfo,
@@ -386,6 +387,8 @@ export function TutorialGate() {
         const store = defaultStore();
         markTutorialSeen(store);
         setOpen(false);
+        // Keyboard: the closed tour leaves focus on nothing; put it on the page content (web only).
+        if (typeof window !== 'undefined') setTimeout(() => { focusMain(); }, 350);
         if (how === 'signup') {
           router.push('/signin?mode=signup' as never);
           return;

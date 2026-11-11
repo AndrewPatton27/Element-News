@@ -101,9 +101,11 @@ export function UndoToast({
     <Animated.View style={[styles.dock, enter]} pointerEvents={leaving ? 'none' : 'box-none'}>
       <View testID="undo-toast" style={[styles.toast, { backgroundColor: p.ink }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
         <Text style={[styles.text, { color: p.bg }]}>{text}</Text>
+        {showUndo ? (
         <Pressable onPress={onUndo} accessibilityRole="button" hitSlop={8} style={styles.undo}>
           <Text style={[styles.undoText, { color: p.accentSoft }]}>Undo</Text>
         </Pressable>
+        ) : null}
       </View>
     </Animated.View>
   );

@@ -33,6 +33,8 @@ export function DataNotices({ card, config, small }: { card: BlurbCard; config: 
           style={[styles.notice, small && styles.noticeSmall, { color: p.muted }]}
           {...(n.url ? linkProps(n.url) : {})}
           accessibilityRole={n.url ? 'link' : 'text'}
+          // Still clickable, but not a Tab stop: keyboard readers reach the card's own actions first (the same link is in the Sources sheet).
+          {...({ focusable: false, tabIndex: -1 } as object)}
         >
           {n.text}
         </Text>

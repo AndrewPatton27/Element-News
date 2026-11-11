@@ -49,6 +49,7 @@ interface Props {
   reaction?: Feedback; // signed in: this user's like/dislike
   onReact?: (card: BlurbCard, pressed: Feedback) => void; // signed in only
   followedTopic?: boolean;
+  reason?: string | null; // For you: why this card is here ("Because you follow NWND"), one muted line under the meta row
   dimmed?: boolean; // Latest: a card the reader disliked stays in time order but is shown faded (client only)
   onToggleTopicFollow?: (card: BlurbCard) => void;
 }
@@ -313,6 +314,11 @@ export function Card(props: Props) {
             </Pressable>
           ) : null}
         </View>
+        {props.reason ? (
+          <Text testID="card-reason" numberOfLines={1} style={[styles.reasonText, wide && { fontSize: 13 }, { color: p.muted }]}>
+            {props.reason}
+          </Text>
+        ) : null}
 
         {linkOut ? (
           <>
@@ -464,6 +470,7 @@ const styles = StyleSheet.create({
   moreDots: { fontSize: 20, lineHeight: 22 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 10, borderRadius: 14 },
   badgeText: { fontFamily: fonts.sansSemi, fontSize: 13 },
+  reasonText: { flexShrink: 0, fontFamily: fonts.sans, fontSize: 12, lineHeight: 16, marginTop: -4 },
   metaText: { fontFamily: fonts.sansSemi, fontSize: 13, letterSpacing: 0.2, flexShrink: 1 },
   headline: { fontFamily: fonts.serif },
   tickers: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

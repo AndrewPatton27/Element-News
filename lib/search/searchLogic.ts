@@ -104,7 +104,9 @@ const TRENDING_HALF_LIFE_HOURS = 8; // rank_params.half_life_hours
 // v9 (M9c #3): question filler is dropped too, so "is the economy ok" searches "economy".
 const STOPWORDS = new Set(
   ('the a an and or of to in on for at by with is are was were be it its as from that this what how why who about into ' +
-    'ok okay doing going now today my me do does should can will you your we our there any am').split(' '),
+    'ok okay doing going now today my me do does should can will you your we our there any am ' +
+    // v10 (M9c fix3): more question filler ("how much is gas", "how long until rates drop")
+    'much many long get tell show mean means whats').split(' '),
 );
 // v9: words that only describe the thing searched ("gas prices", "savings account"): dropped when another word
 // remains, so the card does not have to say "prices" or "account" (core.search_modifiers in SQL).
@@ -147,6 +149,8 @@ export const SEARCH_ALIAS_TIER = 5; // core.search_aliases tier (c_alias_tier in
 export const SEARCH_FILING_PENALTY = 5; // c_filing_penalty in SQL
 const FED_RE = /\b(fed|federal reserve|fomc|rates?|treasury|yield|mortgage)\b/;
 const OIL_RE = /\b(gas|gasoline|oil|crude|wti|diesel|fuel)\b/;
+const HOUSING_RE = /\b(rents?|housing|shelter|mortgages?|home prices?|homes?|house prices?)\b/;
+const HOUSING_SERIES = ['CUSR0000SEHA', 'HOUST', 'MORTGAGE30US', 'CSUSHPINSA'];
 const JOBS_RE = /\b(jobs?|unemployment|payrolls?|employment|labor)\b/;
 const INFL_RE = /\b(cpi|consumer prices?|consumer price index|inflation)\b/;
 const ECON_RE = /\b(economy|economic|gdp|growth|inflation|jobs|unemployment|payrolls|recession|fed|federal reserve|interest rates?)\b/;
@@ -156,22 +160,34 @@ export const SEARCH_ALIASES: Record<string, { re: RegExp; series: string[] }> = 
   gdp: { re: /\b(gdp|economy|growth)\b/, series: ['GDP'] },
   jobs: { re: JOBS_RE, series: ['UNRATE', 'PAYEMS'] },
   unemployment: { re: JOBS_RE, series: ['UNRATE', 'PAYEMS'] },
-  gas: { re: OIL_RE, series: ['DCOILWTICO'] },
-  gasoline: { re: OIL_RE, series: ['DCOILWTICO'] },
-  diesel: { re: OIL_RE, series: ['DCOILWTICO'] },
-  fuel: { re: OIL_RE, series: ['DCOILWTICO'] },
-  'diesel fuel': { re: OIL_RE, series: ['DCOILWTICO'] },
-  oil: { re: OIL_RE, series: ['DCOILWTICO'] },
+  gas: { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
+  gasoline: { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
+  diesel: { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
+  fuel: { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
+  'diesel fuel': { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
+  oil: { re: OIL_RE, series: ['DCOILWTICO', 'GASREGW'] },
   savings: { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
   'savings interest': { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
   'savings rates': { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
   apy: { re: FED_RE, series: ['DFF', 'DGS2', 'DGS10'] },
   rates: { re: FED_RE, series: ['DFF', 'DGS10'] },
   'interest rates': { re: FED_RE, series: ['DFF', 'DGS10'] },
+  // v10: everyday cost-of-living words. "rent and gas costs" finds housing and energy cards.
+  rent: { re: HOUSING_RE, series: HOUSING_SERIES },
+  rents: { re: HOUSING_RE, series: HOUSING_SERIES },
+  shelter: { re: HOUSING_RE, series: HOUSING_SERIES },
+  mortgage: { re: HOUSING_RE, series: HOUSING_SERIES },
+  mortgages: { re: HOUSING_RE, series: HOUSING_SERIES },
 };
 
 export function aliasFor(terms: string[]): { re: RegExp; series: string[] } | null {
   return SEARCH_ALIASES[terms.join(' ')] ?? null;
+}
+
+/** v10: a query made only of alias words ("rent and gas costs") matches a card that fits ANY of them. Null otherwise. */
+export function termAliases(terms: string[]): Map<string, { re: RegExp; series: string[] }> | null {
+  if (terms.length === 0 || aliasFor(terms) || !terms.every((t) => SEARCH_ALIASES[t])) return null;
+  return new Map(terms.map((t) => [t, SEARCH_ALIASES[t]]));
 }
 
 export function matchesAlias(card: BlurbCard, alias: { re: RegExp; series: string[] }): boolean {
@@ -341,11 +357,19 @@ export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: B
   if (terms.length === 0) return [];
   const now = opts.nowHours ?? Date.now() / 3_600_000;
   const alias = aliasFor(terms);
-  const generic = alias !== null || !namesCompany(cards, terms);
+  const termAl = termAliases(terms);
+  const generic = alias !== null || termAl !== null || !namesCompany(cards, terms);
   return cards
     .map((c) => {
-      const s = terms.map((t) => termScores(t, c));
-      return { c, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0), vis: s.some((x) => x.visible && x.gate > 0), all: s.every((x) => x.gate > 0) };
+      const s = terms.map((t) => {
+        const x = termScores(t, c);
+        const ta = termAl?.get(t) ?? alias;
+        // v10: a card that fits the word's alias (headline or macro series) counts as a visible synonym-level match
+        if (ta && matchesAlias(c, ta)) return { gate: Math.max(x.gate, 0.6), rank: Math.max(x.rank, 0.6), visible: true };
+        return x;
+      });
+      const anyHit = s.some((x) => x.gate > 0);
+      return { c, q: s.reduce((a, x) => a + x.gate, 0), rq: s.reduce((a, x) => a + x.rank, 0), vis: s.some((x) => x.visible && x.gate > 0), all: termAl ? anyHit : s.every((x) => x.gate > 0) };
     })
     // v8/v9: every query word must match, not only enough of them ("Beige Book" is not "bookings")
     .filter((x) => x.q >= SEARCH_MIN_QUALITY && x.all)
@@ -354,7 +378,7 @@ export function rankSearch(cards: BlurbCard[], raw: string, trendingHours: (c: B
       k: searchOrderKey(
         {
           visible: x.vis, relevance: x.rq, terms: terms.length, rankPart: rankPrior(trendingHours(x.c), now), affinity: opts.tasteHours ? affinityPrior(opts.tasteHours(x.c)) : null,
-          bonus: (alias && matchesAlias(x.c, alias) ? SEARCH_ALIAS_TIER : 0) - (generic && isFilingLike(x.c) ? SEARCH_FILING_PENALTY : 0),
+          bonus: ((alias && matchesAlias(x.c, alias)) || (termAl && [...termAl.values()].some((a) => matchesAlias(x.c, a))) ? SEARCH_ALIAS_TIER : 0) - (generic && isFilingLike(x.c) ? SEARCH_FILING_PENALTY : 0),
         },
         opts.weight,
         opts.affinityShare,
