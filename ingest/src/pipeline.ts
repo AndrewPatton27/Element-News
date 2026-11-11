@@ -24,7 +24,7 @@ import { runBeaData, runBls } from './agencyRun.ts';
 import { runAuctions, runBlsCal, runCensus, runEia, runFomc, runMts } from './agencyRunData.ts';
 import {
   classifySecEntry, displayCompanyName, isRoutine502, mergeSecEntries, parseSec8kAtom,
-  parseSubmissionsJson, primaryItem, resolveWatchList, type Sec8kEntry, type SecSkipReason, type WatchMap,
+  dailyIndexUrls, isBoilerplateRegFd, isRegFdOnly, parseDailyIndex, parseSubmissionsJson, primaryItem, resolveWatchList, rotationSlice, type DailyIndexFiling, type Sec8kEntry, type SecSkipReason, type WatchMap,
 } from './sources/sec.ts';
 import { secFilingPageText } from './sec-text.ts';
 import { createChainState, summarizeWithChain, type ChainState, type UsageCounter } from './summarizer/chain.ts';
@@ -460,13 +460,15 @@ async function runSec(
   deps: Deps, stats: RunStats, budget: { left: number }, guard: ReturnType<typeof createGuard>, chain: ChainState,
 ): Promise<void> {
   try {
-    // Watch list: household-name companies only. CIKs come from SEC's ticker list; without it
-    // there is no way to tell which filings are watched, so the SEC source is skipped this run.
+    // Watch list: the household-name directory plus the extended large-cap list (config.secExtraWatch). CIKs come from
+    // SEC's ticker list; without it there is no way to tell which filings are watched, so the SEC source is skipped this run.
+    const base: readonly string[] = config.watchCompanies;
+    const allWatch = [...base, ...config.secExtraWatch.filter((t) => !base.includes(t))];
     let watch: WatchMap;
     try {
-      const w = resolveWatchList(await deps.fetchText(config.secTickersUrl, 'page', config.cacheTtlMinutes));
+      const w = resolveWatchList(await deps.fetchText(config.secTickersUrl, 'page', config.cacheTtlMinutes), allWatch);
       watch = w.map;
-      deps.log(`sec: watch list ${w.map.size} of ${config.watchCompanies.length} companies resolved`
+      deps.log(`sec: watch list ${w.map.size} of ${allWatch.length} companies resolved`
         + (w.missing.length ? `; not in the SEC ticker list (skipped): ${w.missing.join(', ')}` : ''));
     } catch (e) {
       deps.log(`sec: ticker list unavailable, skipping SEC this run (watch list needs CIKs): ${(e as Error).message}`);
@@ -478,16 +480,26 @@ async function runSec(
     } catch (e) {
       deps.log(`sec: current 8-K feed failed (continuing with per-company lists): ${(e as Error).message}`);
     }
-    // Per-company filing lists (data.sec.gov, API host list); the shared limiter keeps us under 5 req/s.
+    // Which companies' own filing lists to read (data.sec.gov, API host list; the shared limiter keeps us under 5 req/s):
+    // the CIKs with a new filing in the EDGAR daily index, plus a rotating safety slice (config.secIndex).
+    const listCiks = new Set<string>();
+    try {
+      for (const cik of await newFilingCiks(deps, watch)) listCiks.add(cik);
+    } catch (e) {
+      deps.log(`sec: daily index step failed (rotation only): ${(e as Error).message}`);
+    }
+    const fromIndex = listCiks.size;
+    for (const cik of rotationSlice([...watch.keys()], deps.now)) listCiks.add(cik);
+    deps.log(`sec: reading ${listCiks.size} company filing lists (${fromIndex} with a new filing in the daily index, rest rotation)`);
     let failedLists = 0;
-    for (const cik of watch.keys()) {
+    for (const cik of listCiks) {
       try {
         lists.push(parseSubmissionsJson(await deps.fetchText(config.secSubmissionsUrl.replace('{cik}', cik), 'api', 0), deps.now));
       } catch {
         failedLists++;
       }
     }
-    if (failedLists) deps.log(`sec: per-company filing list unavailable for ${failedLists} of ${watch.size} companies`);
+    if (failedLists) deps.log(`sec: per-company filing list unavailable for ${failedLists} of ${listCiks.size} companies`);
     const entries = mergeSecEntries(lists);
     const items: RawItem[] = [];
     const notCandidates: Partial<Record<SecSkipReason, number>> = {};
@@ -503,10 +515,44 @@ async function runSec(
     const why = Object.entries(notCandidates).map(([k, n]) => `${k} ${n}`).join(', ');
     deps.log(`sec: ${entries.length} filings (feed + watch list), ${items.length} card candidates${why ? ` (not candidates: ${why})` : ''}`);
     await processItems(items, deps, stats, budget, guard, chain, (it) => secFilingPageText(deps.fetchText, it, deps.log),
-      (it, text) => (isRoutine502(it.items ?? [], text) ? 'routine_5.02' : null));
+      (it, text) => (isRoutine502(it.items ?? [], text) ? 'routine_5.02' : isBoilerplateRegFd(it.items ?? [], text) ? 'boilerplate_regfd' : null),
+      // Reg FD / other-events filings cost AI calls with a low hit rate: at most config.secRegFd.maxPerRun new ones per run.
+      { group: { of: (it) => (isRegFdOnly(it.items ?? []) ? 'regfd' : null), max: config.secRegFd.maxPerRun, skip: 'regfd_cap', label: 'Reg FD filings' } });
   } catch (e) {
     deps.log(`sec: feed failed: ${(e as Error).message}`);
   }
+}
+
+/**
+ * CIKs of watched companies that filed an 8-K in the EDGAR daily index (last config.secIndex.days days) which the database
+ * has not handled yet (api.items_handled), newest day first, at most config.secIndex.maxNewCiksPerRun. A missing day (weekend,
+ * holiday, file not published yet) is a 404 and is skipped. No handledUrls on the publisher = every watched filing counts.
+ */
+async function newFilingCiks(deps: Deps, watch: WatchMap): Promise<string[]> {
+  const filings: DailyIndexFiling[] = [];
+  let read = 0;
+  for (const url of dailyIndexUrls(deps.now)) {
+    try {
+      const text = await deps.fetchText(url, 'page', config.secIndex.cacheTtlMinutes);
+      filings.push(...parseDailyIndex(text).filter((f) => watch.has(f.cik)));
+      read++;
+    } catch (e) {
+      deps.log(`sec: daily index not available (${url.slice(-18)}): ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  let fresh = filings;
+  const fn = deps.publisher.handledUrls;
+  if (fn && filings.length) {
+    try {
+      const handled = await fn.call(deps.publisher, filings.map((f) => f.url));
+      fresh = filings.filter((f) => !handled.has(f.url));
+    } catch (e) {
+      deps.log(`sec: handled-items check failed for the daily index (reading all): ${(e as Error).message}`);
+    }
+  }
+  const ciks = [...new Set(fresh.map((f) => f.cik))].slice(0, config.secIndex.maxNewCiksPerRun);
+  deps.log(`sec: daily index ${read} days read, ${filings.length} watched 8-Ks, ${fresh.length} not handled yet, ${ciks.length} companies to read`);
+  return ciks;
 }
 
 interface ItemRow { id: string; is_new: boolean; status: string; status_note?: string | null }

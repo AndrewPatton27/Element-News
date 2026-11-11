@@ -1,0 +1,22 @@
+{
+  "_comment": "Input for scripts/gen-companies-extra.mjs: S&P 500 style large caps not already in contract/companies.ts. ticker -> [sector, industry]. Tickers and CIKs are verified against SEC company_tickers_exchange.json by the generator; unlisted tickers are dropped with a message.",
+  "groups": [
+    ["tech", "Software & IT services", "ACN CDNS SNPS FTNT PTC ROP TYL ADSK WDAY DDOG APP IT EPAM GDDY GEN JKHY AKAM FFIV CTSH CDW NET TEAM SNOW ZS MDB DOCU OKTA"],
+    ["tech", "Chips & hardware", "ANET APH GLW HPQ HPE KEYS MCHP MPWR NXPI ON TEL TER WDC STX NTAP SMCI FSLR ENPH SWKS QRVO MSI TRMB ZBRA"],
+    ["finance", "Payments & data services", "PAYC PAYX ADP FIS FISV GPN CPAY BR FDS MSCI NDAQ CBOE MKTX VRSK"],
+    ["media", "Media & entertainment", "OMC NWSA FOXA TTD TKO EA WMG IPG"],
+    ["retail", "Retail", "KMX GPC LKQ POOL ULTA WSM RL TPR SYY BJ BURL"],
+    ["consumer", "Food, drinks & household", "PM MO KMB CL CLX CHD EL KVUE MDLZ GIS K CPB CAG SJM HRL MKC KHC TSN STZ BF-B TAP ADM BG LW HAS NWL LEN DHI PHM NVR MHK WHR BLDR KDP"],
+    ["travel", "Travel, leisure & transport", "LVS WYNN MGM CZR CHRW EXPD JBHT ODFL CSX NSC UNP URI"],
+    ["autos", "Auto parts", "APTV BWA"],
+    ["finance", "Insurance", "MET PRU AFL AIG TRV CB CINF HIG L MMC MRSH AON AJG WRB ACGL EG PFG GL AIZ ERIE BRO WTW"],
+    ["finance", "Banks & asset managers", "TROW BEN IVZ AMP NTRS RJF KEY RF HBAN FITB MTB CFG BX KKR APO ARES CG ALLY"],
+    ["finance", "Real estate", "PLD AMT EQIX CCI PSA O WELL SPG DLR VICI AVB EQR EXR IRM SBAC WY ARE INVH MAA ESS UDR CPT KIM REG HST BXP FRT CBRE CSGP"],
+    ["health", "Medical devices & services", "TMO ABT DHR ISRG SYK BSX MDT EW ZBH BDX BAX ELV CI HUM CNC MOH HCA UHS DVA LH DGX IQV A MTD WAT IDXX RMD ALGN HOLX DXCM PODD STE COO GEHC TECH RVTY CRL WST"],
+    ["health", "Drugs & distribution", "VTRS ZTS REGN VRTX BIIB INCY MCK COR CAH HSIC"],
+    ["industrials", "Industrial machinery", "ETN EMR ITW PH ROK AME DOV CMI PCAR GWW FAST CTAS CPRT LHX TDG HWM TXT HII J PWR JCI CARR TT OTIS LII AOS SWK SNA IR XYL FTV PNR GNRC WAB DAY MAS WM RSG"],
+    ["industrials", "Materials", "MLM VMC NUE STLD FCX NEM LIN APD SHW ECL DD DOW LYB PPG IFF CTVA MOS CF ALB AMCR BALL PKG IP AVY SW"],
+    ["energy", "Oil, gas & pipelines", "COP EOG OXY SLB HAL BKR PSX MPC VLO KMI WMB OKE TRGP FANG DVN CTRA EQT APA EXE TPL"],
+    ["energy", "Utilities", "NEE DUK SO D AEP EXC SRE XEL PEG ED WEC EIX ETR DTE PPL AEE CMS FE ES CNP ATO NI LNT EVRG PNW NRG VST CEG AES AWK"]
+  ]
+}
