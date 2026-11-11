@@ -6,10 +6,18 @@
 
 import type { BlurbCard } from '../../contract/types.ts';
 
-export type MenuItemId = 'fewer' | 'hideTopic' | 'hideSource' | 'report';
+//   save       "Save for later" / "Remove from saved" (flag `signals`, A-22)
+//   muteTicker "Mute <company>" (flag `signals`; only when the card has a company)
+//   muteTopic  "Mute <fine topic>" (flag `signals`; only when the card carries a fine topic)
+export type MenuItemId = 'fewer' | 'save' | 'muteTicker' | 'muteTopic' | 'hideTopic' | 'hideSource' | 'report';
 
-export function menuItems(card: Pick<BlurbCard, 'kind'> | null, o: { canHideSource: boolean }): MenuItemId[] {
+export function menuItems(card: Pick<BlurbCard, 'kind'> | null, o: { canHideSource: boolean; signals?: { ticker?: boolean; topic?: boolean } }): MenuItemId[] {
   const items: MenuItemId[] = ['fewer'];
+  if (o.signals) {
+    items.push('save');
+    if (o.signals.ticker) items.push('muteTicker');
+    if (o.signals.topic) items.push('muteTopic');
+  }
   if (card && card.kind !== 'data') items.push('hideTopic');
   if (o.canHideSource) items.push('hideSource');
   items.push('report');

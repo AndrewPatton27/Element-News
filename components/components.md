@@ -105,3 +105,9 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 - `DetailActions.tsx`: icons sit in a fixed 24 px box so the four labels line up; press scale. `AboutChips.tsx`: 44 px tap target around the 32 px pill.
 - Headings: page titles level 1 (`ScreenShell`), section labels level 2 (Brief, Companies, Following, Search suggestions, Numbers card, account forms), detail-sheet sub-heads level 3.
 - Worst-case cards (break-ui): `?mock_data=worst` in mock mode swaps the first sample cards for contract-maximum versions (`lib/shared/mockWorst.ts`: 90-character headline, three numbers with long labels and different agencies, a 42-character company name, long source name, long key points, and a two-word card with no body). Use it to stress-test any card change.
+
+## Wave 2 (M9c, flags default OFF)
+
+- `card/GlossText.tsx` (D-02): `GlossText` draws text with its glossary terms underlined (dotted); tapping calls `onTerm`. `DefineSheet` is the small panel with the plain meaning (`SheetModal`, panel variant). `DetailBody` uses both when the `glossary` flag is on (key points and paragraphs); the feed card front is not underlined so a tap there still opens More detail.
+- `card/CardMenu.tsx`: with the `signals` flag the menu also offers Save for later (or Remove from saved), Mute <company> (first ticker) and Mute <topic> (first macro fine topic). The prop is absent otherwise and the menu is unchanged.
+- `card/Card.tsx`: with `signals` on and depth Short, a card shows one key point.

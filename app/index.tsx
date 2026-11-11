@@ -44,6 +44,12 @@ import { CardMenu } from '../components/card/CardMenu';
 import { UndoToast } from '../components/feed/UndoToast';
 import { cornerToastText } from '../lib/feed/toastPlacement';
 import { CardSkeleton, EmptyState, ErrorState } from '../components/shell/States';
+import { readFlags } from '../lib/flags/flags';
+import { FINE_NAMES, fineChips, isFineTopic, laneVisible, matchesFine, MACRO_FINE, fineTopicsOf } from '../lib/topics/fineTopics';
+import { useSignals } from '../lib/signals/useSignals';
+import { interestsFirst, isSaved, toggleMutedTicker, toggleMutedTopic, toggleSaved, withoutMuted } from '../lib/signals/signalsLogic';
+import { cardsSince, sinceStart, startVisit, touchVisit } from '../lib/since/sinceLogic';
+import { hasSeenTutorial } from '../lib/tutorial/tutorialLogic';
 
 // Below this window width the right column is dropped.
 const ASIDE_MIN_WIDTH = 1180;
@@ -57,6 +63,9 @@ export default function FeedScreen() {
   const acct = useAccount();
   const followsState = useFollows();
   const signedIn = acct.user !== null;
+  // Wave 2 flags (lib/flags/flags.ts): all off by default; with them off none of the code below changes the feed.
+  const flags = useMemo(() => readFlags(), []);
+  const { signals, update: updateSignals } = useSignals();
   const params = useLocalSearchParams<{ tab?: string; t?: string; category?: string }>();
   const { width, height: windowHeight } = useWindowDimensions();
   // Short phones (360x640 and similar): the card needs every row, so the guest sign-in
@@ -77,7 +86,8 @@ export default function FeedScreen() {
     | { message: string; label: string; kind: 'source'; previous: string[] }
     | { message: string; label: string; kind: 'follow'; slug: string }
     | { message: string; label: string; kind: 'fewer'; card: BlurbCard }
-    | { message: string; label: string; kind: 'report' };
+    | { message: string; label: string; kind: 'report' }
+    | { message: string; label: string; kind: 'signal'; revert: () => void };
   const [undo, setUndoState] = useState<(FeedUndo & { seq: number }) | null>(null);
   const toastSeq = useRef(0);
   const setUndo = useCallback((u: FeedUndo | null) => setUndoState(u ? { ...u, seq: ++toastSeq.current } : null), []);
@@ -114,9 +124,18 @@ export default function FeedScreen() {
   const sourcesSupported = acct.viewPrefs?.hiddenSources != null;
   // The same filter drives the list on screen and the paging, so "end of feed" and "load
   // more" are decided on what the reader can actually see.
+  const fineSelected = flags.topics && isFineTopic(category) ? category : null;
   const visible = useCallback(
-    (cards: BlurbCard[]) => withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources),
-    [hidden, hiddenSources],
+    (cards: BlurbCard[]) => {
+      let out = withoutHiddenSources(withoutHidden(cards, hidden), hiddenSources);
+      if (flags.signals) out = withoutMuted(out, signals); // A-22 muted companies and fine topics
+      if (flags.topics) {
+        out = out.filter((c) => laneVisible(c, mode, signals.optIn)); // A-12 / D-121 opt-in lanes
+        if (fineSelected) out = out.filter((c) => matchesFine(c, fineSelected));
+      }
+      return out;
+    },
+    [hidden, hiddenSources, flags, signals, mode, fineSelected],
   );
   const local = acct.localPrefs;
   // For you stays locked until 3 stories have been read or reacted to, or one topic or company is followed (forYouGate.ts).
@@ -143,10 +162,10 @@ export default function FeedScreen() {
     seenTimer.current = setTimeout(() => setSeenList(recordSeen(store, c)), FOR_YOU_SEEN_MS);
   }, []);
   useEffect(() => () => { if (seenTimer.current) clearTimeout(seenTimer.current); }, []);
-  const rankPage = useCallback((cards: BlurbCard[]) => rankLocal(cards, local), [local]);
+  const rankPage = useCallback((cards: BlurbCard[]) => (flags.onboarding ? interestsFirst(rankLocal(cards, local), signals.interests) : rankLocal(cards, local)), [local, flags, signals.interests]);
   const { state, loadMore, retry, rerank } = useFeed(
     api,
-    { mode: locked ? 'top' : mode, category: forYou ? null : category, user: acct.user?.id ?? null },
+    { mode: locked ? 'top' : mode, category: forYou || fineSelected ? null : category, user: acct.user?.id ?? null },
     acct.account,
     visible,
     signedIn ? undefined : rankPage,
@@ -155,7 +174,7 @@ export default function FeedScreen() {
   // Load speed: the extra first-page pulls (tab heads) and the wide side column wait until the first
   // cards are on screen (or the request ended), so the first page gets the connection to itself.
   const firstPaintDone = state.items.length > 0 || state.done || !!state.error;
-  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, category, visible, focused && firstPaintDone, mode);
+  const heads = useFeedHeads(api, acct.account, acct.user?.id ?? null, fineSelected ? null : category, visible, focused && firstPaintDone, mode);
   // What the pager shows right now (after all re-ordering), for the view's slot.
   const shownRef = useRef<BlurbCard[]>([]);
   const surfaceRef = useRef<ShadowSurface | null>(null);
@@ -188,7 +207,15 @@ export default function FeedScreen() {
       return Object.keys(next).length === Object.keys(current).length ? current : next;
     });
   }, [signedIn, followed, followsState.follows.topics]);
-  const chipCategories = favoritesFirst(withoutHidden(categories, hidden), followed);
+  const baseChips = favoritesFirst(withoutHidden(categories, hidden), followed);
+  const chipCategories = useMemo(() => {
+    if (!flags.topics) return baseChips;
+    // A-12: the six macro topics (and any opted-in lane) follow the categories; the reader's interests come first.
+    const extra = fineChips(signals.optIn).filter((c) => !signals.mutedTopics.includes(c.slug));
+    return [...baseChips, ...favoritesFirst(extra, signals.interests)];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.topics, categories, hidden, followed.join('|'), signals.optIn, signals.interests, signals.mutedTopics]);
+  const allNames = flags.topics ? [...categories, ...fineChips(['crypto', 'tech-ai'])] : categories;
   useEffect(() => {
     if (category && hidden.includes(category)) setCategory(null);
   }, [category, hidden]);
@@ -248,7 +275,39 @@ export default function FeedScreen() {
     },
     [api, setUndo],
   );
+  // A-22 (flag `signals`): save for later, mute a company, mute a fine topic. Each shows a corner toast with Undo.
+  const signalToast = useCallback(
+    (message: string, label: string, revert: () => void) => {
+      setMenuCard(null);
+      setUndo({ message, label, kind: 'signal', revert });
+    },
+    [setUndo],
+  );
+  const menuSignals = flags.signals
+    ? {
+        saved: menuCard ? isSaved(signals, menuCard.id) : false,
+        onSave: (c: BlurbCard) => {
+          const was = isSaved(signals, c.id);
+          updateSignals((s) => toggleSaved(s, c));
+          signalToast(was ? 'Removed' : 'Saved', was ? 'Removed from saved.' : 'Saved for later. Find it in Account, Saved and signals.', () => updateSignals((s) => toggleSaved(s, c)));
+        },
+        muteTicker: (c: BlurbCard) => (c.tickers[0] ? { symbol: c.tickers[0].symbol, name: c.tickers[0].name || c.tickers[0].symbol } : null),
+        onMuteTicker: (_c: BlurbCard, symbol: string) => {
+          updateSignals((s) => (s.mutedTickers.includes(symbol) ? s : toggleMutedTicker(s, symbol)));
+          signalToast('Muted', `Muted ${symbol}. No more cards about it.`, () => updateSignals((s) => (s.mutedTickers.includes(symbol) ? toggleMutedTicker(s, symbol) : s)));
+        },
+        muteTopic: (c: BlurbCard) => {
+          const t = fineTopicsOf(c).find((x) => (MACRO_FINE as readonly string[]).includes(x));
+          return t ? { slug: t, name: FINE_NAMES[t] } : null;
+        },
+        onMuteTopic: (_c: BlurbCard, slug: string) => {
+          updateSignals((s) => (s.mutedTopics.includes(slug) ? s : toggleMutedTopic(s, slug)));
+          signalToast('Muted', `Muted ${FINE_NAMES[slug as keyof typeof FINE_NAMES] ?? slug}. You can undo it in Saved and signals.`, () => updateSignals((s) => (s.mutedTopics.includes(slug) ? toggleMutedTopic(s, slug) : s)));
+        },
+      }
+    : undefined;
   const undoHide = useCallback(() => {
+    if (undo?.kind === 'signal') undo.revert();
     if (undo?.kind === 'fewer' && acct.reactions[undo.card.id] === 'dislike') acct.react(undo.card, 'dislike'); // pressing again clears it
     if (undo?.kind === 'topic') void acct.restoreTopics(undo.previous).catch(() => undefined);
     if (undo?.kind === 'source') void acct.saveSources(undo.previous).catch(() => undefined);
@@ -322,6 +381,26 @@ export default function FeedScreen() {
     if (forYou && !locked) noteCards(state.items);
   }, [forYou, locked, state.items, noteCards]);
 
+  // ---- B-06 Since yesterday (flag `since`) ----
+  const [visit] = useState(() => (flags.since ? startVisit(store) : null));
+  useEffect(() => {
+    if (!flags.since) return;
+    const t = setInterval(() => touchVisit(store), 5 * 60 * 1000);
+    const onHide = () => touchVisit(store);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('pagehide', onHide);
+    return () => {
+      clearInterval(t);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('pagehide', onHide);
+    };
+  }, [flags.since]);
+  const sinceCount = flags.since && visit && mode === 'latest' ? cardsSince(items, sinceStart(visit)).length : 0;
+
+  // ---- A-17 three-question setup (flag `onboarding`): once, after the tour, skippable ----
+  useEffect(() => {
+    if (flags.onboarding && focused && signals.setup === null && hasSeenTutorial(store)) router.replace('/setup' as never);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.onboarding, focused, signals.setup, params.t]);
+
   const first = items.length === 0;
   let body;
   if (locked) body = <ForYouWarmup progress={gate} onBack={() => setMode('top')} />;
@@ -330,7 +409,7 @@ export default function FeedScreen() {
   else if (first) {
     body = (
       <EmptyState
-        title={forYou ? 'Your topics are quiet' : category ? `No ${categoryName(category, categories)} stories right now` : 'No stories yet'}
+        title={forYou ? 'Your topics are quiet' : category ? `No ${categoryName(category, allNames)} stories right now` : 'No stories yet'}
         message={forYou ? 'Nothing new in your topics right now. Trending has the big market and economy stories.' : category ? 'Nothing new in this topic lately. Try All, or another topic.' : 'No cards yet. Check back soon.'}
         actionLabel={forYou ? 'Show Trending' : category ? 'Show all categories' : undefined}
         onAction={forYou ? () => setMode('top') : category ? () => setCategory(null) : undefined}
@@ -368,6 +447,20 @@ export default function FeedScreen() {
     items.length > 0 && state.error ? (
       <Pressable onPress={retry} accessibilityRole="button" style={[styles.inlineError, { backgroundColor: p.dataSoft }]}>
         <Text style={{ color: p.dataInk, fontFamily: fonts.sansSemi }}>Could not load more. Tap to retry.</Text>
+      </Pressable>
+    ) : null;
+
+  const sincePill =
+    sinceCount > 0 ? (
+      <Pressable
+        onPress={() => router.navigate('/since' as never)}
+        accessibilityRole="link"
+        testID="since-pill"
+        style={[styles.prompt, !wide && styles.promptNarrow, wide && styles.promptWide, { backgroundColor: p.dataSoft }]}
+      >
+        <Text style={[styles.promptText, styles.sincePillText, { color: p.dataInk }]}>
+          {sinceCount} new since your last visit · See what changed →
+        </Text>
       </Pressable>
     ) : null;
 
@@ -460,6 +553,7 @@ export default function FeedScreen() {
               />
             )}
             {prompt}
+            {sincePill}
           </>
         ) : undefined
       }
@@ -491,6 +585,7 @@ export default function FeedScreen() {
       )}
       {/* One page heading for screen readers; each card headline is a level-2 heading under it. */}
       <Text role="heading" aria-level={1} style={styles.srOnly}>{`Element: ${mode === 'latest' ? 'Latest' : forYou ? 'For you' : 'Trending'} stories`}</Text>
+      {wide ? null : sincePill}
       {inlineError}
       <View style={styles.fill}>{body}</View>
       <SourcesSheet card={sheetCard} config={config} onClose={() => setSheetCard(null)} />
@@ -502,6 +597,7 @@ export default function FeedScreen() {
         onFewer={fewerLikeThis}
         onReport={reportCard}
         onHideSource={sourcesSupported ? hideSource : undefined}
+        signals={menuSignals}
         onClose={() => setMenuCard(null)}
       />
       <UndoToast
@@ -536,5 +632,6 @@ const styles = StyleSheet.create({
   forYouWide: { flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12 },
   forYouText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
   forYouEdit: { fontFamily: fonts.sansSemi, fontSize: 14 },
+  sincePillText: { flex: 1, paddingVertical: 10 },
   forYouSync: { fontFamily: fonts.sans, fontSize: 13, textDecorationLine: 'underline' },
 });
