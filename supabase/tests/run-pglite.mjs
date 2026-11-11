@@ -43,6 +43,9 @@ for (const f of migrations) {
   }
 }
 await base.exec(`insert into auth.users (email) values ('element-test-a@example.com'), ('element-test-b@example.com');`);
+// The release queue (20261142000000_release_queue.sql) is ON in production and depends on the clock; the checks assume a card goes live at once,
+// so it is off here. release_queue_check.sql turns it on for itself.
+await base.exec(`update core.drip_config set enabled = false where id;`);
 
 // compare-only report, not a pass/fail check: it must just run without error
 const reportOnly = new Set(['cutover_compare.sql']);

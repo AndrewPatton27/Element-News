@@ -176,7 +176,8 @@ test('env: NEWSDATA_API_KEY and NEWSDATA_ENABLED are read; default is off and ke
   const on = readFunctionEnv(base);
   assert.equal(on.newsdataApiKey, 'pub_SECRETKEY123456');
   assert.equal(on.newsdataEnabled, true);
-  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? undefined : base(k))).newsdataEnabled, false);
+  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? undefined : base(k))).newsdataEnabled, null, 'unset = the code default (on)');
+  assert.equal(readFunctionEnv((k) => (k === 'NEWSDATA_ENABLED' ? '0' : base(k))).newsdataEnabled, false, '0 switches it off')
   assert.equal(env.newsdataApiKey, null);
   assert.ok(!describeFunctionEnv(on).includes('SECRETKEY'));
 });

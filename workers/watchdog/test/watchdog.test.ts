@@ -12,7 +12,7 @@ const ENV: Env = {
 const T0 = new Date('2026-11-10T12:17:00Z');   // a Tuesday, 12:17 UTC: a re-trigger hour
 
 const okOps = (over: Partial<OpsStatus> = {}): OpsStatus => ({
-  jobs: 30, cron_failures_24h: 0, http_non2xx_24h: 0, hung_open: 0, killed_24h: 0, model_missing: 0,
+  jobs: 38, cron_failures_24h: 0, http_non2xx_24h: 0, hung_open: 0, killed_24h: 0, model_missing: 0,
   ai: [{ provider: 'gemini', used: 100, cap: 500 }, { provider: 'groq', used: 10, cap: 74 }], db_size_mb: 120, ...over,
 });
 const okFeed = (over: Partial<FeedStatus> = {}): FeedStatus => ({
@@ -222,24 +222,54 @@ test('no HEALTHCHECK_URL: runs, alerts through GitHub, and never calls a ping se
   assert.equal(w.seen.some((s) => s.url.includes('hc-ping.com')), false);
 });
 
+// ---- supply gap (cadence): no new card for 60 min in market hours ----
+test('supply gap: alerts only in market hours, only past the limit, 0 turns it off, merges with the 24 h floor in one problem', () => {
+  const mkt = new Date('2026-11-10T15:17:00Z');   // Tue 10:17 ET
+  const feed = (minAgo: number) => okFeed({ last_published_at: new Date(mkt.getTime() - minAgo * 60_000).toISOString(), last_ok_run_at: new Date(mkt.getTime() - 600_000).toISOString() });
+  const ops = okOps({ cards_24h: 20, cards_1h: 0 });
+  assert.deepEqual(evaluate(feed(59), ops, mkt).map((p) => p.kind), [], '59 min: fine');
+  const p = evaluate(feed(75), ops, mkt);
+  assert.deepEqual(p.map((x) => x.kind), ['supply']);
+  assert.match(p[0]!.title, /No new card for 75 minutes/);
+  assert.match(p[0]!.detail, /slot_coverage_14d/);
+  assert.deepEqual(evaluate(feed(75), ops, mkt, undefined, { cards24h: 10, cardsMarketHour: 0, gapMinutes: 0 }).map((x) => x.kind), [], 'gap check off');
+  assert.deepEqual(evaluate(feed(75), ops, mkt, undefined, { cards24h: 10, cardsMarketHour: 0, gapMinutes: 90 }).map((x) => x.kind), [], 'limit 90');
+  const night = new Date('2026-11-10T03:17:00Z');  // Mon 22:17 ET
+  assert.deepEqual(evaluate(okFeed({ last_published_at: new Date(night.getTime() - 5 * 3_600_000).toISOString(), last_ok_run_at: new Date(night.getTime() - 600_000).toISOString() }), ops, night).map((x) => x.kind), []);
+  const both = evaluate(feed(75), okOps({ cards_24h: 3 }), mkt);
+  assert.equal(both.filter((x) => x.kind === 'supply').length, 1, 'one supply problem');
+  assert.match(both[0]!.detail, /cards in 24 hours/);
+  assert.match(both[0]!.detail, /No new card for 75 minutes/);
+  assert.deepEqual(evaluate(null, ops, mkt).map((x) => x.kind), ['supabase']);
+});
+
+test('supply gap: Worker var SUPPLY_GAP_MINUTES overrides the limit', async () => {
+  const mkt = new Date('2026-11-10T15:17:00Z');
+  const feed = okFeed({ last_published_at: new Date(mkt.getTime() - 30 * 60_000).toISOString(), last_ok_run_at: new Date(mkt.getTime() - 600_000).toISOString() });
+  const w = world({ feed, ops: okOps({ cards_24h: 20 }) });
+  assert.deepEqual((await runWatchdog(ENV, mkt, w.fetchImpl)).problems, []);
+  const w2 = world({ feed, ops: okOps({ cards_24h: 20 }) });
+  assert.deepEqual((await runWatchdog({ ...ENV, SUPPLY_GAP_MINUTES: '20' }, mkt, w2.fetchImpl)).problems, ['supply']);
+});
+
 // ---- supply floor (M9 workstream 1) ----
 test('supply floor: below the 24 h floor is a problem, at the floor is fine, a missing count (older database) is skipped, 0 turns it off', () => {
-  const k = (ops: OpsStatus, floors?: { cards24h: number; cardsMarketHour: number }) => evaluate(okFeed(), ops, T0, undefined, floors).map((p) => p.kind);
+  const k = (ops: OpsStatus, floors?: { cards24h: number; cardsMarketHour: number; gapMinutes: number }) => evaluate(okFeed(), ops, T0, undefined, floors).map((p) => p.kind);
   assert.deepEqual(k(okOps({ cards_24h: 9, cards_1h: 0 })), ['supply']);
   assert.deepEqual(k(okOps({ cards_24h: 10, cards_1h: 0 })), []);
   assert.deepEqual(k(okOps()), [], 'ops_status without cards_24h: no alert');
   assert.deepEqual(k(okOps({ cards_24h: null })), []);
-  assert.deepEqual(k(okOps({ cards_24h: 0 }), { cards24h: 0, cardsMarketHour: 0 }), []);
-  assert.deepEqual(k(okOps({ cards_24h: 3 }), { cards24h: 5, cardsMarketHour: 0 }), ['supply']);
+  assert.deepEqual(k(okOps({ cards_24h: 0 }), { cards24h: 0, cardsMarketHour: 0, gapMinutes: 0 }), []);
+  assert.deepEqual(k(okOps({ cards_24h: 3 }), { cards24h: 5, cardsMarketHour: 0, gapMinutes: 0 }), ['supply']);
   const p = evaluate(okFeed(), okOps({ cards_24h: 4 }), T0)[0]!;
   assert.match(p.title, /4 cards in 24 hours/);
   assert.match(p.detail, /supply-readout/);
 });
 
 test('supply floor: the market-hour floor is off by default, and when on it counts only in market hours (ET, DST aware)', () => {
-  const on = { cards24h: 10, cardsMarketHour: 1 };
+  const on = { cards24h: 10, cardsMarketHour: 1, gapMinutes: 0 };
   const ops = okOps({ cards_24h: 20, cards_1h: 0 });
-  assert.deepEqual(evaluate(okFeed(), ops, T0).map((p) => p.kind), [], 'default 0: off');
+  assert.deepEqual(evaluate(okFeed(), ops, T0).map((p) => p.kind), [], 'default 0: off (and 07:17 ET is outside the gap check)');
   assert.deepEqual(evaluate(okFeed(), ops, T0, undefined, on).map((p) => p.kind), [], 'Tue 12:17 UTC is 07:17 ET: not a market hour');
   const mkt = new Date('2026-11-10T15:17:00Z');   // Tue 10:17 ET
   assert.deepEqual(evaluate(okFeed({ last_published_at: new Date(mkt.getTime() - 3_600_000).toISOString(), last_ok_run_at: new Date(mkt.getTime() - 600_000).toISOString() }), ops, mkt, undefined, on).map((p) => p.kind), ['supply']);

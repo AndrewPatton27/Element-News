@@ -20,6 +20,7 @@ export interface Env {
   ALERT_REPO: string;                   // var: "owner/element-ops" (private)
   SUPPLY_FLOOR_CARDS_24H?: string;      // optional var: cards in 24 h below this opens a 'supply' alert (default 10, 0 = off)
   SUPPLY_FLOOR_CARDS_MARKET_HOUR?: string;   // optional var: cards in the last hour below this during market hours (default 0 = off)
+  SUPPLY_GAP_MINUTES?: string;          // optional var: no new card for this many minutes during market hours opens a 'supply' alert (default 60, 0 = off)
   HEALTHCHECK_URL?: string;             // optional secret (https://hc-ping.com/<uuid>); when unset the ping is skipped
 }
 
@@ -56,6 +57,7 @@ export async function runWatchdog(env: Env, now: Date, f: Fetcher = (u, i) => fe
   const floors = {
     cards24h: parseFloor(env.SUPPLY_FLOOR_CARDS_24H, DEFAULT_SUPPLY_FLOORS.cards24h),
     cardsMarketHour: parseFloor(env.SUPPLY_FLOOR_CARDS_MARKET_HOUR, DEFAULT_SUPPLY_FLOORS.cardsMarketHour),
+    gapMinutes: parseFloor(env.SUPPLY_GAP_MINUTES, DEFAULT_SUPPLY_FLOORS.gapMinutes),
   };
   const problems = evaluate(feed, ops, now, err, floors);
   report.problems = problems.map((p) => p.kind);

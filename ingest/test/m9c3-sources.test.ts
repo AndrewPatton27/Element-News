@@ -269,5 +269,5 @@ test('migrations 20261138: series rows match the code, run_log extends the live 
   }
   assert.ok(cron.includes('cron.unschedule'), 'idempotent');
   const logic = readFileSync(new URL('../../workers/watchdog/src/logic.ts', import.meta.url), 'utf8');
-  assert.match(logic, /EXPECTED_JOBS = 30;/, '26 + the four jobs of this migration');
+  assert.match(logic, /EXPECTED_JOBS = 38;/, '26 + 4 (M9c3) + 8 cadence jobs: 5 fast sources, 2 NewsData, 1 release queue');
 });

@@ -1,5 +1,6 @@
-// NewsData.io (free plan) -> link-out items. OFF by default (config.newsdata.enabled, env NEWSDATA_ENABLED=1, and the
-// database flag core.app_config.linkout_cards); with no NEWSDATA_API_KEY the source does nothing.
+// NewsData.io (free plan) -> link-out items. ON by default in code (config.newsdata.enabled) but with no NEWSDATA_API_KEY the source
+// does nothing; the Edge Function secret NEWSDATA_ENABLED=0 switches it off; cards publish only while the database flag
+// core.app_config.linkout_cards is true.
 // Rule 7: a link-out card is the publisher's headline verbatim (200-char cap), the publisher's URL, "via NewsData.io" and
 // "Delayed 12 h". Never a description, content, image or AI text: parseNewsdata keeps only the fields listed in
 // NewsdataArticle, so nothing else can reach an item or a card. The article page is never downloaded.
@@ -81,6 +82,29 @@ export function watchTickers(title: string): string[] {
   return [...new Set(config.cpsc.watchNames.filter(([pat]) => new RegExp(`\\b(?:${pat})\\b`, 'i').test(title)).map(([, t]) => t))];
 }
 
+/**
+ * Relevance score without AI (cadence, D-270): how likely a headline is important macro / market / corporate news for a
+ * business reader. Tiers add up once each (macro 3, markets 2, corporate 2, generic finance words 1); a trusted outlet +1;
+ * a ticker symbol +1, a watch-list company +2; a promotional outlet -2; listicle or explainer wording -3. Pure.
+ */
+export function relevanceScore(a: NewsdataArticle): number {
+  const c = config.newsdata;
+  let host = '';
+  try { host = new URL(a.link).hostname.replace(/^www\./, '').toLowerCase(); } catch { /* no link: no domain points */ }
+  const inList = (list: readonly string[]) => list.some((d) => host === d || host.endsWith(`.${d}`));
+  let s = 0;
+  if (c.macroPattern.test(a.title)) s += 3;
+  if (c.marketPattern.test(a.title)) s += 2;
+  if (c.corporatePattern.test(a.title)) s += 2;
+  if (c.financePattern.test(a.title)) s += 1;
+  if (inList(c.trustedDomains)) s += 1;
+  if (inList(c.lowValueDomains)) s -= 2;
+  if (watchTickers(a.title).length) s += 2;
+  else if (a.symbols.length) s += 1;
+  if (c.softPattern.test(a.title)) s -= 3;
+  return s;
+}
+
 /** Article -> link-out RawItem, or the reason it is skipped. Pure. */
 export function newsdataToItem(a: NewsdataArticle, now: Date): { item: RawItem } | { skip: NewsdataSkipReason } {
   const c = config.newsdata;
@@ -92,7 +116,7 @@ export function newsdataToItem(a: NewsdataArticle, now: Date): { item: RawItem }
   if (!when) return { skip: 'bad_date' };
   if (now.getTime() - when.getTime() > c.maxAgeHours * 3_600_000) return { skip: 'too_old' };
   if (c.offTopicPattern.test(a.title)) return { skip: 'off_topic' };
-  if (!c.financePattern.test(a.title)) return { skip: 'not_finance' };
+  if (relevanceScore(a) < c.minScore) return { skip: 'not_finance' };
   const watch = watchTickers(a.title);
   if (c.microPattern.test(a.title) && !watch.length) return { skip: 'micro_or_recall' };
   if (findAdvice(a.title).length) return { skip: 'advice_language' };

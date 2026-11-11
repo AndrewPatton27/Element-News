@@ -87,6 +87,12 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
     refreshTrending: () => rpc('refresh_trending', {}),
     mlPurge: () => rpc('ml_purge', {}),
     async recentHeadlines() {
+      // Live AND queued cards (release queue, 20261142000000_release_queue.sql): a held card must still count as a duplicate.
+      // An older database without api.recent_headlines falls back to the public feed page.
+      try {
+        const all = await rpc<unknown>('recent_headlines', { p_limit: 150 });
+        if (Array.isArray(all)) return all.map((h) => String(h ?? '')).filter(Boolean);
+      } catch { /* fall back */ }
       const page: any = await rpc<any>('feed', { p_mode: 'latest', p_cursor: null, p_limit: 100, p_category: null });
       const items = Array.isArray(page) ? page : page?.items;
       return Array.isArray(items) ? items.map((c: { headline?: unknown }) => String(c.headline ?? '')).filter(Boolean) : [];
