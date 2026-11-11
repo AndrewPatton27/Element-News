@@ -176,3 +176,5 @@ These are not in SQL; set them by hand in every project.
 Tunable ranking and account values (half-life, weights, For you boosts, tracking limits) are rows in `core.rank_params` and `core.rank_event_weights`; change them with `update`.
 
 M9 hardening migrations (not applied): `20261130000000_revoke_pg_net.sql` revokes pg_net (schema `net`) from the client roles by running each REVOKE as the object owner (the earlier revoke ran as `postgres` and did nothing); `20261130000100_report_blurb.sql` adds `api.report_blurb(uuid, text)` (private `core.blurb_reports` table, per-client, per-card and global rate limits, 90-day purge job). Checks: `tests/pg_net_revoke_check.sql`, `tests/report_blurb_check.sql`.
+
+`migrations/20261135000100_topic_tags.sql` (wave 2, NOT applied): `core.topic_tags_of(headline, body, category)` returns the finer topic tags (rates, housing, trade, labor, banks, retirement, crypto, tech-ai); pure, `search_path` empty, execute for the service role only. Mirrors `lib/topics/fineTopics.ts`. Check: `supabase/tests/topic_tags_check.sql`.
