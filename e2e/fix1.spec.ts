@@ -60,3 +60,15 @@ test('data card "More detail" is never empty: numbers panel, what the number mea
   await expect(sheet.getByText(/isn.t available/)).toHaveCount(0);
   await page.context().close();
 });
+
+test('search: "gas prices" finds the oil card first, "Beige Book" finds nothing', async ({ browser }) => {
+  const page = await open(browser, { width: 390, height: 844 }, '/search');
+  const box = page.getByLabel('Search stories, companies and topics');
+  await box.fill('gas prices');
+  await expect(page.getByText(/WTI crude oil/).first()).toBeVisible({ timeout: 30_000 });
+  const firstHeadline = await page.locator('[aria-label^="More detail: "]').first().getAttribute('aria-label');
+  expect(firstHeadline).toMatch(/WTI crude oil/);
+  await box.fill('Beige Book');
+  await expect(page.getByText(/Nothing found for/)).toBeVisible({ timeout: 30_000 });
+  await page.context().close();
+});
