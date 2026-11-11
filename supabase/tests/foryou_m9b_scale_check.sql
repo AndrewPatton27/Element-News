@@ -23,6 +23,7 @@ begin
 
   -- ---- data (bulk load: card triggers off; tags written directly) ----
   alter table core.blurbs disable trigger user;
+  alter table core.blurb_sources disable trigger user;
   insert into core.companies (ticker, name, short_name, sector, industry)
   select 'ZQ' || chr(65 + g / 26) || chr(65 + g % 26), 'Scale Co ' || g, 'Scale ' || g, 'tech', 'software'
     from generate_series(0, 99) g on conflict do nothing;
@@ -45,6 +46,7 @@ begin
     from core.blurbs b where b.dedupe_key like 'sc-%' and abs(hashtext(b.dedupe_key)) % 5 = 0
   on conflict do nothing;
   alter table core.blurbs enable trigger user;
+  alter table core.blurb_sources enable trigger user;
 
   insert into auth.users (email) select 'scale-' || g || '@example.invalid' from generate_series(1, 20000) g;
   insert into core.user_events (user_id, blurb_id, kind, dwell_ms, created_at)
