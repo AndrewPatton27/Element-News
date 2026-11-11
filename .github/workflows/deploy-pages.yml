@@ -1,0 +1,68 @@
+# Deploys the website to Cloudflare Pages (project element-news) when code lands on main, after one approval.
+#
+# What it does NOT do: database migrations and Edge Function deploys stay manual (DEPLOY.md, D-94, D-95): apply those
+# first, then approve this deploy. A site deployed before its migrations can call functions that do not exist yet.
+#
+# Safety: the deploy job runs in the GitHub Environment `production`. Set "Required reviewers" on that environment
+# (Settings, Environments, production) and the job waits for approval before any secret is available.
+# Secrets (environment `production`): CLOUDFLARE_API_TOKEN (Pages: Edit only), CLOUDFLARE_ACCOUNT_ID.
+# Variables (environment `production`, public values only): EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.
+# Never put a service role key, an AI key or any other server secret here. The repository token is read-only.
+name: deploy-pages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'ml/**'
+      - 'workers/**'
+      - 'supabase/**'
+      - '.github/workflows/train-ranker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Checks before building
+        run: |
+          npm run scan:secrets
+          npx tsc --noEmit
+          npm run test:app
+          npm run test:scripts
+      - name: Build the web app (live mode, public values only)
+        env:
+          EXPO_PUBLIC_API_MODE: supabase
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$EXPO_PUBLIC_SUPABASE_URL" && test -n "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          npm run export:web
+      - name: Security gate on the build (files only)
+        run: node scripts/security-gate.mjs --require-build
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler@4 pages deploy dist-pages --project-name element-news --branch main --commit-hash "$GITHUB_SHA" --commit-dirty=true
+      - name: Smoke test the live site
+        env:
+          SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run smoke:prod
