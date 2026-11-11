@@ -20,3 +20,9 @@ writeFileSync(join(root, mig), replaceBlock(read(mig), SEED_BEGIN, SEED_END, com
 const check = 'supabase/tests/companies_check.sql';
 writeFileSync(join(root, check), replaceBlock(read(check), CASES_BEGIN, CASES_END, taggingCasesSql(cases)));
 console.log(`gen-companies-sql: wrote the seed into ${mig} and ${cases.length} cases into ${check}`);
+
+// Extended SEC watch list (contract/companiesExtra.ts) -> supabase/migrations/20261136000000_companies_extra.sql
+import { EXTRA_BEGIN, EXTRA_END, extraCompaniesSeedSql } from '../contract/companiesSql.ts';
+const extraMig = 'supabase/migrations/20261136000000_companies_extra.sql';
+writeFileSync(join(root, extraMig), replaceBlock(read(extraMig), EXTRA_BEGIN, EXTRA_END, extraCompaniesSeedSql()));
+console.log(`gen-companies-sql: wrote the extended seed into ${extraMig}`);

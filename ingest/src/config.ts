@@ -4,6 +4,8 @@
 // Outputs: the `config` object, small derived helpers (caps, pacing, Federal Register URLs) and
 // readEnv/describeEnv for the environment (key values are never printed).
 
+import { COMPANIES_EXTRA } from '../../contract/companiesExtra.ts';
+
 export const config = {
   // ---- AI summarizer --------------------------------------------------------
   gemini: {
@@ -252,7 +254,7 @@ export const config = {
   sourceTextMaxChars: 10_000,                  // about 2.5k tokens sent to the AI
 
   feeds: {
-    sec8k: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=40&output=atom',
+    sec8k: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=100&output=atom',   // 100 newest 8-Ks (EDGAR accepts 100; was 40, M9c R-360): the hourly run sees more of the same-day filings
     fedRss: [
       'https://www.federalreserve.gov/feeds/press_monetary.xml',
       'https://www.federalreserve.gov/feeds/press_all.xml',
@@ -474,6 +476,34 @@ export const config = {
   // unfinished for weeks and a run could not reach its tail inside the time budget. 21 days keeps the per-company lists useful as a
   // safety net for the 40-entry current feed without stale quarter-old cards (M9c, R-300).
   secLookbackDays: 21,
+  // Extended SEC watch list (M9c, R-360): large US-listed companies beyond the household-name directory, from
+  // contract/companiesExtra.ts (generated from SEC's own ticker list). Same 8-K rules as watchCompanies; the directory
+  // test keeps watchCompanies at the household-name list, so this is a second list that runSec adds to it.
+  secExtraWatch: COMPANIES_EXTRA.map((c) => c.ticker) as readonly string[],
+  // How runSec finds filings for ~540 companies inside the Edge Function's ~140 s wall limit (it used to make one
+  // data.sec.gov request per company, 190 of them):
+  //   1. EDGAR daily index on www.sec.gov (one file per business day, ~1 MB, every 8-K of the day with its CIK and
+  //      accession number, no key): the last `days` calendar days are read, the watched CIKs picked out, filings the
+  //      database already handled dropped (api.items_handled) and only the CIKs with a NEW filing get one
+  //      data.sec.gov submissions request (that is where the item numbers are).
+  //   2. A rotating safety slice of `rotationPerRun` watched CIKs, chosen from the clock hour (hour mod slices), so every
+  //      company's own filing list is re-read about every (540 / rotationPerRun) hours even if the index is missing.
+  //   3. The current 8-K Atom feed, as before.
+  // Fair access: the shared limiter (5 requests a second, SEC allows 10) and SEC_USER_AGENT (app name plus contact email).
+  secIndex: {
+    urlTemplate: 'https://www.sec.gov/Archives/edgar/daily-index/{yyyy}/QTR{q}/form.{yyyymmdd}.idx',
+    days: 3,                       // today, yesterday and the day before (weekends and holidays have no file: a 404 is fine)
+    cacheTtlMinutes: 30,
+    maxNewCiksPerRun: 60,          // upper bound on submissions requests caused by index hits in one run
+    rotationPerRun: 30,            // safety slice per run
+  },
+  // Reg FD (7.01) and other-events (8.01) filings (M9c, R-360): they used to be dropped as 'low_value' before any AI call. Now a
+  // watch-list filing whose only card items are 7.01/8.01 may become a card IF the AI scores it relevance 3+ (minEverydayRelevance,
+  // unchanged). Cost control: at most `maxPerRun` such filings are worked on per run (hourly runs, so at most about 24 AI
+  // attempts a day, usually 10 to 20 because most hours have none), pure boilerplate is skipped before any AI call
+  // (conference attendance, slide decks, exhibit-only pointers; see isBoilerplateRegFd), and they never get a template card
+  // (a template cannot judge relevance), so with no AI available they simply wait.
+  secRegFd: { enabled: true, maxPerRun: 1, items: ['7.01', '8.01'] as readonly string[], minWords: 14 },
   // Earnings press release. An Item 2.02 8-K is usually a cover page; the figures sit in the EX-99.1
   // exhibit (a page on www.sec.gov, so the page host list already allows it). For a filing with one of
   // these items the exhibit is fetched through the same limiter and cache and its text goes to the AI

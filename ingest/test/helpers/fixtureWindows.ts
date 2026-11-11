@@ -13,3 +13,5 @@ c.cpsc.maxPerRun = 5;
 c.nasa.maxAgeDays = 14;
 c.secLookbackDays = 14;
 c.secLookbackDays = 10;
+// The fixtures hold Apple's filing list only: read every watched company's list (no rotating slice) so it is reached.
+c.secIndex.rotationPerRun = 100_000;

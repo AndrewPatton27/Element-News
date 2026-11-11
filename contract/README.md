@@ -10,6 +10,7 @@ The shared data contract between the back end (Supabase, `api` schema) and the a
 | `account.ts` | Types and RPC bodies for signed-in users (`UserPrefs`, `ForYouPage`, `TrackParams`, ...). Described in `account.md`. |
 | `account.md` | The accounts contract: sign-in calls, account RPCs, For you behaviour and scoring, account security and dashboard settings. |
 | `companies.ts` | The company directory (ticker, name, sector, industry, aliases, ambiguous names, cue and negative words) and the sector list. Source of the `core.companies` seed. No prices. |
+| `companiesExtra.ts` | GENERATED. About 350 more large US-listed companies (ticker, CIK, exchange, name, sector) for the SEC 8-K watch list and the company directory; no aliases, so they are tagged by filing or explicit ticker only. See `scripts/gen-companies-extra.mjs`. |
 | `companyMatch.ts` | Which companies a card is about (deterministic; the TypeScript twin of `core.match_companies`), plus the search scoring and trigram helpers shared with `api.search_companies`. |
 | `companiesSql.ts` | Builds the generated SQL blocks (directory seed, shared test cases) for `scripts/gen-companies-sql.mjs`. |
 | `fixtures/company_tagging_cases.json` | Tagging cases (false positives such as "apple pie", "Harrison Ford", "Chevron deference" and real mentions) run by both the ingest test and the SQL check. |
