@@ -1,0 +1,16 @@
+{
+  "status": "success",
+  "totalResults": 9,
+  "results": [
+    {"article_id": "a1", "title": "Fed holds rates steady as inflation cools to 2.9%", "link": "https://www.example-times.com/business/fed-holds", "description": "SECRET DESCRIPTION TEXT", "content": "SECRET FULL CONTENT", "image_url": "https://img.example-times.com/fed.jpg", "pubDate": "2026-11-10 20:00:00", "pubDateTZ": "UTC", "source_id": "example_times", "source_name": "Example Times", "symbol": ["SPY"], "ai_summary": "SECRET AI SUMMARY"},
+    {"article_id": "a2", "title": "Fed holds rates steady, inflation cools to 2.9%, officials say", "link": "https://www.other-news.com/fed-steady", "pubDate": "2026-11-10 19:00:00", "source_name": "Other News", "symbol": []},
+    {"article_id": "a3", "title": "Acme Widgets recalls 400 desk lamps over fire risk", "link": "https://www.example-times.com/recall-lamps", "pubDate": "2026-11-10 18:00:00", "source_name": "Example Times"},
+    {"article_id": "a4", "title": "Penny stock XYZQ soars 300% on OTC markets", "link": "https://www.example-times.com/penny", "pubDate": "2026-11-10 17:00:00", "source_name": "Example Times", "symbol": ["XYZQ"]},
+    {"article_id": "a5", "title": "Celebrity couple buys a mansion", "link": "https://www.example-times.com/celeb", "pubDate": "2026-11-10 16:00:00", "source_name": "Example Times"},
+    {"article_id": "a6", "title": "Analyst says it is time to buy Nvidia stock before earnings", "link": "https://www.example-times.com/nvda-buy", "pubDate": "2026-11-10 15:00:00", "source_name": "Example Times", "symbol": ["NVDA"]},
+    {"article_id": "a7", "title": "Home Depot recalls ladders; shares slip after earnings", "link": "https://www.example-times.com/hd", "pubDate": "2026-11-10 14:00:00", "source_name": "Example Times", "symbol": ["HD"]},
+    {"article_id": "a8", "title": "Treasury yields climb after strong jobs report", "link": "http://insecure.example.com/yields", "pubDate": "2026-11-10 13:00:00", "source_name": "Insecure"},
+    {"article_id": "a9", "title": "Oil prices fall on OPEC supply news", "link": "https://www.example-times.com/oil", "pubDate": "2026-11-01 13:00:00", "source_name": "Example Times"}
+  ],
+  "nextPage": null
+}

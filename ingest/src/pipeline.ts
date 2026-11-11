@@ -13,6 +13,7 @@ import { beaItemToItem } from './sources/bea.ts';
 import { cpscToItem, cpscUrl, parseCpscJson, selectRecalls } from './sources/cpsc.ts';
 import { nasaFeedUrl, nasaToItem, parseNasaRss, selectNasaReleases } from './sources/nasa.ts';
 import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
+import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, type NewsdataEndpoint } from './sources/newsdata.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
@@ -35,9 +36,9 @@ import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
-  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts';
+  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'newsdata_market' | 'newsdata_latest';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata',
-  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts'];
+  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'newsdata_market', 'newsdata_latest'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -51,6 +52,8 @@ export interface Deps {
   /** EIA open data key (EIA_API_KEY) and optional Census key (CENSUS_API_KEY); null/undefined = that source skips */
   eiaApiKey?: string | null;
   censusApiKey?: string | null;
+  /** NewsData.io link-out source (all optional): the key (NEWSDATA_API_KEY), the env switch (NEWSDATA_ENABLED=1) and the credit counter. No key or switch off = the source skips. */
+  newsdata?: { apiKey?: string | null; enabled?: boolean; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -162,6 +165,8 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('fomc')) await runFomc(deps, stats);
   if (only.has('blscal')) await runBlsCal(deps, stats);
   if (only.has('mts')) await runMts(deps, stats);
+  if (only.has('newsdata_market')) await runNewsdata(deps, ctx, 'market');
+  if (only.has('newsdata_latest')) await runNewsdata(deps, ctx, 'latest');
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
@@ -327,6 +332,74 @@ async function runNasa(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
     });
   } catch (e) {
     deps.log(`nasa: feed failed: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * NewsData.io link-out cards (rule 7). Three locks: the switch (config.newsdata.enabled or NEWSDATA_ENABLED=1), the key
+ * (NEWSDATA_API_KEY) and, in the database, app_config.linkout_cards. Each run costs ONE credit, counted before the request
+ * against config.newsdata.dailyCreditCap. No AI, no page fetch; only the headline, publisher and link are kept.
+ */
+async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: NewsdataEndpoint): Promise<void> {
+  const nd = deps.newsdata;
+  const c = config.newsdata;
+  const tag = `newsdata ${endpoint}`;
+  if (!(c.enabled || nd?.enabled)) { deps.log(`${tag}: switched off, skipping`); return; }
+  const key = nd?.apiKey?.trim();
+  if (!key) { deps.log(`${tag}: NEWSDATA_API_KEY not set, skipping`); return; }
+  const take = nd?.takeCredit ?? (async () => {
+    if (deps.counter.used('newsdata') >= c.dailyCreditCap) return false;
+    deps.counter.add('newsdata');
+    return true;
+  });
+  if (!(await take())) { deps.log(`${tag}: daily credit cap ${c.dailyCreditCap} reached, skipping`); return; }
+  try {
+    const articles = parseNewsdata(await deps.fetchText(newsdataUrl(endpoint, key), 'api', 0));
+    const seen: string[] = [];                       // headlines of this run's new cards (the same story from two publishers)
+    let recent: string[] | null = null;              // headlines of live cards, loaded once and only if a candidate gets that far
+    let fresh = 0;
+    let skipped = 0;
+    for (const a of articles.sort((x, y) => y.pubDate.localeCompare(x.pubDate))) {
+      if (fresh >= c.maxPerRun) break;
+      const r = newsdataToItem(a, deps.now);
+      if (!('item' in r)) { skipped++; continue; }
+      const it = r.item;
+      const cand = { url: it.url, tickers: it.tickers.map((t) => t.symbol), sortAt: new Date(it.published_at) };
+      const d = guard.check(cand);
+      if (!d.ok) { stats.skipped++; continue; }
+      if (!recent) {
+        try { recent = (await Promise.resolve(deps.publisher.recentHeadlines?.())) ?? []; } catch { recent = []; }
+      }
+      if (isNearDuplicate(it.title, [...seen, ...recent])) { stats.skipped++; deps.log(`skip duplicate_story: ${it.title}`); continue; }
+      let row: ItemRow;
+      try {
+        row = await deps.publisher.upsertItem(it);
+      } catch (e) {
+        stats.failed++;
+        deps.log(`failed: record item: ${redactKey((e as Error).message, key)}`);
+        continue;
+      }
+      if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
+      fresh++;
+      try {
+        const payload = newsdataPayload(it, row.id);
+        const v = validatePublish(payload, { linkOutEnabled: true });
+        if (!v.ok) throw new Error(v.errors.join('; '));
+        const res = await deps.publisher.publishBlurb(payload);
+        stats[res.status === 'published' ? 'published' : res.status]++;
+        if (res.status === 'published') { guard.record(cand); seen.push(it.title); }
+        deps.log(`${res.status} [link_out] ${payload.headline}`);
+      } catch (e) {
+        stats.failed++;
+        const msg = redactKey((e as Error).message, key);
+        deps.log(`failed: ${it.url}: ${msg}`);
+        // Database flag off (linkout_cards false): leave the item 'new' so it publishes once Drew flips the flag.
+        if (!/link_out cards are disabled/.test(msg)) await deps.publisher.setItemStatus(row.id, 'failed', msg).catch(() => {});
+      }
+    }
+    deps.log(`${tag}: ${articles.length} articles, ${skipped} filtered out (not finance, recall/micro, advice, old), ${fresh} new`);
+  } catch (e) {
+    deps.log(`${tag}: request failed: ${redactKey((e as Error).message, key)}`);
   }
 }
 

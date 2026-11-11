@@ -6,7 +6,7 @@
 //              (--limit = max cards; with --dry-run: the cards in src/fixtures/rewrite-cards.json)
 //   --backfill-macro  one-off: FRED history for the Trends charts via api.upsert_macro (no data cards);
 //              --weeks N = weeks of history (default 16); with --dry-run: DGS10 fixture only
-//   --only     comma-separated subset of sources (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts)
+//   --only     comma-separated subset of sources (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, newsdata_market, newsdata_latest)
 //   --limit    max news items summarized per run (default 20)
 //   --json     with --dry-run: print the card payloads as JSON
 //   --fix-category <card-id> <slug>   re-file one card (service role; api.set_card_category)
@@ -270,6 +270,7 @@ export async function main(argv: string[]): Promise<number> {
     keys: { bls: process.env.BLS_API_KEY?.trim() || null, bea: process.env.BEA_API_KEY?.trim() || null, beaDataEnabled: process.env.BEA_DATA_ENABLED === '1' },
     eiaApiKey: process.env.EIA_API_KEY?.trim() || null,        // optional keys for the agency sources (never logged)
     censusApiKey: process.env.CENSUS_API_KEY?.trim() || null,
+    newsdata: { apiKey: process.env.NEWSDATA_API_KEY?.trim() || null, enabled: process.env.NEWSDATA_ENABLED === '1' },   // link-out source, OFF unless both are set
     now: new Date(),
     log,
     reportCard: process.env.REPORT_CARD_PROTOCOL === '1' ? { enabled: true } : undefined,   // write -> score -> revise-once protocol, off by default

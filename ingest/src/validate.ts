@@ -572,8 +572,33 @@ export interface PublishSource {
   license_class: string;
 }
 
+/**
+ * Rule 7 for a link_out card. Accepted ONLY when the feature flag is on, the card was built by the newsdata source, it is
+ * AI-free, has no body, a verbatim headline of at most config.newsdata.headlineMaxChars, the "via NewsData.io" credit,
+ * and exactly link_out publisher sources. Returns the errors (empty = ok).
+ */
+export function checkLinkOut(
+  card: { ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null },
+  enabled: boolean,
+): string[] {
+  if (!enabled) return ['link_out cards are disabled in this build'];
+  const e: string[] = [];
+  if (card.origin !== 'newsdata') e.push('link_out cards are only allowed from the newsdata source');
+  if (card.ai_generated) e.push('link_out cards are never AI-generated');
+  if (card.body) e.push('link_out cards carry no body or description (rule 7)');
+  const h = card.headline ?? '';
+  if (!h.trim()) e.push('link_out card needs a headline');
+  else if (h.length > config.newsdata.headlineMaxChars) e.push(`link_out headline longer than ${config.newsdata.headlineMaxChars} chars`);
+  if (card.attribution !== config.newsdata.attribution) e.push(`link_out card must carry "${config.newsdata.attribution}"`);
+  for (const s of card.sources ?? []) if (s.license_class !== 'link_out') e.push(`link_out card cites a source that is not link_out: ${s.license_class}`);
+  return e;
+}
+
 /** Publish-time checks (same as api.publish_blurb): >= 1 https source, no dev_only, AI cards cite only summarizable text, no link_out. */
-export function validatePublish(card: { kind: string; ai_generated: boolean; sources: PublishSource[] }): Result {
+export function validatePublish(
+  card: { kind: string; ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null },
+  opts: { linkOutEnabled?: boolean } = {},
+): Result {
   const errors: string[] = [];
   if (!Array.isArray(card.sources) || card.sources.length === 0) errors.push('card needs at least one source link');
   else {
@@ -590,6 +615,6 @@ export function validatePublish(card: { kind: string; ai_generated: boolean; sou
       }
     }
   }
-  if (card.kind === 'link_out') errors.push('link_out cards are disabled in this build');
+  if (card.kind === 'link_out') errors.push(...checkLinkOut(card, opts.linkOutEnabled === true));
   return { ok: errors.length === 0, errors };
 }
