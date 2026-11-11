@@ -51,7 +51,7 @@ export function auctionCard(a: AuctionResult): PublishPayload | null {
   const body = `The Treasury's ${day} auction of ${term} ${kind}s set a high yield of ${fmt(a.highYield, 3)}%, the highest rate accepted.${sold}${cover}`;
   const at = new Date(`${a.auctionDate}T17:00:00Z`).toISOString();
   return buildAgencyDataCard({
-    dedupeKey: `treasury-auction:${a.cusip}:${a.auctionDate}`, headline, body, category: 'markets', asOf: at,
+    dedupeKey: `AUCTION_${term.replace("-year","Y").toUpperCase()}_${kind.toUpperCase()}:${a.auctionDate}`, headline, body, category: 'markets', asOf: at,
     agencyName: AGENCY, agencyUrl: 'https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/', docLabel: 'Treasury Securities Auctions Data',
     attribution: config.agency.auctions.attribution,
     paragraphs: [

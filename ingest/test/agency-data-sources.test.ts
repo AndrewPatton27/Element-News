@@ -46,7 +46,7 @@ test('EIA petroleum: crude headline with the change, gasoline and distillate in 
   assert.equal(c.kind, 'data');
   assert.equal(c.ai_generated, false);
   assert.equal(c.category, 'energy');
-  assert.equal(c.dedupe_key, 'eia:petroleum:2026-11-06');
+  assert.equal(c.dedupe_key, 'EIA_PETROLEUM:2026-11-06');
   assert.equal(c.attribution, 'Source: U.S. Energy Information Administration');
   assert.equal(c.sources[0].name, 'U.S. Energy Information Administration');
   assert.equal(c.sources[0].license_class, 'public_domain');
@@ -57,7 +57,7 @@ test('EIA petroleum: crude headline with the change, gasoline and distillate in 
 test('EIA gas storage and gasoline: formatted, bad "null" rows ignored; one row only gives no card', () => {
   const g = gasStorageCard(parseEia(fx('eia-gas-storage.json')))!;
   assert.equal(g.headline, 'U.S. natural gas storage rises 52 Bcf in the week ending Nov 6');
-  assert.equal(g.dedupe_key, 'eia:gas-storage:2026-11-06');
+  assert.equal(g.dedupe_key, 'EIA_GAS_STORAGE:2026-11-06');
   assert.deepEqual(validatePublish(g).errors, []);
   const p = gasolineCard(parseEia(fx('eia-gasoline.json')))!;
   assert.equal(p.headline, 'U.S. regular gas price rises to $3.12 a gallon in the week of Nov 9');
@@ -66,7 +66,7 @@ test('EIA gas storage and gasoline: formatted, bad "null" rows ignored; one row 
   assert.deepEqual(parseEia('{}'), []);
 });
 
-test('runOnce eia: needs a key, never logs it, two cards (gasoline stays off), a rerun gives duplicates only', async () => {
+test('runOnce eia: needs a key, never logs it, three cards (gasoline stays off), a rerun gives duplicates only', async () => {
   const none = fakeDeps(async () => { throw new Error('should not fetch'); });
   await runOnce(none.deps, { only: ['eia'] });
   assert.ok(none.lines.some((l) => /EIA_API_KEY not set/.test(l)));
@@ -76,18 +76,18 @@ test('runOnce eia: needs a key, never logs it, two cards (gasoline stays off), a
   const { dry, lines, deps } = fakeDeps(async (url, kind) => {
     assertAllowed(url, kind);
     seen.push(url);
-    return url.includes('/stoc/wstk/') ? fx('eia-petroleum-stocks.json') : url.includes('/stor/wkly/') ? fx('eia-gas-storage.json') : '{}';
+    return url.includes('/stoc/wstk/') ? fx('eia-petroleum-stocks.json') : url.includes('/stor/wkly/') ? fx('eia-gas-storage.json') : url.includes('/sndw/') ? fx('eia-supply-weekly.json') : url.includes('/wiup/') ? fx('eia-utilization-weekly.json') : '{}';
   }, { eiaApiKey: KEY });
   const stats = await runOnce(deps, { only: ['eia'] });
-  assert.equal(seen.length, 2, 'one request per report group, gasoline off');
-  assert.equal(dry.cards.length, 2);
-  assert.equal(stats.data_cards, 2);
-  assert.equal(stats.template, 2);
+  assert.equal(seen.length, 4, 'one request per report group (supply uses two), gasoline off');
+  assert.equal(dry.cards.length, 3);
+  assert.equal(stats.data_cards, 3);
+  assert.equal(stats.template, 3);
   assert.equal(stats.ai, 0, 'no AI call');
   assert.ok(!JSON.stringify([lines, dry.cards]).includes(KEY), 'the key never reaches cards or logs');
   const again = await runOnce(deps, { only: ['eia'] });
   assert.equal(again.published, 0);
-  assert.equal(dry.cards.length, 2, 'idempotent');
+  assert.equal(dry.cards.length, 3, 'idempotent');
 });
 
 test('runOnce eia: one failing report does not stop the other', async () => {
@@ -109,7 +109,7 @@ test('Treasury auctions: only settled note/bond results, TIPS and bills skipped,
   assert.equal(c.headline, '10-year Treasury note auction clears at 4.215%');
   assert.match(c.body!, /offered \$42 billion/);
   assert.match(c.body!, /2\.61 times/);
-  assert.equal(c.dedupe_key, 'treasury-auction:91282CPA1:2026-11-10');
+  assert.equal(c.dedupe_key, 'AUCTION_10Y_NOTE:2026-11-10');
   assert.equal(c.category, 'markets');
   assert.equal(c.sources[0].name, 'U.S. Department of the Treasury, Fiscal Service');
   assert.deepEqual(validatePublish(c).errors, []);
@@ -143,7 +143,7 @@ test('Census parsers and cards (when enabled): error rows dropped, notice on the
   assert.deepEqual(retail.map((p) => p.time), ['2026-08', '2026-09', '2026-10']);
   const c = censusCard('retail', retail)!;
   assert.equal(c.headline, 'Retail sales rise 0.6% in Oct');
-  assert.equal(c.dedupe_key, 'census:retail:2026-10');
+  assert.equal(c.dedupe_key, 'CENSUS_RETAIL:2026-10');
   assert.match(c.attribution!, /not endorsed or certified by the Census Bureau/);
   assert.match(c.body!, /\$745\.5 billion/);
   assert.deepEqual(validatePublish(c).errors, []);
@@ -195,9 +195,9 @@ test('FOMC minutes arrive through the existing Fed page path: labelled, credited
   assert.ok(config.pageHosts.includes('www.federalreserve.gov'));
 });
 
-test('every agency source states a per-run cap of at most 3 new cards', () => {
+test('every agency source states a per-run cap of at most 4 new cards (EIA reports four a week)', () => {
   const a = config.agency;
-  for (const cap of [a.eia.maxCardsPerRun, a.census.maxCardsPerRun, a.auctions.maxCardsPerRun]) assert.ok(cap >= 1 && cap <= 3);
+  for (const cap of [a.eia.maxCardsPerRun, a.census.maxCardsPerRun, a.auctions.maxCardsPerRun]) assert.ok(cap >= 1 && cap <= 4);
 });
 
 test('cron migration: idempotent, mirrors the element-ingest jobs, run_log accepts the new sources', () => {
