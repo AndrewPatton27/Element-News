@@ -14,6 +14,7 @@ import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts } from '../../lib/theme/theme';
 import { linkProps } from './SourceChip';
+import { SeriesChart } from './SeriesChart';
 
 // Green = generally good for households, red = generally bad, gray = no change
 // or neither (see lib/numberTone.ts). The glyph and word carry the direction.
@@ -41,7 +42,9 @@ export function DataNotices({ card, config, small }: { card: BlurbCard; config: 
   );
 }
 
-export function DataFacts({ card, config, compact, dense, hideNotices }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean; hideNotices?: boolean }) {
+// chartH: height of the history chart under the numbers (0 or missing = none; the feed card passes 0 on short phones);
+// `detail` draws the taller detail-sheet chart with its low/high line.
+export function DataFacts({ card, config, compact, dense, hideNotices, chartH = 0, detail }: { card: BlurbCard; config: AppConfig | null; compact?: boolean; dense?: boolean; hideNotices?: boolean; chartH?: number; detail?: boolean }) {
   const p = usePalette();
   // One number gets the design's 64 px. Two short ones sit side by side, smaller, with the change
   // on its own line. Three numbers, or any long value ("10,284.57"), become rows (label and
@@ -96,6 +99,7 @@ export function DataFacts({ card, config, compact, dense, hideNotices }: { card:
         ))}
         </View>
         )}
+        {chartH > 0 ? <SeriesChart card={card} height={chartH} detail={detail} /> : null}
         {sharedCite ? (
           <Text numberOfLines={2} style={[styles.cite, styles.citeMulti, styles.citeShared, { color: p.inkSoft, borderTopColor: p.border }]}>
             {sharedCite}

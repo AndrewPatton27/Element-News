@@ -122,3 +122,10 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 - `SearchSuggestions.tsx`: headlines get 3 lines on phones (the topic button is 112 px max) instead of cutting at 2.
 - `DetailBody.tsx` uses `detailKeyPoints` (`lib/shared/detail.ts`): no "Source: ..." bullet (the source line and Sources list say it) and, on a data card, no bullet that repeats a number from the numbers panel.
 
+
+## Data-card history charts (M9c chart cards, D-260 to D-262)
+
+- `card/SeriesChart.tsx`: the small line chart of a data card, drawn with `react-native-svg` (no new dependency), no animation (so nothing to reduce). One line for a single series (latest reading as a dot with a ring; the line is green or red only when the change is judged, otherwise the brand accent, via `trendColors`), and four lines (2, 5, 10, 30-year; colour and dash both differ, plus a text legend with the latest values) on the daily yield-curve card (the card whose facts include the 2- and 10-year). The chart sits inside the numbers panel under the numbers, so the agency citation and the FRED notice (`DataNotices`, outside the scrolling middle) are untouched (rule 8). The wrapper is `role="img"` with a sentence ("10-year yield, 4.84%, up 3 basis points since Tuesday; chart of the last 60 days"); the svgs are `aria-hidden`.
+- Sizes: `Card.tsx` passes `chartH` to `DataFacts`: 30 (a thin line, no caption or legend) on compact phone cards, 36 to 52 on normal phone cards, 56 or 84 on desktop. The chart loads lazily when the card is shown and reserves its room while loading; a card with no history (agency cards such as EIA or auctions) shows nothing. `DetailBody` passes `detail` with a 170 px chart and a caption with the low and high (dates included).
+- Data: `lib/history/` (see `lib/lib.md`).
+- Test: `e2e/chart.spec.ts` (screenshots at 360, 390, 820, 1280 in `context/m9c-chart-shots/`).

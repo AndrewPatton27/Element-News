@@ -199,3 +199,11 @@ Flags (`flags/flags.ts`): `onboarding`, `signals`, `since`, `glossary`, `topics`
 - `glossary/glossary.ts` (D-02): about 120 terms (D-232: Fed, core inflation, PPI, retail sales, ISM/PMI, oil benchmarks, EBITDA, Form 4, Schedule 13D, credit spreads, Chapter 11 and more), static text, `segmentText` marks each term once per text (max 6), `glossaryTermsIn` feeds the 44 px "Words in this story" row in the detail sheet, no lookbehind regex (older Safari).
 - `onboarding/setupLogic.ts` (A-17): `planSetup` turns the three answers into interests, lanes, depth and parent-category follows. Lanes are opted in, never followed.
 - Tests: `__tests__/wave2.test.ts`.
+
+## Data-card history (`history/`, M9c chart cards)
+
+- `seriesHistory.ts` (pure): `parseMacroHistory` (api.macro_history answer, bad rows dropped), `chartSpec(card)` (which series a data card charts: the four maturities for the yield-curve card, else its first number), `chartGeometry` (shared scale, x by date), `describeChart` (screen-reader sentence), `spokenChange`, `spanPhrase`, `formatLike` / `rangeText` (low and high in the card's own units).
+- `historyLoader.ts` (pure, injected fetch): collects asks for 30 ms and sends batches of at most 6 series, caches answers 10 minutes (a series without history too) and failures 60 seconds; never rejects.
+- `useSeriesHistory.ts`: the React hook (one loader per `Api`); `mockHistory.ts`: seeded sample history that ends on the sample card's value.
+- `Api.macroHistory(ids)` (`api.supabase.ts` plans `rpc/macro_history` with `p_series`; a missing RPC or any error gives `{}`, so the card just has no chart). The feed page payload is unchanged: history is fetched lazily per card.
+- Tests: `lib/__tests__/seriesHistory.test.ts`.

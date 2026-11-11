@@ -71,7 +71,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
         </View>
       ) : null}
 
-      {card.kind === 'data' ? <DataFacts card={card} config={config} /> : null}
+      {card.kind === 'data' ? <DataFacts card={card} config={config} chartH={170} detail /> : null}
 
       {paragraphs.map((t, i) =>
         gloss ? (

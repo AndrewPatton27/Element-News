@@ -148,6 +148,8 @@ export function Card(props: Props) {
   const headlineLead = wide ? 1.07 : linkOut ? 1.12 : 1.1;
   // Bar and type sizes. Narrow phones (under 360 px of card) get the small bar.
   const barSize: BarSize = wide ? 'wide' : compact || (box.w > 0 && box.w < 350) ? 'small' : 'phone';
+  // History chart under the numbers: a thin line on compact (short) phones, small on dense two- and three-number cards.
+  const chartH = card.kind !== 'data' ? 0 : compact ? 30 : wide ? (tight ? 56 : 84) : denseData ? 40 : box.h > 0 && box.h < 560 ? 36 : 52;
   const type = bodyType(!!wide, !!compact, box.h, tablet);
   // How many bullets fit: data cards share the space with the numbers panel.
   // A-22 depth preference (flag `signals`): "Short" keeps one bullet per card.
@@ -376,7 +378,7 @@ export function Card(props: Props) {
                 >
                   {headline}
 
-                  {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} hideNotices /> : null}
+                  {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} hideNotices chartH={chartH} /> : null}
 
                   {showTakeaways ? (
                     <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />

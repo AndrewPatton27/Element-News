@@ -7,6 +7,7 @@ import { resolveApiConfig, readEnv, type ApiConfig } from './config.ts';
 import { allCards, createMockApi } from './api.mock.ts';
 import { createMockAccount, createSupabaseAccount, type AccountApi } from '../account/account.ts';
 import { createSupabaseApi } from './api.supabase.ts';
+import type { MacroHistory } from '../history/seriesHistory.ts';
 import type { ReportReason, ReportResult } from './report.ts';
 import type { CompanyApi } from '../companies/companyApi.ts';
 
@@ -30,6 +31,8 @@ export interface Api {
   topStories(): Promise<BlurbCard[]>;
   /** 10-yr Treasury, CPI, unemployment, WTI crude with a 12-point history. [] when unavailable. */
   numberTrends(): Promise<NumberTrend[]>;
+  /** Recent readings of up to 6 macro series for the data-card charts (api.macro_history). {} when unavailable; never throws. */
+  macroHistory(ids: string[]): Promise<MacroHistory>;
   search(q: string, cursor?: string | null, limit?: number): Promise<FeedPage>;
   relatedCards(cardId: string, limit?: number): Promise<BlurbCard[]>;
   /** One published card by id (the /b/<id> share page). null when unknown, not published, or the server

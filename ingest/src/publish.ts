@@ -14,6 +14,8 @@ export interface Publisher {
   setItemStatus(id: string, status: 'new' | 'skipped' | 'failed', note: string): Promise<void>;   // 'new' + note = retry counter (src/retry.ts)
   publishBlurb(p: PublishPayload): Promise<{ status: 'published' | 'duplicate' | 'ticker_cap'; id: string | null }>;
   upsertMacro(o: MacroObservation): Promise<void>;
+  /** Recent history of one series in one call (api.upsert_macro_batch, max 200 rows) for the data-card charts. Optional; a failure never stops a run. */
+  upsertMacroBatch?(rows: MacroObservation[]): Promise<void>;
   /** --rewrite: published cards whose prompt_version is not in `current` (api.blurbs_to_revise). */
   listToRevise?(current: string[], limit: number): Promise<RevisableCard[]>;
   /** --rewrite: update a card in place or hide it (api.revise_blurb). */
@@ -82,6 +84,7 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
     },
     publishBlurb: (p) => rpc('publish_blurb', { p }),
     upsertMacro: async ({ move: _move, ...o }) => { await rpc('upsert_macro', { p: o }); },   // move is not stored
+    upsertMacroBatch: async (rows) => { if (rows.length) await rpc('upsert_macro_batch', { p: rows.map(({ move: _move, ...o }) => o) }); },
     listToRevise: (current, limit) => rpc('blurbs_to_revise', { p_current: current, p_limit: limit }),
     reviseBlurb: (p) => rpc('revise_blurb', { p }),
     refreshTrending: () => rpc('refresh_trending', {}),
@@ -119,6 +122,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
   const items: RawItem[] = [];
   const cards: PublishPayload[] = [];
   const macro: MacroObservation[] = [];
+  const macroHistory: MacroObservation[][] = [];
   const revisions: RevisePayload[] = [];
   const seen = new Set<string>();
   const trending = { refreshes: 0, mlPurges: 0 };
@@ -138,6 +142,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
       return { status: 'published', id: `dry-card-${cards.length}` };
     },
     async upsertMacro(o) { macro.push(o); },
+    async upsertMacroBatch(rows) { macroHistory.push(rows); },
     async listToRevise(current, limit) {
       return toRevise.filter((c) => !c.prompt_version || !current.includes(c.prompt_version)).slice(0, limit);
     },
@@ -150,7 +155,7 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
     async refreshTrending() { trending.refreshes += 1; return { generation: trending.refreshes, boosted: 0 }; },
     async mlPurge() { trending.mlPurges += 1; return { pages: 0, events: 0, runs: 0, stopped: false }; },
   };
-  return { publisher, items, cards, macro, revisions, trending, categories, materials };
+  return { publisher, items, cards, macro, macroHistory, revisions, trending, categories, materials };
 }
 
 /** Row for api.upsert_item: the item's metadata (page text is never stored). */

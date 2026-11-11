@@ -2,6 +2,7 @@
 // Only the project URL and the publishable key are used; never a secret key.
 // No React imports, so node --test can run it with a fake fetch.
 
+import { parseMacroHistory } from '../history/seriesHistory.ts';
 import type { Api, FeedRequest } from './api.ts';
 import type { BlurbCard, Brief, FeedPage, MacroFact, NumberTrend } from '../../contract/types.ts';
 import { isValidReport, type ReportResult } from './report.ts';
@@ -40,8 +41,8 @@ export interface PlannedRequest {
 export function planRequest(
   base: string,
   key: string,
-  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief' | 'feed_status',
-  req?: FeedRequest & { q?: string; cardId?: string; topics?: string[]; sources?: string[]; tickers?: string[] },
+  op: 'feed' | 'categories' | 'numbers' | 'config' | 'top_stories' | 'number_trends' | 'search' | 'related_cards' | 'following_feed' | 'daily_brief' | 'weekly_brief' | 'feed_status' | 'macro_history',
+  req?: FeedRequest & { seriesIds?: string[]; q?: string; cardId?: string; topics?: string[]; sources?: string[]; tickers?: string[] },
   token?: string | null,
 ): PlannedRequest {
   const headers: Record<string, string> = { apikey: key, Accept: 'application/json', 'Accept-Profile': 'api' };
@@ -64,6 +65,10 @@ export function planRequest(
       url: `${base}/rest/v1/rpc/${op}`,
       init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: '{}' },
     };
+  }
+  if (op === 'macro_history') {
+    const ids = [...new Set(req?.seriesIds ?? [])].filter((s) => /^[A-Z0-9_]{1,40}$/.test(s)).slice(0, 6);
+    return { url: `${base}/rest/v1/rpc/macro_history`, init: { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Profile': 'api' }, body: JSON.stringify({ p_series: ids }) } };
   }
   if (op === 'search' || op === 'related_cards' || op === 'following_feed' || op === 'daily_brief' || op === 'weekly_brief') {
     const extra = req;
@@ -217,6 +222,14 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
         return parseNumberTrends(await call(planRequest(opts.url, opts.key, 'number_trends')));
       } catch {
         return [];
+      }
+    },
+    // Chart history is extra: before the migration is applied (404) or on any error the card simply has no chart.
+    async macroHistory(ids) {
+      try {
+        return parseMacroHistory(await call(planRequest(opts.url, opts.key, 'macro_history', { mode: 'top', seriesIds: ids })));
+      } catch {
+        return {};
       }
     },
     async search(q, cursor, limit) {
