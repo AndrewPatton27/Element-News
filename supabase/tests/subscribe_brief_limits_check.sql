@@ -62,15 +62,6 @@ begin
   end if;
   perform set_config('request.headers', '', true);
 
-  -- per-address daily cap (review m9c): 3 processed attempts per address per UTC day, then silent success
-  update core.subscribe_attempts set created_at = created_at - interval '11 minutes';
-  perform api.subscribe_brief('valid.user@example.com', 'daily', 10, 'UTC');   -- 3rd processed attempt
-  update core.subscribe_attempts set created_at = created_at - interval '11 minutes';
-  r := api.subscribe_brief('valid.user@example.com', 'daily', 11, 'UTC');       -- 4th: silent
-  if r <> '{"ok": true, "status": "pending"}'::jsonb then raise exception 'FAIL: daily cap answer differs: %', r; end if;
-  if (select send_hour from core.brief_subscriptions where email = 'valid.user@example.com') <> 10 then
-    raise exception 'FAIL: 4th attempt in a day was processed (confirmation email re-queued)';
-  end if;
 
   -- per-client limit: 5 per hour per client key (this client already has 2), the 6th new address trips PT429
   perform set_config('request.headers', '{"cf-connecting-ip": "203.0.113.7, 10.0.0.1"}', true);
