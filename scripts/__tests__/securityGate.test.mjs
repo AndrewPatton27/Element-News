@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildHeadersFile, fullCsp, inlineScripts, parseHeadersFile, sha256Source } from '../security-headers.mjs';
+import { buildHeadersFile, enforceFullFromEnv, ENFORCE_FULL_CSP, fullCsp, inlineScripts, parseHeadersFile, sha256Source } from '../security-headers.mjs';
 import { checkBuildHeaders, checkGrants, checkHeaderSet, exitCode, parseDbOutput, readSecretValues, scanBundleText, ANON_API } from '../security-gate.mjs';
 
 const html = '<html><head><script>var a=1</script><script src="/x.js"></script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js"></script></head><body><script>(function(){})()</script></body></html>';
@@ -63,11 +63,14 @@ test('grant check: allowlisted RPCs pass, service-only and core exposure fail', 
     fn('core', 'invoke_function', false, true), fn('api', 'x', false, false, { cfg: '' }), fn('net', 'http_post', true, true),
     { k: 'rel', s: 'core', name: 'user_events', args: 'r', anon: true, authd: false, rls: false }, { k: 'schema', s: 'vault', anon: true, authd: false },
     fn('api', 'search', false, false)]);
-  assert.equal(bad.fail.length, 9);
+  assert.equal(bad.fail.length, 10);
   assert.ok(bad.fail.some((f) => /anon can execute service-only api\.ml_v3_check/.test(f)));
   assert.ok(bad.fail.some((f) => /anon can execute service-only api\.track/.test(f)));
   assert.ok(bad.fail.some((f) => /without pinned search_path/.test(f)));
-  assert.ok(bad.warn.some((w) => /net\.http_post/.test(w)));
+  assert.ok(bad.fail.some((f) => /client role can execute net\.http_post/.test(f)));
+  assert.ok(checkGrants([fn('net', 'http_get', false, false, { authr: true })]).fail.length === 1);
+  assert.ok(checkGrants([{ k: 'schema', s: 'net', anon: false, authd: true }]).fail.some((f) => /USAGE on schema net/.test(f)));
+  assert.deepEqual(checkGrants([fn('net', 'http_post', false, false)]), { fail: [], warn: [] });
   assert.ok(bad.warn.some((w) => /search/.test(w)));
   assert.ok(ANON_API.includes('ops_status'));
 });
@@ -80,4 +83,23 @@ test('parseDbOutput skips the status line and rejects errors', () => {
 test('exit code is 1 only on FAIL', () => {
   assert.equal(exitCode([{ status: 'PASS' }, { status: 'WARN' }, { status: 'SKIP' }]), 0);
   assert.equal(exitCode([{ status: 'PASS' }, { status: 'FAIL' }]), 1);
+});
+
+test('default CORS header is detached and the gate flags a page that still sends it', () => {
+  const text = buildHeadersFile({ html });
+  assert.ok(parseHeadersFile(text).find((r) => r.path === '/*').detached.has('access-control-allow-origin'));
+  const noDetach = text.split(/\r?\n/).filter((l) => !l.includes('! Access-Control-Allow-Origin')).join('\n');
+  assert.match(checkBuildHeaders(noDetach, html).join(), /does not detach/);
+  const h = new Map(parseHeadersFile(text).find((r) => r.path === '/*').headers);
+  assert.deepEqual(checkHeaderSet(h, html), []);
+  h.set('access-control-allow-origin', '*');
+  assert.match(checkHeaderSet(h, html).join(), /Access-Control-Allow-Origin/);
+});
+
+test('full CSP enforcement stays off unless switched on explicitly', () => {
+  assert.equal(ENFORCE_FULL_CSP, false);
+  assert.equal(enforceFullFromEnv(undefined), false);
+  assert.equal(enforceFullFromEnv('0'), false);
+  assert.equal(enforceFullFromEnv('1'), true);
+  assert.equal(enforceFullFromEnv('true'), true);
 });

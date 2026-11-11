@@ -19,6 +19,7 @@
     "ingest",
     "supabase/functions",
     "workers",
+    "e2e/csp.spec.ts",
     "docs"
   ]
 }

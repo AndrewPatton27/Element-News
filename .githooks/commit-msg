@@ -1,0 +1,3 @@
+#!/bin/sh
+# Rejects commit messages with AI Co-Authored-By trailers. Install once: npm run hooks:install
+exec node scripts/commit-guard.mjs --message "$1"

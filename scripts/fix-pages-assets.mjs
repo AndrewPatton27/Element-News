@@ -8,7 +8,7 @@
 // so a post-build injection is the only place the tag can go for every deploy.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildHeadersFile } from './security-headers.mjs';
+import { buildHeadersFile, enforceFullFromEnv } from './security-headers.mjs';
 
 const dist = process.argv[2] ?? 'dist';
 
@@ -67,7 +67,7 @@ function writeHeaders(outDir) {
   const htmlPath = join(outDir, 'index.html');
   const html = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : '';
   const supabaseUrl = readEnvValue('EXPO_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
-  writeFileSync(join(outDir, '_headers'), buildHeadersFile({ html, supabaseUrl }));
+  writeFileSync(join(outDir, '_headers'), buildHeadersFile({ html, supabaseUrl, enforceFull: enforceFullFromEnv(readEnvValue('ENFORCE_FULL_CSP')) }));
 }
 
 function injectFontPreloads(outDir) {
