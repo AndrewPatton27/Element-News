@@ -8,8 +8,8 @@ The web app is hosted on Cloudflare Pages at **https://element-news.pages.dev** 
 
 One-time setup in GitHub (Settings, Environments, New environment `production`):
 1. Required reviewers: add yourself. The job then waits for your approval and no secret is exposed before it.
-2. Environment secrets: `CLOUDFLARE_API_TOKEN` (create at Cloudflare, My Profile, API Tokens, template Edit Cloudflare Workers is too broad: use a custom token with Account, Cloudflare Pages, Edit only) and `CLOUDFLARE_ACCOUNT_ID` (Cloudflare dashboard, Workers & Pages, right column).
-3. Environment variables (public values only): `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the same two values as in `.env`).
+2. Environment secret: `CLOUDFLARE_API_TOKEN` (a custom token with Account, Cloudflare Pages, Edit only; the broader worker templates are too much).
+3. Environment variables (public values only): `CLOUDFLARE_ACCOUNT_ID` (Cloudflare dashboard, Workers & Pages, right column), `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the same two values as in `.env`).
 Never add a service role key or an AI key to this environment.
 
 ## One-time setup (already done for this project)
