@@ -9,7 +9,7 @@ import { assertAllowed, AllowlistError } from '../src/allowlist.ts';
 import { config } from '../src/config.ts';
 import { runOnce, SOURCE_NAMES, type Deps } from '../src/pipeline.ts';
 import { createDryRunPublisher } from '../src/publish.ts';
-import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataArticle } from '../src/sources/newsdata.ts';
+import { dedupeArticles, isNearDuplicate, NEWSDATA_PARAMS, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataArticle } from '../src/sources/newsdata.ts';
 import { memoryCounter } from '../src/summarizer/chain.ts';
 import type { RawItem } from '../src/types.ts';
 import { checkLinkOut, SUMMARIZABLE, validatePublish } from '../src/validate.ts';
@@ -34,7 +34,8 @@ test('the flag constant is ON in the shipped config (cadence), and the sources a
   assert.ok((SOURCE_NAMES as readonly string[]).includes('newsdata_latest'));
   assert.equal(config.newsdata.attribution, 'via NewsData.io');
   assert.equal(config.newsdata.headlineMaxChars, 200);
-  assert.equal(config.newsdata.dailyCreditCap, 144);
+  assert.equal(config.newsdata.dailyCreditCap, 195);
+  assert.ok((SOURCE_NAMES as readonly string[]).includes('newsdata_topic'));
 });
 
 test('allowlist: newsdata.io is an API host only; the article host is not', () => {
@@ -192,7 +193,7 @@ test('credit budget: one credit per request, stops at the daily cap; a refused t
   assert.equal(counter.used('newsdata'), config.newsdata.dailyCreditCap);
   await runOnce(f.deps, { only: ['newsdata_market', 'newsdata_latest'] });
   assert.equal(calls, 1, 'at the cap: no more requests');
-  assert.ok(f.lines.some((l) => /daily credit cap 144 reached/.test(l)));
+  assert.ok(f.lines.some((l) => /daily credit cap 195 reached/.test(l)));
   let taken = 0;
   const g = fakeDeps(async () => { throw new Error('must not fetch'); }, { newsdata: { apiKey: KEY, enabled: true, takeCredit: async () => { taken++; return false; } } });
   await runOnce(g.deps, { only: ['newsdata_latest'] });
@@ -245,18 +246,138 @@ test('within a run the most relevant headlines are processed first', async () =>
   assert.equal(f.dry.cards[0]?.headline, 'Fed holds rates as inflation cools; stocks rally');
 });
 
-test('credit pacing: at 80% of the daily cap /latest pauses (no request, no credit), /market keeps going', async () => {
+test('credit pacing: at 95% of the daily cap the extra topic queries pause (no request, no credit), core queries keep going', async () => {
   const counter = memoryCounter();
-  const stop = Math.floor(config.newsdata.dailyCreditCap * config.newsdata.latestStopFraction);
+  const stop = Math.floor(config.newsdata.dailyCreditCap * config.newsdata.extraPauseFraction);
   for (let i = 0; i < stop; i++) counter.add('newsdata');
   let calls = 0;
   const f = fakeDeps(async () => { calls++; return body; }, { ...on, counter });
-  await runOnce(f.deps, { only: ['newsdata_latest'] });
+  await runOnce(f.deps, { only: ['newsdata_topic'], newsdataQuery: 'fed_rates' });
   assert.equal(calls, 0);
   assert.equal(counter.used('newsdata'), stop);
-  assert.ok(f.lines.some((l) => /\/latest paused/.test(l)));
+  assert.ok(f.lines.some((l) => /extra queries paused/.test(l)));
   await runOnce(f.deps, { only: ['newsdata_market'] });
-  assert.equal(calls, 1);
+  await runOnce(f.deps, { only: ['newsdata_latest'] });
+  await runOnce(f.deps, { only: ['newsdata_topic'], newsdataQuery: 'trusted' });
+  assert.equal(calls, 3);
+});
+
+// ---- query set (config.newsdata.queries) ----
+const q = config.newsdata.queries;
+
+// Fires per day of a cron like "4,34 0-9,22-23 * * *" (minute and hour lists/ranges only; day, month, weekday are *).
+function firesPerDay(cron: string): number {
+  const [min, hour, dom, mon, dow] = cron.split(' ');
+  assert.deepEqual([dom, mon, dow], ['*', '*', '*'], cron);
+  const count = (field: string) => field.split(',').reduce((n, part) => {
+    const m = /^(\d+)-(\d+)$/.exec(part);
+    return n + (m ? Number(m[2]) - Number(m[1]) + 1 : 1);
+  }, 0);
+  return count(min) * count(hour);
+}
+
+test('query set: ids unique, credits match each cron, total under the cap and the free plan, free-plan params only', () => {
+  assert.equal(new Set(q.map((x) => x.id)).size, q.length);
+  assert.ok(q.some((x) => x.id === 'market') && q.some((x) => x.id === 'business'));
+  let total = 0;
+  for (const x of q) {
+    assert.equal(firesPerDay(x.cron), x.creditsPerDay, `${x.id}: creditsPerDay must equal the cron fires per day`);
+    total += x.creditsPerDay;
+    for (const [k, v] of Object.entries(x.params)) {
+      assert.ok((NEWSDATA_PARAMS as readonly string[]).includes(k), `${x.id}: ${k}`);
+      if (k === 'qInTitle') assert.ok(v.length <= 100, `${x.id}: free plan keyword limit is 100 characters (${v.length})`);
+      if (k === 'domainurl' || k === 'category' || k === 'country') assert.ok(v.split(',').length <= 5, `${x.id}: at most 5 values`);
+    }
+    assert.ok(!('q' in x.params) && !('qInMeta' in x.params), 'q cannot be combined with qInTitle');
+    assert.ok(x.endpoint === 'latest' || !Object.keys(x.params).some((k) => k === 'qInTitle'), 'market queries carry no keyword');
+  }
+  assert.equal(total, 180);
+  assert.ok(total <= config.newsdata.dailyCreditCap && config.newsdata.dailyCreditCap <= 195, 'cap leaves at least 5 of the 200 credits spare');
+  const core = q.filter((x) => x.tier === 'core').reduce((n, x) => n + x.creditsPerDay, 0);
+  assert.ok(core <= Math.floor(config.newsdata.dailyCreditCap * config.newsdata.extraPauseFraction), 'core queries fit under the extras pause line');
+  // distinct (minute, hour) slots so the NewsData 30 requests / 15 min limit is never approached
+  const minutes = q.flatMap((x) => x.cron.split(' ')[0].split(','));
+  assert.equal(new Set(minutes).size, minutes.length, 'no two query jobs share a minute');
+});
+
+test('request URL: configured params, free-plan only, key only in apikey', () => {
+  const u = new URL(newsdataUrl(q.find((x) => x.id === 'fed_rates')!, KEY));
+  assert.equal(u.origin + u.pathname, 'https://newsdata.io/api/1/latest');
+  assert.equal(u.searchParams.get('size'), '10');
+  assert.equal(u.searchParams.get('removeduplicate'), '1');
+  assert.match(u.searchParams.get('qInTitle')!, /"Federal Reserve"/);
+  assert.equal(u.searchParams.get('q'), null);
+  assert.equal(u.searchParams.get('image'), null);
+  const t = new URL(newsdataUrl(q.find((x) => x.id === 'trusted')!, KEY));
+  assert.match(t.searchParams.get('domainurl')!, /reuters\.com/);
+  assert.equal(new URL(newsdataUrl('market', KEY)).pathname, '/api/1/market');
+  assert.equal(new URL(newsdataUrl('latest', KEY)).searchParams.get('category'), 'business');
+  assert.throws(() => newsdataUrl({ ...q[0], params: { timeframe: '6' } }, KEY), /not allowed/);
+  assert.throws(() => newsdataUrl({ ...q[0], params: { full_content: '1' } }, KEY), /not allowed/);
+});
+
+test('dedupe across articles: same article_id or same URL (query string, www, trailing slash ignored) appears once', () => {
+  const a = (id: string, link: string, title = 'Fed holds rates'): NewsdataArticle => ({ article_id: id, title, link, pubDate: '2026-11-10 20:00:00', source_name: 'E', symbols: [] });
+  const list = [
+    a('1', 'https://www.example.com/fed/'), a('1', 'https://other.com/x'), a('2', 'https://example.com/fed?utm_source=x'), a('3', 'https://example.com/oil'),
+  ];
+  assert.deepEqual(dedupeArticles(list).map((x) => x.article_id), ['1', '3']);
+  const seen = { ids: new Set<string>(), urls: new Set<string>() };
+  assert.equal(dedupeArticles([a('1', 'https://example.com/fed')], seen).length, 1);
+  assert.equal(dedupeArticles([a('9', 'https://example.com/fed')], seen).length, 0, 'same URL from a second query');
+  assert.equal(dedupeArticles([a('1', 'https://example.com/z')], seen).length, 0, 'same article_id from a second query');
+  const r = newsdataToItem({ ...a('5', 'https://example.com/stocks?utm_source=tw&id=7#top', 'Stocks rally as Fed holds'), pubDate: '2026-11-10 20:00:00' }, NOW) as { item: RawItem };
+  assert.equal(r.item.url, 'https://example.com/stocks?id=7', 'tracking parameters and fragment removed, other parameters kept');
+});
+
+test('a topic query runs through newsdata_topic: its own params, one credit, dedupe against another query', async () => {
+  const urls: string[] = [];
+  const counter = memoryCounter();
+  const f = fakeDeps(async (u) => { urls.push(u); return body; }, { ...on, counter });
+  f.dry.publisher.recentHeadlines = async () => f.dry.cards.map((c) => c.headline);
+  await runOnce(f.deps, { only: ['newsdata_topic'], newsdataQuery: 'inflation' });
+  assert.equal(urls.length, 1);
+  assert.match(urls[0], /qInTitle=/);
+  assert.equal(counter.used('newsdata'), 1);
+  const first = f.dry.cards.length;
+  assert.ok(first >= 1);
+  await runOnce(f.deps, { only: ['newsdata_topic'], newsdataQuery: 'fed_rates' });   // same articles again from another query
+  assert.equal(counter.used('newsdata'), 2);
+  assert.equal(f.dry.cards.length, first, 'no duplicate cards');
+  assert.ok(f.dry.cards.every((c) => c.kind === 'link_out' && c.attribution === 'via NewsData.io' && c.body === null));
+  assert.ok(!JSON.stringify([f.dry.cards, f.lines]).includes(KEY));
+});
+
+test('a topic run with a missing or unknown query id makes no request and spends no credit', async () => {
+  const counter = memoryCounter();
+  const f = fakeDeps(async () => { throw new Error('must not fetch'); }, { ...on, counter });
+  await runOnce(f.deps, { only: ['newsdata_topic'] });
+  await runOnce(f.deps, { only: ['newsdata_topic'], newsdataQuery: 'nope' });
+  assert.equal(counter.used('newsdata'), 0);
+  assert.equal(f.lines.filter((l) => /unknown or missing query id/.test(l)).length, 2);
+});
+
+test('hard guard: a taker that always says yes still cannot push the counter past the cap', async () => {
+  const counter = memoryCounter();
+  for (let i = 0; i < config.newsdata.dailyCreditCap; i++) counter.add('newsdata');
+  let calls = 0;
+  const f = fakeDeps(async () => { calls++; return body; }, { newsdata: { apiKey: KEY, enabled: true, takeCredit: async () => true }, counter });
+  for (const id of ['market', 'business', 'trusted', 'stocks']) {
+    await runOnce(f.deps, { only: id === 'market' ? ['newsdata_market'] : ['newsdata_topic'], newsdataQuery: id });
+  }
+  assert.equal(calls, 0);
+});
+
+test('every credit is counted: a full day of cron fires stays inside the cap', async () => {
+  const counter = memoryCounter();
+  let calls = 0;
+  const f = fakeDeps(async () => { calls++; return JSON.stringify({ status: 'success', results: [] }); }, { ...on, counter });
+  // fire every configured query twice as often as scheduled: the cap, not the schedule, is the limit
+  for (const x of q) {
+    for (let i = 0; i < x.creditsPerDay * 2; i++) await runOnce(f.deps, x.id === 'market' ? { only: ['newsdata_market'] } : { only: ['newsdata_topic'], newsdataQuery: x.id });
+  }
+  assert.ok(counter.used('newsdata') <= config.newsdata.dailyCreditCap);
+  assert.equal(calls, counter.used('newsdata'), 'one request per counted credit');
 });
 
 test('default on: deps.newsdata.enabled unset follows the code default, but no key still means no request', async () => {

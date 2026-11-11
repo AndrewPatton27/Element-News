@@ -39,6 +39,7 @@ begin
   -- run_log accepts the new names
   perform api.log_run('{"source":"newsdata_market"}');
   perform api.log_run('{"source":"newsdata_latest"}');
+  perform api.log_run('{"source":"newsdata_topic"}');
 
   raise exception 'ALL LINKOUT CHECKS PASSED';
 end $$;

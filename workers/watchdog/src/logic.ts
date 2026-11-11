@@ -5,7 +5,7 @@
 export const STALE_HOURS = 3;
 export const QUIET_HOURS = 24;
 export const QUIET_HOURS_WEEKEND = 48;
-export const EXPECTED_JOBS = 38;                   // 15 before M9 + bls, beadata, eia, auctions, fomc + element-prune-reports + element-prune-subscribe-attempts + blscal, mts, newsdata_market, newsdata_latest (M9c) + beige, trade, regpress, annual (M9c3) + 5 element-fast-* sources, 2 element-fast-newsdata-*, element-release-queue (cadence, 20261142000100)
+export const EXPECTED_JOBS = 47;                   // 47 = 38 minus the 4 old NewsData jobs plus 13 element-newsdata-* query jobs (20261201000300). Before that: 15 before M9 + bls, beadata, eia, auctions, fomc + element-prune-reports + element-prune-subscribe-attempts + blscal, mts, newsdata_market, newsdata_latest (M9c) + beige, trade, regpress, annual (M9c3) + 5 element-fast-* sources, 2 element-fast-newsdata-*, element-release-queue (cadence, 20261142000100)
 export const AI_WARN_FRACTION = 0.8;
 export const DB_WARN_MB = 400;
 /** Supply floors (setting `supply_floor_cards_24h`, `supply_floor_cards_market_hour`; the Worker vars SUPPLY_FLOOR_CARDS_24H / SUPPLY_FLOOR_CARDS_MARKET_HOUR override them). 0 = check off. */

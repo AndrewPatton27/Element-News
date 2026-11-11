@@ -43,6 +43,7 @@ export interface Args {
   dryRun: boolean;
   loop: boolean;
   only: SourceName[];
+  query?: string;                    // --query <id>: with --only newsdata_topic, the config.newsdata.queries id
   limit: number;
   json: boolean;
   rewrite: boolean;
@@ -65,6 +66,11 @@ export function parseArgs(argv: string[]): Args {
       const n = Number(argv[++i]);
       if (!Number.isInteger(n) || n < 1 || n > 520) throw new Error('--weeks needs a whole number from 1 to 520');
       a.weeks = n;
+    }
+    else if (k === '--query') {
+      const v = (argv[++i] ?? '').trim();
+      if (!config.newsdata.queries.some((q) => q.id === v)) throw new Error(`--query: unknown id "${v}" (use ${config.newsdata.queries.map((q) => q.id).join(', ')})`);
+      a.query = v;
     }
     else if (k === '--only') {
       const v = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -251,7 +257,7 @@ export async function main(argv: string[]): Promise<number> {
       if (args.json) console.log(JSON.stringify(dry.revisions, null, 2));
       return 0;
     }
-    const stats = await runOnce(deps, { only: args.only, limit: args.limit });
+    const stats = await runOnce(deps, { only: args.only, limit: args.limit, newsdataQuery: args.query });
     await refreshTrendingSafely(deps.publisher, log);
     await mlPurgeSafely(deps.publisher, log);
     log(`dry run: ${JSON.stringify(stats)}`);
@@ -290,7 +296,7 @@ export async function main(argv: string[]): Promise<number> {
   }
   do {
     deps.now = new Date();
-    const stats = await runOnce(deps, { only: args.only, limit: args.limit });
+    const stats = await runOnce(deps, { only: args.only, limit: args.limit, newsdataQuery: args.query });
     await refreshTrendingSafely(deps.publisher, log);
     await mlPurgeSafely(deps.publisher, log);
     log(`run finished ${deps.now.toISOString()}: ${JSON.stringify(stats)}`);

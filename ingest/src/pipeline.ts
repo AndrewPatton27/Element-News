@@ -6,14 +6,14 @@
 // Outputs: RunStats counts; cards and items are written through deps.publisher.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { config, fedRegisterUrls, groqDailyCap } from './config.ts';
+import { config, fedRegisterUrls, groqDailyCap, type NewsdataQuery } from './config.ts';
 import { createGuard, normalizeUrl } from './dedupe.ts';
 import { buildPublishPayload, type Publisher } from './publish.ts';
 import { beaItemToItem } from './sources/bea.ts';
 import { cpscToItem, cpscUrl, parseCpscJson, selectRecalls } from './sources/cpsc.ts';
 import { nasaFeedUrl, nasaToItem, parseNasaRss, selectNasaReleases } from './sources/nasa.ts';
 import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
-import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataEndpoint } from './sources/newsdata.ts';
+import { dedupeArticles, findQuery, isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore } from './sources/newsdata.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
@@ -36,9 +36,9 @@ import { reviewCard, type CardScore, type ScoreClient } from './reportCard.ts';
 import { aiDraftsRejected, decideReportCardRetry, decideSoftRetry } from './retry.ts';
 
 export type SourceName = 'macro' | 'treasury' | 'fed' | 'fedspeech' | 'secpress' | 'bea' | 'fedreg' | 'sec' | 'wiki' | 'cpsc' | 'usgs' | 'nasa' | 'bls' | 'beadata'
-  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'beige' | 'trade' | 'regpress' | 'annual' | 'newsdata_market' | 'newsdata_latest';
+  | 'eia' | 'census' | 'auctions' | 'fomc' | 'blscal' | 'mts' | 'beige' | 'trade' | 'regpress' | 'annual' | 'newsdata_market' | 'newsdata_latest' | 'newsdata_topic';
 export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec', 'wiki', 'cpsc', 'usgs', 'nasa', 'bls', 'beadata',
-  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'beige', 'trade', 'regpress', 'annual', 'newsdata_market', 'newsdata_latest'];
+  'eia', 'census', 'auctions', 'fomc', 'blscal', 'mts', 'beige', 'trade', 'regpress', 'annual', 'newsdata_market', 'newsdata_latest', 'newsdata_topic'];
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
@@ -65,6 +65,7 @@ export interface Deps {
 export interface RunOptions {
   only?: SourceName[];
   limit?: number;                    // max news items summarized per run (all sources together)
+  newsdataQuery?: string;            // with source newsdata_topic: the config.newsdata.queries id to run
 }
 
 export interface RunStats {
@@ -169,8 +170,13 @@ async function runOnceInState(deps: Deps, opts: RunOptions, state: RunState): Pr
   if (only.has('trade')) await runTrade(deps, stats);
   if (only.has('regpress')) await runRegPress(deps, stats);
   if (only.has('annual')) await runAnnual(deps, stats);
-  if (only.has('newsdata_market')) await runNewsdata(deps, ctx, 'market');
-  if (only.has('newsdata_latest')) await runNewsdata(deps, ctx, 'latest');
+  if (only.has('newsdata_market')) await runNewsdata(deps, ctx, findQuery('market')!);
+  if (only.has('newsdata_latest')) await runNewsdata(deps, ctx, findQuery('business')!);
+  if (only.has('newsdata_topic')) {
+    const q = opts.newsdataQuery ? findQuery(opts.newsdataQuery) : undefined;
+    if (q) await runNewsdata(deps, ctx, q);
+    else deps.log(`newsdata topic: unknown or missing query id "${opts.newsdataQuery ?? ''}" (use ${config.newsdata.queries.map((x) => x.id).join(', ')}), skipping`);
+  }
   if (state.collector) await runSelected(state.collector, deps, ctx, opts.limit ?? 20);
   deps.log(`report card: PASS ${stats.report_pass}, REVISE/rejected ${stats.report_revise}, ABANDON ${stats.report_abandon}, unscored ${stats.report_unscored}, DUPLICATE ${stats.report_duplicate}; scorers Gemini ${stats.report_provider_gemini}, Groq ${stats.report_provider_groq}`);
   return stats;
@@ -344,25 +350,26 @@ async function runNasa(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
  * (NEWSDATA_API_KEY) and, in the database, app_config.linkout_cards. Each run costs ONE credit, counted before the request
  * against config.newsdata.dailyCreditCap. No AI, no page fetch; only the headline, publisher and link are kept.
  */
-async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: NewsdataEndpoint): Promise<void> {
+async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, query: NewsdataQuery): Promise<void> {
   const nd = deps.newsdata;
   const c = config.newsdata;
-  const tag = `newsdata ${endpoint}`;
+  const tag = `newsdata ${query.id}`;
   if (!(nd?.enabled ?? c.enabled)) { deps.log(`${tag}: switched off, skipping`); return; }
   const key = nd?.apiKey?.trim();
   if (!key) { deps.log(`${tag}: NEWSDATA_API_KEY not set, skipping`); return; }
-  // Degrade gracefully: near the daily cap the /latest calls stop first so the /market backbone keeps its credits.
-  if (endpoint === 'latest' && deps.counter.used('newsdata') >= Math.floor(c.dailyCreditCap * c.latestStopFraction)) {
-    deps.log(`${tag}: ${Math.round(c.latestStopFraction * 100)}% of the daily credits used, /latest paused`); return;
+  // Degrade gracefully: near the daily cap the 'extra' topic queries stop first so the 'core' queries keep their credits.
+  if (query.tier === 'extra' && deps.counter.used('newsdata') >= Math.floor(c.dailyCreditCap * c.extraPauseFraction)) {
+    deps.log(`${tag}: ${Math.round(c.extraPauseFraction * 100)}% of the daily credits used, extra queries paused`); return;
   }
+  // Hard guard: the counter is checked here as well, so the cap holds even when the injected taker (the database) says yes.
+  if (deps.counter.used('newsdata') >= c.dailyCreditCap) { deps.log(`${tag}: daily credit cap ${c.dailyCreditCap} reached, skipping`); return; }
   const take = nd?.takeCredit ?? (async () => {
-    if (deps.counter.used('newsdata') >= c.dailyCreditCap) return false;
     deps.counter.add('newsdata');
     return true;
   });
   if (!(await take())) { deps.log(`${tag}: daily credit cap ${c.dailyCreditCap} reached, skipping`); return; }
   try {
-    const articles = parseNewsdata(await deps.fetchText(newsdataUrl(endpoint, key), 'api', 0));
+    const articles = dedupeArticles(parseNewsdata(await deps.fetchText(newsdataUrl(query, key), 'api', 0)));
     const seen: string[] = [];                       // headlines of this run's new cards (the same story from two publishers)
     let recent: string[] | null = null;              // headlines of live cards, loaded once and only if a candidate gets that far
     let fresh = 0;

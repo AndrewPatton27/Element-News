@@ -20,7 +20,7 @@ No public surface (HTTP requests get 404). Cloudflare Free allows 5 cron trigger
 |---|---|
 | `stale` | no error-free run (brief-summary excluded) and no card in 3 h |
 | `quiet` | no card in 24 h (48 h from Saturday 00:00 to Monday 12:00 UTC). Alert only: news can be quiet |
-| `jobs` | the number of `element-%` pg_cron jobs is not `EXPECTED_JOBS` (38: the 30 before cadence + 5 `element-fast-*` sources, 2 `element-fast-newsdata-*`, `element-release-queue`) |
+| `jobs` | the number of `element-%` pg_cron jobs is not `EXPECTED_JOBS` (47 after the NewsData query set; was 38: the 30 before cadence + 5 `element-fast-*` sources, 2 `element-fast-newsdata-*`, `element-release-queue`) |
 | `cron` | failed cron runs or non-2xx function replies in the last 24 h |
 | `hung` | a run open for over 10 minutes, or a run marked `killed` in the last 24 h |
 | `model` | a run used the fallback model (`stats.model_missing`) |

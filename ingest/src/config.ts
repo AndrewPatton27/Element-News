@@ -6,6 +6,16 @@
 
 import { COMPANIES_EXTRA } from '../../contract/companiesExtra.ts';
 
+/** One NewsData.io request template (config.newsdata.queries). */
+export interface NewsdataQuery {
+  id: string;
+  endpoint: 'latest' | 'market';
+  tier: 'core' | 'extra';                       // extras pause first near the daily cap
+  params: Readonly<Record<string, string>>;     // category, country, qInTitle, domainurl only (newsdata.ts NEWSDATA_PARAMS)
+  cron: string;                                 // UTC; one pg_cron job per query (20261201000300_newsdata_queries_cron.sql)
+  creditsPerDay: number;                        // = cron fires per day, 1 credit each
+}
+
 export const config = {
   // ---- AI summarizer --------------------------------------------------------
   gemini: {
@@ -653,8 +663,32 @@ export const config = {
     attribution: 'via NewsData.io',
     delayedHours: 12,
     headlineMaxChars: 200,                      // rule 7 safety cap
-    dailyCreditCap: 144,                        // a weekday uses 104 (hourly baseline 48 + market-hours /market every 15 min 42 + /latest every 30 min 14); the free plan allows 200
-    latestStopFraction: 0.8,                    // at 80% of the cap /latest calls stop (the /market backbone keeps its credits); the cap itself stops everything
+    // Hard daily credit cap, enforced in code before every request (handler.ts takeCredit + pipeline.ts counter). The free plan
+    // allows 200; 195 leaves 5 spare so a stray cron fire or retry can never reach the plan limit. NEVER raise above 195.
+    dailyCreditCap: 195,
+    extraPauseFraction: 0.95,                   // at 95% of the cap (185) the 'extra' topic queries pause; the 'core' queries keep the rest
+    // The query set (M9 supply, D-13 free only). One cron job per query, 1 credit per call, <= 10 articles per call; the plan is
+    // 180 credits/day (context/settings.md). TIMING: the free plan delays news by 12 h, so US-daytime stories arrive 22:00-09:59 UTC;
+    // queries poll in that arrival window ("0-9,22-23"), not in US market hours. `params` are the only extra request parameters.
+    // Free-plan limits (newsdata.io docs/llms-full.txt, read 2026-11-11): q/qInTitle up to 100 characters (the blog says 512; stay at
+    // 100), category/country/domainurl up to 5 values, q/qInTitle/qInMeta never together, size 10. creditsPerDay must equal the cron's
+    // fires per day (a test checks it). Sources: newsdata_market and newsdata_latest run ids 'market' and 'business'; every other
+    // id runs through newsdata_topic with {"query":"<id>"}.
+    queries: [
+      { id: 'market',     endpoint: 'market', tier: 'core',  params: {},                                                                                    cron: '4,34 0-9,22-23 * * *',    creditsPerDay: 24 },
+      { id: 'business',   endpoint: 'latest', tier: 'core',  params: { category: 'business', country: 'us' },                                               cron: '7,37 0-9,22-23 * * *',    creditsPerDay: 24 },
+      { id: 'trusted',    endpoint: 'latest', tier: 'core',  params: { category: 'business', domainurl: 'reuters.com,cnbc.com,apnews.com,marketwatch.com,bloomberg.com' }, cron: '12,42 0-9,22-23 * * *', creditsPerDay: 24 },
+      { id: 'stocks',     endpoint: 'latest', tier: 'extra', params: { qInTitle: 'stocks OR "Wall Street" OR Nasdaq OR "S&P 500" OR "Dow Jones"' },        cron: '5 0-9,22-23 * * *',       creditsPerDay: 12 },
+      { id: 'inflation',  endpoint: 'latest', tier: 'extra', params: { qInTitle: 'inflation OR CPI OR payrolls OR "jobs report" OR unemployment OR GDP' }, cron: '11 0-9,22-23 * * *',      creditsPerDay: 12 },
+      { id: 'fed_rates',  endpoint: 'latest', tier: 'extra', params: { qInTitle: 'Fed OR "Federal Reserve" OR Powell OR "rate cut" OR "Treasury yields" OR "mortgage rates"' }, cron: '13 0-9,22-23 * * *', creditsPerDay: 12 },
+      { id: 'trade',      endpoint: 'latest', tier: 'extra', params: { qInTitle: 'tariffs OR "trade deal" OR "trade war" OR "export controls" OR "trade deficit"' }, cron: '29 0-9,22-23 * * *',  creditsPerDay: 12 },
+      { id: 'energy',     endpoint: 'latest', tier: 'extra', params: { qInTitle: '"oil prices" OR crude OR OPEC OR "natural gas" OR "energy prices"' },    cron: '31 0-9,22-23 * * *',      creditsPerDay: 12 },
+      { id: 'earnings',   endpoint: 'latest', tier: 'extra', params: { qInTitle: 'earnings OR JPMorgan OR "Goldman Sachs" OR "Wells Fargo" OR "Bank of America" OR Citigroup' }, cron: '41 0-9,22-23 * * *', creditsPerDay: 12 },
+      { id: 'deals',      endpoint: 'latest', tier: 'extra', params: { qInTitle: 'IPO OR merger OR acquisition OR takeover OR buyout OR antitrust' },      cron: '43 0-9,22-23 * * *',      creditsPerDay: 12 },
+      { id: 'world_cb',   endpoint: 'latest', tier: 'extra', params: { qInTitle: 'ECB OR "Bank of Japan" OR "Bank of England" OR "China economy" OR recession' }, cron: '53 0-9,22-23 * * *', creditsPerDay: 12 },
+      { id: 'housing',    endpoint: 'latest', tier: 'extra', params: { qInTitle: '"housing market" OR "home sales" OR "housing starts" OR "home prices" OR mortgage' }, cron: '33 1,5,9,13,17,21 * * *', creditsPerDay: 6 },
+      { id: 'crypto_reg', endpoint: 'latest', tier: 'extra', params: { qInTitle: '"crypto regulation" OR "bitcoin ETF" OR stablecoin OR "crypto bill" OR "SEC crypto"' }, cron: '35 3,7,11,15,19,23 * * *', creditsPerDay: 6 },
+    ] as readonly NewsdataQuery[],
     minScore: 2,                                // relevance gate (newsdata.ts relevanceScore): headlines below this are skipped as not_finance
     pageSize: 10,                               // free-plan maximum articles per call (1 credit)
     maxPerRun: 10,                              // new cards per run

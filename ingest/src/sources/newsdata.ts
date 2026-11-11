@@ -8,7 +8,7 @@
 // unless a watch-list company is named; advice-like headlines (buy, sell, price target, ...) are skipped.
 // Inputs: /latest or /market JSON. Outputs: RawItems (license_class link_out) and link_out publish payloads.
 
-import { config } from '../config.ts';
+import { config, type NewsdataQuery } from '../config.ts';
 import type { PublishPayload, RawItem, TickerRef } from '../types.ts';
 import { contentWords, findAdvice } from '../validate.ts';
 
@@ -27,12 +27,58 @@ export interface NewsdataArticle {
 export type NewsdataSkipReason =
   | 'bad_url' | 'no_title' | 'too_old' | 'off_topic' | 'not_finance' | 'micro_or_recall' | 'advice_language' | 'bad_date';
 
-/** Request URL. The key is in the query string, so callers must never log this URL (use redactKey for messages). */
-export function newsdataUrl(endpoint: NewsdataEndpoint, apiKey: string): string {
+/** The only request parameters a query may add (all free-plan). q / qInMeta are not listed: they can't be mixed with qInTitle. */
+export const NEWSDATA_PARAMS = ['category', 'country', 'qInTitle', 'domainurl'] as const;
+
+/** Looks a configured query up by id (config.newsdata.queries). */
+export function findQuery(id: string): NewsdataQuery | undefined {
+  return config.newsdata.queries.find((q) => q.id === id);
+}
+
+/**
+ * Request URL. `target` is a configured query, or a bare endpoint ('latest' = category business, country from config).
+ * The key is in the query string, so callers must never log this URL (use redactKey for messages).
+ */
+export function newsdataUrl(target: NewsdataEndpoint | NewsdataQuery, apiKey: string): string {
   const c = config.newsdata;
+  const query: { endpoint: NewsdataEndpoint; params: Readonly<Record<string, string>> } = typeof target === 'string'
+    ? { endpoint: target, params: target === 'latest' ? { category: 'business', country: c.country } : {} }
+    : target;
   const q = new URLSearchParams({ apikey: apiKey, language: c.language, size: String(c.pageSize), removeduplicate: '1' });
-  if (endpoint === 'latest') { q.set('category', 'business'); q.set('country', c.country); }
-  return `${c.baseUrl}/${endpoint}?${q.toString()}`;
+  for (const [k, v] of Object.entries(query.params)) {
+    if (!(NEWSDATA_PARAMS as readonly string[]).includes(k)) throw new Error(`newsdata: parameter "${k}" is not allowed on the free plan set`);
+    q.set(k, v);
+  }
+  return `${c.baseUrl}/${query.endpoint}?${q.toString()}`;
+}
+
+/** Canonical link for dedupe: host (no www) + path (no trailing slash), lower-cased; query string and fragment ignored. */
+export function urlKey(link: string): string {
+  try {
+    const u = new URL(link);
+    return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}`.toLowerCase();
+  } catch { return link.toLowerCase(); }
+}
+
+/** Drops articles whose article_id or canonical URL was already seen (one response, or across `seen` from earlier queries). Pure; order kept. */
+export function dedupeArticles(list: readonly NewsdataArticle[], seen: { ids: Set<string>; urls: Set<string> } = { ids: new Set(), urls: new Set() }): NewsdataArticle[] {
+  const out: NewsdataArticle[] = [];
+  for (const a of list) {
+    const k = urlKey(a.link);
+    if ((a.article_id && seen.ids.has(a.article_id)) || (a.link && seen.urls.has(k))) continue;
+    if (a.article_id) seen.ids.add(a.article_id);
+    if (a.link) seen.urls.add(k);
+    out.push(a);
+  }
+  return out;
+}
+
+/** Removes tracking parameters and the fragment from a publisher link (the publisher URL otherwise stays as given). */
+function cleanLink(url: URL): URL {
+  const u = new URL(url.toString());
+  for (const k of [...u.searchParams.keys()]) if (/^(utm_|fbclid$|gclid$|mc_)/i.test(k)) u.searchParams.delete(k);
+  u.hash = '';
+  return u;
 }
 
 /** Removes the key (and the apikey= query value) from a message. */
@@ -111,6 +157,7 @@ export function newsdataToItem(a: NewsdataArticle, now: Date): { item: RawItem }
   let url: URL;
   try { url = new URL(a.link); } catch { return { skip: 'bad_url' }; }
   if (url.protocol !== 'https:' || /(^|\.)newsdata\.io$/i.test(url.hostname)) return { skip: 'bad_url' };
+  url = cleanLink(url);
   if (!a.title) return { skip: 'no_title' };
   const when = parsePubDate(a.pubDate);
   if (!when) return { skip: 'bad_date' };

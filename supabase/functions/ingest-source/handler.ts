@@ -1,4 +1,4 @@
-// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, beige, trade, regpress, annual, newsdata_market, newsdata_latest),
+// ingest-source: ONE ingest source per call (macro, treasury, bls, beadata, fed, fedspeech, secpress, bea, fedreg, sec, wiki, cpsc, usgs, nasa, eia, census, auctions, fomc, blscal, mts, beige, trade, regpress, annual, newsdata_market, newsdata_latest, newsdata_topic),
 // the cloud version of one slice of `node src/main.ts --once` (ingest/src/main.ts live path).
 // The pipeline is ingest/src/pipeline.ts runOnce({ only: [source], limit: workCap }), unchanged:
 // allowlisted fetchers and parsers, topic filter, license gate, Gemini -> Groq -> template chain with
@@ -29,6 +29,8 @@ export interface IngestOptions {
   source: SourceName;
   workCap: number;
   finish: boolean;
+  /** source newsdata_topic only: the config.newsdata.queries id to run */
+  query?: string;
   /** tests only: skip the run-log row */
   noRunLog?: boolean;
 }
@@ -39,7 +41,13 @@ export function parseIngestOptions(o: Record<string, unknown>): IngestOptions {
   if (!(SOURCE_NAMES as readonly string[]).includes(source)) throw new Error(`source must be one of ${SOURCE_NAMES.join(', ')}`);
   const cap = o.work_cap === undefined || o.work_cap === '' ? defaultWorkCapFor(source) : Number(o.work_cap);
   if (!Number.isInteger(cap) || cap < 1 || cap > MAX_WORK_CAP) throw new Error(`work_cap must be a whole number from 1 to ${MAX_WORK_CAP}`);
-  return { source: source as SourceName, workCap: cap, finish: truthy(o.finish) };
+  let query: string | undefined;
+  if (o.query !== undefined && o.query !== '') {
+    query = String(o.query);
+    if (!config.newsdata.queries.some((q) => q.id === query)) throw new Error(`query must be one of ${config.newsdata.queries.map((q) => q.id).join(', ')}`);
+  }
+  if (source === 'newsdata_topic' && !query) throw new Error('newsdata_topic needs a query id');
+  return { source: source as SourceName, workCap: cap, finish: truthy(o.finish), ...(query ? { query } : {}) };
 }
 
 export interface IngestDeps {
@@ -120,7 +128,7 @@ export async function handleIngestSource(deps: IngestDeps, opts: IngestOptions):
       // not stop it. Off = the source's own order, every item start passes through the guard.
       selection: { enabled: false },
     };
-    stats = await runOnce(pipelineDeps, { only: [opts.source], limit: opts.workCap });
+    stats = await runOnce(pipelineDeps, { only: [opts.source], limit: opts.workCap, newsdataQuery: opts.query });
     if (opts.finish) await finishRun(guarded.publisher, say);
   };
   try {

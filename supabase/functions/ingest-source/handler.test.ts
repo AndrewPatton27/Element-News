@@ -181,3 +181,10 @@ test('env: NEWSDATA_API_KEY and NEWSDATA_ENABLED are read; default is off and ke
   assert.equal(env.newsdataApiKey, null);
   assert.ok(!describeFunctionEnv(on).includes('SECRETKEY'));
 });
+
+test("newsdata_topic: needs a known query id from config.newsdata.queries", () => {
+  assert.deepEqual(parseIngestOptions({ source: "newsdata_topic", query: "fed_rates" }), { source: "newsdata_topic", workCap: DEFAULT_WORK_CAP, finish: false, query: "fed_rates" });
+  assert.throws(() => parseIngestOptions({ source: "newsdata_topic" }), /needs a query id/);
+  assert.throws(() => parseIngestOptions({ source: "newsdata_topic", query: "nope" }), /query must be one of/);
+  assert.equal(parseIngestOptions({ source: "newsdata_market" }).query, undefined);
+});
