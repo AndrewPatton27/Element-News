@@ -208,7 +208,8 @@ test('cron migration: idempotent, mirrors the element-ingest jobs, run_log accep
   }
   assert.ok(!sql.includes('"source":"census"'), 'census has no cron job');
   assert.ok(/cron\.unschedule\(jobname\)/.test(sql));
-  const check = /check \(source in \(([^)]*)\)\)/.exec(sql)![1].replace(/\s|'/g, '').split(',');
-  for (const s of ['eia', 'census', 'auctions', 'fomc', 'macro', 'brief-summary']) assert.ok(check.includes(s), s);
+  const m = /unnest\(names \|\| array\[([^\]]*)\]\)/.exec(sql)!;
+  const check = m[1].replace(/\s|'/g, '').split(',');
+  for (const s of ['eia', 'census', 'auctions', 'fomc', 'brief-summary']) assert.ok(check.includes(s), s);
   for (const s of check.filter((x) => x !== 'brief-summary')) assert.ok((SOURCE_NAMES as readonly string[]).includes(s), s);
 });

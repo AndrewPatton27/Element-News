@@ -207,7 +207,7 @@ test('migration 20261134000000: rows match the code, run_log names match the reg
     assert.ok(row, `migration row for ${id}`);
     assert.deepEqual([row[1], row[2], row[3], row[4], Number(row[5])], [s.label, s.source_name, s.source_short, `https://fred.stlouisfed.org/series/${id}`, s.sort_order], id);
   }
-  assert.ok(sql.includes("array['blscal', 'mts']"));
+  assert.ok(sql.includes("array['blscal', 'mts',"));
   const cron = readFileSync(new URL('../../supabase/migrations/20261134000100_m9c_sources_cron.sql', import.meta.url), 'utf8');
   for (const name of ['blscal', 'mts']) {
     assert.ok(cron.includes(`'element-ingest-${name}'`), name);
