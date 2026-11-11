@@ -8,7 +8,8 @@
 --   3. The 16 series (in_numbers = false). Citations name the original agency and "via FRED" (rule 8), never bare "FRED".
 --      The existing hourly element-ingest-macro job fetches them: no new job for them.
 
--- 1. run_log accepts the new source names (read the current list, add ours)
+-- 1. run_log accepts the new source names (read the current list, add ours; also re-adds bls, beadata, eia, census,
+--    auctions, fomc in case an older apply of 20261128000000 dropped them: review m9c)
 do $$
 declare
   def   text;
@@ -19,7 +20,7 @@ begin
    where c.conrelid = 'ingest.run_log'::regclass and c.conname = 'run_log_source_check';
   select coalesce(array_agg(distinct m[1]), '{}') into names
     from regexp_matches(coalesce(def, ''), '''([^'']+)''', 'g') as m;
-  names := array(select distinct n from unnest(names || array['blscal', 'mts']) as n order by n);
+  names := array(select distinct n from unnest(names || array['blscal', 'mts', 'bls', 'beadata', 'eia', 'census', 'auctions', 'fomc', 'brief-summary']) as n order by n);
   alter table ingest.run_log drop constraint if exists run_log_source_check;
   execute format('alter table ingest.run_log add constraint run_log_source_check check (source in (%s))',
                  (select string_agg(quote_literal(n), ',') from unnest(names) as n));

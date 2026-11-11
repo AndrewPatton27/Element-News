@@ -62,6 +62,7 @@ begin
   end if;
   perform set_config('request.headers', '', true);
 
+
   -- per-client limit: 5 per hour per client key (this client already has 2), the 6th new address trips PT429
   perform set_config('request.headers', '{"cf-connecting-ip": "203.0.113.7, 10.0.0.1"}', true);
   delete from core.subscribe_attempts;
