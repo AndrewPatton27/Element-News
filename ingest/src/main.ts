@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchAllowed } from './allowlist.ts';
 import { config, describeEnv, fedRegisterUrls, readEnv } from './config.ts';
 import { runOnce, SOURCE_NAMES, type Deps, type SourceName } from './pipeline.ts';
-import { runBackfill, runCardBackfill } from './backfill.ts';
+import { runBackfill, runCardBackfill, sharedAiCounter } from './backfill.ts';
 import { runRewrite } from './rewrite.ts';
 import { runAudit, groqRevision } from './audit.ts';
 import { isMailCommand, mailMain } from './mailCli.ts';
@@ -290,9 +290,16 @@ export async function main(argv: string[]): Promise<number> {
     reportCard: process.env.REPORT_CARD_PROTOCOL === '1' ? { enabled: true } : undefined,   // write -> score -> revise-once protocol, off by default
   };
   if (args.backfillCards) {
-    const cs = await runCardBackfill(deps, cardOpts());
-    await refreshTrendingSafely(deps.publisher, log);
-    log(`card backfill finished: ${JSON.stringify({ ...cs, perRound: undefined })}`);
+    const shared = await sharedAiCounter(env.supabaseUrl, env.supabaseServiceRoleKey);   // same daily caps as the cloud runs
+    deps.counter = shared.counter;
+    log(`backfill-cards: AI used today before start: gemini ${deps.counter.used('gemini')}, groq ${deps.counter.used('groq')}`);
+    try {
+      const cs = await runCardBackfill(deps, cardOpts());
+      await refreshTrendingSafely(deps.publisher, log);
+      log(`card backfill finished: ${JSON.stringify({ ...cs, perRound: undefined })}`);
+    } finally {
+      log(`backfill-cards: ${await shared.flush()} AI calls written to the shared counter`);
+    }
     return 0;
   }
   if (args.backfillMacro) {

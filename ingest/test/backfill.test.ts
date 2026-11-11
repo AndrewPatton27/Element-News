@@ -162,3 +162,27 @@ test('card backfill stops when the AI budget is used and never publishes templat
   assert.equal(r.rounds, 0);
   assert.equal(dry.cards.length, 0);
 });
+
+test('card backfill skips disaster, recall, space and world sources by default; widens short feed windows then restores them', async () => {
+  const s = newsSources();
+  for (const n of ['usgs', 'cpsc', 'nasa', 'wiki', 'macro', 'treasury'] as const) assert.ok(!s.includes(n), n);
+  for (const n of ['fed', 'fedspeech', 'secpress', 'bea', 'fedreg', 'sec'] as const) assert.ok(s.includes(n), n);
+  const before = [config.fedSpeechMaxAgeDays, config.secPressMaxAgeDays];
+  await runCardBackfill(dryDeps().deps, { days: 60, limit: 100 });
+  assert.deepEqual([config.fedSpeechMaxAgeDays, config.secPressMaxAgeDays], before);
+});
+
+test('sharedAiCounter starts from cloud usage and flushes its own calls through ai_usage_take', async () => {
+  const calls: string[] = [];
+  const f = (async (u: string) => {
+    calls.push(String(u).split('/').pop()!);
+    return new Response(String(u).endsWith('ai_usage_get') ? '{"gemini":40}' : 'true', { status: 200 });
+  }) as unknown as typeof fetch;
+  const { sharedAiCounter } = await import('../src/backfill.ts');
+  const { counter, flush } = await sharedAiCounter('https://x.supabase.co', 'k', f);
+  assert.equal(counter.used('gemini'), 40);
+  counter.add('gemini'); counter.add('gemini');
+  assert.equal(counter.used('gemini'), 42);
+  assert.equal(await flush(), 2);
+  assert.deepEqual(calls, ['ai_usage_get', 'ai_usage_take', 'ai_usage_take']);
+});

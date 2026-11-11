@@ -109,7 +109,8 @@ export interface CardBackfillStats {
 
 /** News sources only (no data-card sources). */
 export function newsSources(): SourceName[] {
-  return SOURCE_NAMES.filter((n) => !(config.cardBackfill.excludeSources as readonly string[]).includes(n));
+  const skip = [...config.cardBackfill.excludeSources, ...config.cardBackfill.defaultSkipSources] as readonly string[];
+  return SOURCE_NAMES.filter((n) => !skip.includes(n));
 }
 
 /** AI calls left today across the providers in this run (gemini + groq; template costs nothing). */
@@ -132,6 +133,16 @@ export async function runCardBackfill(deps: Deps, opts: CardBackfillOptions = {}
   const limit = opts.limit ?? cb.limitPerRound;
   const maxRounds = opts.maxRounds ?? cb.maxRounds;
   const stats: CardBackfillStats = { days, rounds: 0, published: 0, stoppedBy: 'max_rounds', perRound: [] };
+  // Feeds with a short own window (Fed speeches 30 d, SEC press 14 d) are widened to the backfill window for this run only.
+  const saved = { speech: config.fedSpeechMaxAgeDays, press: config.secPressMaxAgeDays };
+  (config as { fedSpeechMaxAgeDays: number }).fedSpeechMaxAgeDays = Math.max(saved.speech, days);
+  (config as { secPressMaxAgeDays: number }).secPressMaxAgeDays = Math.max(saved.press, days);
+  try { return await backfillRounds(deps, only, limit, maxRounds, days, stats); }
+  finally { (config as { fedSpeechMaxAgeDays: number }).fedSpeechMaxAgeDays = saved.speech; (config as { secPressMaxAgeDays: number }).secPressMaxAgeDays = saved.press; }
+}
+
+async function backfillRounds(deps: Deps, only: SourceName[], limit: number, maxRounds: number, days: number, stats: CardBackfillStats): Promise<CardBackfillStats> {
+  const cb = config.cardBackfill;
   const usesAi = deps.providers.some((p) => p.name === 'gemini' || p.name === 'groq');
 
   for (let round = 1; round <= maxRounds; round++) {
@@ -148,7 +159,35 @@ export async function runCardBackfill(deps: Deps, opts: CardBackfillOptions = {}
     stats.perRound.push(r);
     stats.published += r.published;
     deps.log(`backfill-cards: round ${round}: ${r.published} published, ${r.skipped} skipped, ${r.failed} failed`);
-    if (r.published === 0) { stats.stoppedBy = 'no_new_cards'; return stats; }
+    if (r.published === 0 && r.ai === 0 && r.template === 0) { stats.stoppedBy = 'no_new_cards'; return stats; }   // AI-rejected rounds still moved the queue forward
   }
   return stats;
+}
+
+/**
+ * Counter that starts from the cloud's AI usage today (api.ai_usage_get) so a laptop backfill respects the same caps,
+ * and writes its own calls back with api.ai_usage_take when `flush` runs (so the cloud runs see them).
+ */
+export async function sharedAiCounter(url: string, serviceKey: string, fetchImpl: typeof fetch = fetch): Promise<{ counter: Deps['counter']; flush: () => Promise<number> }> {
+  const call = async (name: string, body: unknown) => {
+    const r = await fetchImpl(`${url}/rest/v1/rpc/${name}`, {
+      method: 'POST', headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`rpc ${name}: HTTP ${r.status}`);
+    return r.json() as Promise<unknown>;
+  };
+  const start = (await call('ai_usage_get', {})) as Record<string, number>;
+  const added = new Map<string, number>();
+  const counter: Deps['counter'] = {
+    used: (p) => (start[p] ?? 0) + (added.get(p) ?? 0),
+    add: (p) => added.set(p, (added.get(p) ?? 0) + 1),
+  };
+  const caps: Record<string, number> = { gemini: aiDailyCap(), groq: groqDailyCap() };
+  const flush = async () => {
+    let n = 0;
+    for (const [p, c] of added) for (let i = 0; i < c; i++) { if (await call('ai_usage_take', { p_provider: p, p_cap: caps[p] ?? 1_000_000 }) === true) n++; }
+    added.clear();
+    return n;
+  };
+  return { counter, flush };
 }

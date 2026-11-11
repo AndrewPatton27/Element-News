@@ -239,11 +239,13 @@ export const config = {
   backfillWeeksDefault: 16,                    // --backfill-macro: weeks of history (Trends charts show 12 weekly points)
   cardBackfill: {                              // --backfill-cards (M9 item 1): bulk-publish the last N days of news cards
     daysDefault: 7,
-    daysMax: 30,
+    daysMax: 60,
     limitPerRound: 50,                         // items summarized per round (each round re-reads every source)
     maxRounds: 10,
     aiReserve: 15,                             // stop with this many AI calls left today, for the normal cloud runs
     excludeSources: ['macro', 'treasury'] as readonly string[],   // data-card sources: latest reading only, never backfilled
+    // Left out unless named in --only (Drew 2026-11-11: limit natural-disaster news; recalls, space science and world items are low value for the macro/finance focus).
+    defaultSkipSources: ['usgs', 'cpsc', 'nasa', 'wiki'] as readonly string[],
   },
   backfillPauseMs: 700,                        // --backfill-macro: pause between FRED requests (limit is 120/minute)
   fedMaxAgeDays: 120,                            // ignore older press releases
