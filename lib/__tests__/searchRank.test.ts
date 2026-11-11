@@ -61,9 +61,9 @@ test('search finds exact tickers and series ids', () => {
   assert.equal(matchedTermCount(d, [d.macro[0].series_id.toLowerCase()]), 1);
 });
 
-test('multiple words: any word matches; more and better matches first, then trending (x1.3 bonus per extra word)', () => {
-  // fedcut matches both words (0.5 + 0.8), fedhold one exact (1.0), mortgage one stem (0.8).
-  assert.deepEqual(ids('fed rate'), ['fedcut', 'fedhold', 'mortgage']);
+test('multiple words: every word must match (v8/v9, like api.search); the x1.3 bonus per extra word is kept for searchScore', () => {
+  // fedcut matches both words (0.5 + 0.8); fedhold and mortgage match one word only and no longer count.
+  assert.deepEqual(ids('fed rate'), ['fedcut']);
   assert.ok(Math.abs(searchScore(0, 2) - 8 * Math.log2(SEARCH_TERM_BONUS)) < 1e-9);
 });
 

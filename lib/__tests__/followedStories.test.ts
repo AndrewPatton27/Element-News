@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFollowedStories, toggleStory, isStoryFollowed, updatesFor, storyBadge, storiesHeader, sortStories, serializeFollowedStories, MAX_FOLLOWED_STORIES, clearStoryUpdatesCache, loadStoryUpdates, STORY_UPDATES_TTL_MS } from '../following/followedStories.ts';
+import { parseFollowedStories, toggleStory, isStoryFollowed, updatesFor, storyBadge, storiesHeader, sortStories, serializeFollowedStories, MAX_FOLLOWED_STORIES, clearStoryUpdatesCache, loadStoryUpdates, STORY_UPDATES_TTL_MS, withoutShownStories } from '../following/followedStories.ts';
 import type { BlurbCard } from '../../contract/types.ts';
 
 const c = (id: string, published_at: string) => ({ id, published_at, sources: [] }) as unknown as BlurbCard;
@@ -95,4 +95,11 @@ test('followed stories belong to who is signed in: a different user never gets t
   switchFollowedStoriesOwner(s, 'bob');
   assert.deepEqual(ids('bob'), ['b1']);
   assert.equal(switchFollowedStoriesOwner(s, 'bob'), false, 'same owner: nothing changes');
+});
+
+test('withoutShownStories drops followed stories and their updates from the feed below (M9c #4)', () => {
+  const a = c('a', '2026-10-01T00:00:00Z'), u = c('u', '2026-10-02T00:00:00Z'), x = c('x', '2026-10-03T00:00:00Z');
+  const out = withoutShownStories([a, u, x], [{ id: 'a' }], [{ story: a, updates: [u] }]);
+  assert.deepEqual(out.map((k) => k.id), ['x']);
+  assert.deepEqual(withoutShownStories([a, x], [], []).map((k) => k.id), ['a', 'x']);
 });

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
-import { NO_DETAIL_MESSAGE, detailKeyPoints, detailParagraphs } from '../../lib/shared/detail';
+import { NO_DETAIL_MESSAGE, dataMeasures, detailKeyPoints, detailParagraphs, showNoDetailNote } from '../../lib/shared/detail';
 import { clampHeadline } from '../../lib/shared/format';
 import { aiNoticeText, cardLabels, primarySource, shareAlikeCredit } from '../../lib/shared/labels';
 import { openUrl } from '../../lib/shared/openUrl';
@@ -37,7 +37,9 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
   const gloss = flagOn('glossary');
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const keyPoints = detailKeyPoints(card);
-  const { paragraphs, fallback } = detailParagraphs(card);
+  const { paragraphs } = detailParagraphs(card);
+  const noDetail = showNoDetailNote(card);
+  const measures = dataMeasures(card);
   const labels = cardLabels(card, config);
   const aiLabel = labels.aiLabel ?? (alwaysAiNotice ? aiNoticeText(config) : null);
   const credit = shareAlikeCredit(card, config);
@@ -80,7 +82,20 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
           </Text>
         ),
       )}
-      {fallback ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
+      {measures.length ? (
+        <View style={styles.sources}>
+          <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>
+            What this number measures
+          </Text>
+          {measures.map((m) => (
+            <Text key={m.label} style={[styles.pointText, { color: p.inkSoft }]}>
+              <Text style={{ fontFamily: fonts.sansSemi, color: p.ink }}>{m.label}: </Text>
+              {m.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      {noDetail ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
 
       <View style={styles.sources}>
         <Text style={[styles.h3, { color: p.ink }]} accessibilityRole="header" aria-level={headingLevel + 1}>

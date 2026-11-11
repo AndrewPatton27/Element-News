@@ -19,7 +19,7 @@ import { linkProps } from '../../lib/shared/openUrl';
 import { usePalette } from '../../lib/theme/useTheme';
 import type { Palette } from '../../lib/theme/theme';
 import { fonts, radius } from '../../lib/theme/theme';
-import { DataFacts } from './DataCard';
+import { DataFacts, DataNotices } from './DataCard';
 import { ExternalIcon, NumbersIcon, PulseIcon, ShareIcon, SparkleIcon, ThumbDownIcon, ThumbUpIcon } from '../shell/Icons';
 import type { Feedback } from '../../lib/account/accountLogic';
 import { ShareAlikeLine } from './Labels';
@@ -376,7 +376,7 @@ export function Card(props: Props) {
                 >
                   {headline}
 
-                  {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} /> : null}
+                  {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} hideNotices /> : null}
 
                   {showTakeaways ? (
                     <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />
@@ -397,6 +397,7 @@ export function Card(props: Props) {
               </View>
             ) : null}
             </View>
+            {card.kind === 'data' ? <DataNotices card={card} config={config} small /> : null}
             {opensDetail && pinMore ? <View style={styles.morePinned}>{moreDetail}</View> : null}
             {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
           </>

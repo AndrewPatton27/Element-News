@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cardDetail, detailKeyPoints, detailParagraphs } from '../shared/detail.ts';
+import { cardDetail, dataMeasures, detailKeyPoints, detailParagraphs, showNoDetailNote } from '../shared/detail.ts';
 import { cardLabels } from '../shared/labels.ts';
 import { isBlurbCard } from '../shared/types.ts';
 import { card } from './helpers.ts';
@@ -59,4 +59,14 @@ test('detailKeyPoints drops "Source:" bullets and data-card bullets that restate
   assert.deepEqual(detailKeyPoints(only), ['Yield 4.02%']);
   // a plain card keeps all points except "Source:" lines
   assert.deepEqual(detailKeyPoints(withDetail({ paragraphs: [], key_points: ['A', 'Source: X'] })), ['A']);
+});
+
+test('data card without detail: no "not available" note, and a plain line per number (M9c #6)', () => {
+  const cpi = card({ kind: 'data', macro: [{ series_id: 'CPIAUCSL', label: 'CPI', value: '3.2%' }] as never, detail: null });
+  assert.equal(showNoDetailNote(cpi), false);
+  assert.equal(dataMeasures(cpi).length, 1);
+  assert.match(dataMeasures(cpi)[0].text, /cost/);
+  assert.equal(showNoDetailNote(card({ detail: null })), true, 'a plain card still says so');
+  assert.deepEqual(dataMeasures(card({ detail: null })), []);
+  assert.deepEqual(dataMeasures(card({ kind: 'data', macro: [{ series_id: 'ZZZ', label: 'z', value: '1' }] as never })), []);
 });
