@@ -22,7 +22,7 @@ lines; never keys or source text).
 
 ### Limits inside one call (`_shared/budget.ts`, `_shared/usage.ts`)
 
-- **Work cap:** at most `work_cap` (5) new items per call. Items over the cap are not recorded, so the next
+- **Work cap:** at most `work_cap` new items per call (default 5; `sec` 10 from `config.workCapBySource`; a routine 5.02 skip gives its slot back). Items over the cap are not recorded, so the next
   call picks them up.
 - **Time budget:** no new item starts after 100 s; no AI call starts if its pacing wait plus the 20 s
   request timeout would end after 140 s (the chain then falls back to the next provider or the template,
