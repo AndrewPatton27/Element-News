@@ -12,7 +12,7 @@ const ENV: Env = {
 const T0 = new Date('2026-11-10T12:17:00Z');   // a Tuesday, 12:17 UTC: a re-trigger hour
 
 const okOps = (over: Partial<OpsStatus> = {}): OpsStatus => ({
-  jobs: 22, cron_failures_24h: 0, http_non2xx_24h: 0, hung_open: 0, killed_24h: 0, model_missing: 0,
+  jobs: 24, cron_failures_24h: 0, http_non2xx_24h: 0, hung_open: 0, killed_24h: 0, model_missing: 0,
   ai: [{ provider: 'gemini', used: 100, cap: 500 }, { provider: 'groq', used: 10, cap: 74 }], db_size_mb: 120, ...over,
 });
 const okFeed = (over: Partial<FeedStatus> = {}): FeedStatus => ({

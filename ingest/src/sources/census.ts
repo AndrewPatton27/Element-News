@@ -71,7 +71,7 @@ export function censusCard(series: CensusSeries, pts: CensusPoint[]): PublishPay
     measure = 'What this number measures: how many new homes builders started, a sign of the housing market.';
   }
   return buildAgencyDataCard({
-    dedupeKey: `census:${series}:${now.time}`, headline, body, category: 'economy', asOf, agencyName: AGENCY, agencyUrl: url, docLabel: doc, attribution,
+    dedupeKey: `CENSUS_${series.toUpperCase()}:${now.time}`, headline, body, category: 'economy', asOf, agencyName: AGENCY, agencyUrl: url, docLabel: doc, attribution,
     paragraphs: [body, measure, `The numbers come from the ${AGENCY}. ${notice}`],
     keyPoints: [...points, `Source: ${AGENCY}`],
   });
