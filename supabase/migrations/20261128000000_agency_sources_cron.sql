@@ -18,12 +18,23 @@
 -- Re-runnable. Check: select jobname, schedule from cron.job where jobname like 'element-ingest-%';
 -- Remove: select cron.unschedule('element-ingest-eia'); (same for the other three)
 
--- 1. run_log accepts the new source names. The list is the union of every earlier migration's sources: if another
---    migration added a source before this one, add it here too.
-alter table ingest.run_log drop constraint if exists run_log_source_check;
-alter table ingest.run_log add constraint run_log_source_check
-  check (source in ('macro','treasury','fed','fedspeech','secpress','bea','fedreg','sec','wiki','cpsc','usgs','nasa',
-                    'eia','census','auctions','fomc','brief-summary'));
+-- 1. run_log accepts the new source names. The list is READ from the current constraint and extended (review m9c: the
+--    old hard-coded list here dropped bls and beadata, added by 20261127000000, so those two sources could not log runs).
+do $$
+declare
+  def   text;
+  names text[];
+begin
+  select pg_get_constraintdef(c.oid) into def
+    from pg_constraint c
+   where c.conrelid = 'ingest.run_log'::regclass and c.conname = 'run_log_source_check';
+  select coalesce(array_agg(distinct m[1]), '{}') into names
+    from regexp_matches(coalesce(def, ''), '''([^'']+)''', 'g') as m;
+  names := array(select distinct n from unnest(names || array['eia', 'census', 'auctions', 'fomc', 'brief-summary']) as n order by n);
+  alter table ingest.run_log drop constraint if exists run_log_source_check;
+  execute format('alter table ingest.run_log add constraint run_log_source_check check (source in (%s))',
+                 (select string_agg(quote_literal(n), ',') from unnest(names) as n));
+end $$;
 
 -- 2. cron jobs (idempotent: unschedule by name first)
 select cron.unschedule(jobname) from cron.job
