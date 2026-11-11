@@ -5,6 +5,7 @@
 // `alwaysAiNotice` shows the AI notice even when a card does not say it was AI-generated (the share page).
 // The headline is a level-2 heading by default (the page or sheet title is level 1).
 
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { AppConfig, BlurbCard } from '../../contract/types.ts';
 import { NO_DETAIL_MESSAGE, cardDetail, detailParagraphs } from '../../lib/shared/detail';
@@ -18,6 +19,9 @@ import { fonts } from '../../lib/theme/theme';
 import { AiLabel, Disclaimer, ShareAlikeLine } from './Labels';
 import { SourceList } from './SourceList';
 import { DataFacts } from './DataCard';
+import { DefineSheet, GlossText } from './GlossText';
+import { flagOn } from '../../lib/flags/flags';
+import type { GlossaryTerm } from '../../lib/glossary/glossary';
 
 interface Props {
   card: BlurbCard;
@@ -29,6 +33,9 @@ interface Props {
 export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = false }: Props) {
   const p = usePalette();
   const wide = useWide();
+  // D-02: with the `glossary` flag on, jargon in the key points and paragraphs is tap-to-define.
+  const gloss = flagOn('glossary');
+  const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const detail = cardDetail(card);
   const { paragraphs, fallback } = detailParagraphs(card);
   const labels = cardLabels(card, config);
@@ -56,7 +63,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
           {detail.key_points.map((k, i) => (
             <View key={i} style={styles.point}>
               <Text style={[styles.bullet, { color: p.inkSoft }]}>•</Text>
-              <Text style={[styles.pointText, { color: p.inkSoft }]}>{k}</Text>
+              {gloss ? <GlossText text={k} style={[styles.pointText, { color: p.inkSoft }]} onTerm={setTerm} /> : <Text style={[styles.pointText, { color: p.inkSoft }]}>{k}</Text>}
             </View>
           ))}
         </View>
@@ -64,11 +71,15 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
 
       {card.kind === 'data' ? <DataFacts card={card} config={config} /> : null}
 
-      {paragraphs.map((t, i) => (
-        <Text key={i} style={[styles.para, { color: p.inkSoft }]}>
-          {t}
-        </Text>
-      ))}
+      {paragraphs.map((t, i) =>
+        gloss ? (
+          <GlossText key={i} text={t} style={[styles.para, { color: p.inkSoft }]} onTerm={setTerm} />
+        ) : (
+          <Text key={i} style={[styles.para, { color: p.inkSoft }]}>
+            {t}
+          </Text>
+        ),
+      )}
       {fallback ? <Text style={[styles.note, { color: p.muted }]}>{NO_DETAIL_MESSAGE}</Text> : null}
 
       <View style={styles.sources}>
@@ -83,6 +94,7 @@ export function DetailBody({ card, config, headingLevel = 2, alwaysAiNotice = fa
         {aiLabel ? <AiLabel text={aiLabel} /> : null}
         <Disclaimer text={labels.disclaimer} />
       </View>
+      {gloss ? <DefineSheet term={term} onClose={() => setTerm(null)} /> : null}
     </>
   );
 }

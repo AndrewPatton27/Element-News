@@ -25,6 +25,7 @@ import type { Feedback } from '../../lib/account/accountLogic';
 import { ShareAlikeLine } from './Labels';
 import { CardBar, type BarSize } from './CardBar';
 import { Takeaways } from './Takeaways';
+import { useShortDepth } from '../../lib/signals/useShortDepth';
 import { AboutChips } from '../companies/AboutChips';
 import { useFollowedStories } from '../../lib/following/useFollowedStories';
 import { linkOutCredit, linkOutDelay, shareUrl } from './cardFooter';
@@ -149,7 +150,9 @@ export function Card(props: Props) {
   const barSize: BarSize = wide ? 'wide' : compact || (box.w > 0 && box.w < 350) ? 'small' : 'phone';
   const type = bodyType(!!wide, !!compact, box.h, tablet);
   // How many bullets fit: data cards share the space with the numbers panel.
-  const maxPoints = wide ? (card.kind === 'data' ? (tight ? 2 : 3) : 4) : compact ? (card.kind === 'data' ? 1 : 2) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
+  // A-22 depth preference (flag `signals`): "Short" keeps one bullet per card.
+  const shortDepth = useShortDepth();
+  const maxPoints = shortDepth ? 1 : wide ? (card.kind === 'data' ? (tight ? 2 : 3) : 4) : compact ? (card.kind === 'data' ? 1 : 2) : denseData ? 2 : card.kind === 'data' ? 3 : 4;
   // Bullets are whole or not shown: when the middle overflows (short screens, long
   // headlines), drop the last bullet until it fits instead of cutting one mid-line.
   const [fit, setFit] = useState({ key: '', points: maxPoints });

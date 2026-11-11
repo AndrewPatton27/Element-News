@@ -20,6 +20,7 @@ import { userMessage } from '../lib/api/errors';
 import { fonts, font, radius } from '../lib/theme/theme';
 import { PasswordField, fieldStyles } from '../components/account/PasswordField';
 import { OutlineButton, PrimaryButton, ListRow, SectionLabel } from '../components/account/FormParts';
+import { readFlags } from '../lib/flags/flags';
 import { AccountPrompt, DeviceData, QuickLinks } from '../components/account/AccountEntry';
 import { ScreenShell } from '../components/shell/ScreenShell';
 import { TopicStatePicker } from '../components/feed/TopicStatePicker';
@@ -155,6 +156,19 @@ export default function AccountScreen() {
       </View>
     </View>
   );
+
+  // Wave 2 (flags `signals` / `onboarding`): links to the Saved and signals page and the three-question setup.
+  const wave = readFlags();
+  const waveLinks =
+    wave.signals || wave.onboarding ? (
+      <View style={styles.section}>
+        <SectionLabel>Saved and signals</SectionLabel>
+        <View style={card}>
+          {wave.signals ? <ListRow first wide={wide} chevron label="Saved stories, muted topics and detail" onPress={() => router.navigate('/signals' as never)} /> : null}
+          {wave.onboarding ? <ListRow first={!wave.signals} wide={wide} chevron label="Set up Element again" onPress={() => router.navigate('/setup' as never)} /> : null}
+        </View>
+      </View>
+    ) : null;
 
   const topicsSection = (
     <View style={styles.section}>
@@ -369,6 +383,7 @@ export default function AccountScreen() {
       {wide ? (
         <View style={styles.cols}>
           <View style={styles.colMain}>
+            {waveLinks}
             {topicsSection}
             {watchlistSection}
             {sourcesSection}
@@ -381,6 +396,7 @@ export default function AccountScreen() {
         </View>
       ) : (
         <>
+          {waveLinks}
           {topicsSection}
           {watchlistSection}
           {sourcesSection}
