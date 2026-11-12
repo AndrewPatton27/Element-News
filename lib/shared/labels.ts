@@ -9,11 +9,16 @@ import type { AppConfig, BlurbCard, NoticePlacement, RequiredNotice } from '../.
 export const DISCLAIMER_FALLBACK = 'Informational only · Not investment advice';
 export const AI_NOTICE_FALLBACK = 'AI-generated summary · may contain errors';
 
-export const RENDERABLE_KINDS = ['summary', 'data'] as const;
+export const RENDERABLE_KINDS = ['summary', 'data', 'link_out'] as const;
 export type RenderableKind = (typeof RENDERABLE_KINDS)[number];
 
-// 'link_out' is reserved and unknown kinds may arrive from a newer back end: skip them.
+// Unknown kinds may arrive from a newer back end: skip them. 'link_out' (NewsData.io headline + link, rule 7) renders in the feed
+// (Card.tsx); the Brief shows only summary and data cards (isBriefKind).
 export function isRenderableKind(kind: unknown): kind is RenderableKind {
+  return kind === 'summary' || kind === 'data' || kind === 'link_out';
+}
+
+export function isBriefKind(kind: unknown): boolean {
   return kind === 'summary' || kind === 'data';
 }
 

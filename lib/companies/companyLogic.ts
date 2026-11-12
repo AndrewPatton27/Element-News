@@ -8,7 +8,7 @@
 import type { BlurbCard } from '../../contract/types.ts';
 import { COMPANY_SECTORS, sectorLabel } from '../../contract/companies.ts';
 import { companyQueryScore, normalizeCompanyText } from '../../contract/companyMatch.ts';
-import { isBlurbCard } from '../shared/types.ts';
+import { isBlurbCard, textOnlyData } from '../shared/types.ts';
 
 export type CompanyMatchKind = 'ticker' | 'name' | 'prefix' | 'typo';
 
@@ -92,7 +92,7 @@ export function parseCompanyPage(x: unknown): CompanyPage {
   const r = x as Record<string, unknown>;
   return {
     company: parseCompanySummary(r.company),
-    items: Array.isArray(r.items) ? r.items.filter(isBlurbCard) : [],
+    items: Array.isArray(r.items) ? r.items.filter(isBlurbCard).map(textOnlyData) : [],
     next_cursor: typeof r.next_cursor === 'string' && r.next_cursor !== '' ? r.next_cursor : null,
   };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isBlurbCard, isHttpUrl, parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
+import { isBlurbCard, textOnlyData, isHttpUrl, parseAppConfig, parseCategories, parseFeedPage, parseMacroFacts } from '../shared/types.ts';
 import { card, config, dataCard, fact } from './helpers.ts';
 
 test('isHttpUrl accepts only https URLs (matches the DB CHECK)', () => {
@@ -43,11 +43,13 @@ test('ticker rows need a non-empty symbol', () => {
   assert.equal(isBlurbCard(card({ tickers: [{ symbol: '' }] })), false);
 });
 
-test('unknown kinds, link_out, empty headlines and data cards without numbers are rejected', () => {
-  assert.equal(isBlurbCard(card({ kind: 'link_out' })), false);
+test('unknown kinds and empty headlines are rejected; link_out and figure-less data cards are valid (the latter render as text cards)', () => {
+  assert.equal(isBlurbCard(card({ kind: 'link_out' })), true);
   assert.equal(isBlurbCard({ ...card(), kind: 'poll' }), false);
   assert.equal(isBlurbCard(card({ headline: '  ' })), false);
-  assert.equal(isBlurbCard(dataCard({ macro: [] })), false);
+  assert.equal(isBlurbCard(dataCard({ macro: [] })), true);
+  assert.equal(textOnlyData(dataCard({ macro: [] })).kind, 'summary');
+  assert.equal(textOnlyData(dataCard()).kind, 'data');
   assert.equal(isBlurbCard(null), false);
   assert.equal(isBlurbCard('card'), false);
 });
@@ -56,7 +58,7 @@ test('parseFeedPage filters bad rows and normalises the cursor', () => {
   const page = parseFeedPage({ items: [card(), { id: 'x' }, card({ id: 'l', kind: 'link_out' })], next_cursor: '' });
   assert.deepEqual(
     page.items.map((c) => c.id),
-    ['c1'],
+    ['c1', 'l'],
   );
   assert.equal(page.next_cursor, null);
   assert.throws(() => parseFeedPage({ nope: true }));

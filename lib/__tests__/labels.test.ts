@@ -7,6 +7,7 @@ import {
   cardLabels,
   cardNotices,
   howMadeText,
+  isBriefKind,
   isRenderableKind,
   noticesFor,
   shareAlikeCredit,
@@ -44,10 +45,12 @@ test('template cards (ai.generated false) carry no AI label', () => {
   assert.equal(cardLabels(card({ ai: { generated: false, label: null } }), config()).aiLabel, null);
 });
 
-test('only summary and data kinds render', () => {
+test('summary, data and link_out kinds render; the Brief takes summary and data only', () => {
   assert.equal(isRenderableKind('summary'), true);
   assert.equal(isRenderableKind('data'), true);
-  assert.equal(isRenderableKind('link_out'), false);
+  assert.equal(isRenderableKind('link_out'), true);
+  assert.equal(isBriefKind('link_out'), false);
+  assert.equal(isBriefKind('data'), true);
   assert.equal(isRenderableKind('video'), false);
   assert.equal(isRenderableKind(undefined), false);
 });

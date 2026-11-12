@@ -77,6 +77,32 @@ function parsePubDate(s: string): Date | null {
   return d && Number.isFinite(d.getTime()) ? d : null;
 }
 
+// Some publishers' feeds reach NewsData.io as UTF-8 bytes read as Windows-1252 ("Chinatownâ€‘International"). That is a
+// character-encoding fault, not wording, so it is undone before the headline is stored; text that does not round-trip
+// cleanly is left exactly as received.
+const CP1252: Record<number, number> = { 0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89,
+  0x0160: 0x8a, 0x2039: 0x8b, 0x0152: 0x8c, 0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92, 0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+  0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b, 0x0153: 0x9c, 0x017e: 0x9e, 0x0178: 0x9f };
+const MOJI_RUN = /(?:[Â-ô][-¿ŒœŠšŸŽžƒˆ˜–-›€™]{1,3})+/g;
+function decodeRun(run: string): string {
+  const bytes: number[] = [];
+  for (const ch of run) {
+    const cp = ch.codePointAt(0)!;
+    if (cp < 0x100) bytes.push(cp);
+    else if (CP1252[cp] !== undefined) bytes.push(CP1252[cp]);
+    else return run;
+  }
+  try {
+    const fixed = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes));
+    return fixed.length < run.length ? fixed : run;
+  } catch {
+    return run;
+  }
+}
+export function repairMojibake(text: string): string {
+  return text.replace(MOJI_RUN, decodeRun);   // only the broken runs change; correct characters elsewhere stay as received
+}
+
 /** Watch-list tickers (config.cpsc.watchNames) named in the headline: such a company's news counts as material. */
 export function watchTickers(title: string): string[] {
   return [...new Set(config.cpsc.watchNames.filter(([pat]) => new RegExp(`\\b(?:${pat})\\b`, 'i').test(title)).map(([, t]) => t))];
@@ -115,7 +141,7 @@ export function newsdataToItem(a: NewsdataArticle, now: Date): { item: RawItem }
   const when = parsePubDate(a.pubDate);
   if (!when) return { skip: 'bad_date' };
   if (now.getTime() - when.getTime() > c.maxAgeHours * 3_600_000) return { skip: 'too_old' };
-  if (c.offTopicPattern.test(a.title)) return { skip: 'off_topic' };
+  if (c.offTopicPattern.test(a.title) || c.offTopicPattern2.test(a.title)) return { skip: 'off_topic' };
   if (relevanceScore(a) < c.minScore) return { skip: 'not_finance' };
   const watch = watchTickers(a.title);
   if (c.microPattern.test(a.title) && !watch.length) return { skip: 'micro_or_recall' };
@@ -126,7 +152,7 @@ export function newsdataToItem(a: NewsdataArticle, now: Date): { item: RawItem }
       source: 'newsdata',
       external_id: a.article_id || url.pathname,
       url: url.toString(),
-      title: a.title.slice(0, c.headlineMaxChars),               // verbatim, 200-char safety cap
+      title: repairMojibake(a.title).slice(0, c.headlineMaxChars), // verbatim wording (only broken character encoding is repaired), 200-char cap
       published_at: new Date(Math.min(when.getTime(), now.getTime())).toISOString(),
       license_class: 'link_out',
       category: c.category as RawItem['category'],

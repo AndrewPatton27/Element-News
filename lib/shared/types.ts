@@ -52,17 +52,24 @@ export function isBlurbCard(x: unknown): x is BlurbCard {
   if (!Array.isArray(x.tickers) || !x.tickers.every((ticker) => isObj(ticker) && isStr(ticker.symbol) && ticker.symbol.trim() !== '') || !Array.isArray(x.macro)) return false;
   if (!isObj(x.ai) || typeof x.ai.generated !== 'boolean') return false;
   if (x.story_link !== undefined && !(isObj(x.story_link) && ['update','angle','related'].includes(String(x.story_link.kind)) && isStr(x.story_link.related_id) && isStr(x.story_link.related_headline))) return false;
-  if (x.kind === 'data' && (x.macro.length === 0 || !x.macro.every(isMacroFact))) return false;
+  // A data card carries facts in `macro`; a calendar or agency data card with no figures (BLS release calendar, auctions) has none
+  // and renders as a text card (parseFeedPage), so only malformed facts are rejected here.
+  if (x.kind === 'data' && !x.macro.every(isMacroFact)) return false;
   return true;
 }
 
 // Keeps only valid, renderable cards. next_cursor must be a string or null.
 // `page_id` (signed-in pages only, added by the ML shadow logging migration) is kept when it is a
 // non-empty string and ignored otherwise; the key is absent when the server sends none.
+/** A data card with no figures shows as a plain summary card (there is nothing for the numbers panel to draw). */
+export function textOnlyData(c: BlurbCard): BlurbCard {
+  return c.kind === 'data' && c.macro.length === 0 ? { ...c, kind: 'summary' } : c;
+}
+
 export function parseFeedPage(x: unknown): FeedPage & { page_id?: string } {
   if (!isObj(x) || !Array.isArray(x.items)) throw new Error('Feed response has no items array.');
   const next = isStr(x.next_cursor) && x.next_cursor !== '' ? x.next_cursor : null;
-  const page: FeedPage & { page_id?: string } = { items: x.items.filter(isBlurbCard), next_cursor: next };
+  const page: FeedPage & { page_id?: string } = { items: x.items.filter(isBlurbCard).map(textOnlyData), next_cursor: next };
   if (isStr(x.page_id) && x.page_id !== '') page.page_id = x.page_id;
   if (typeof x.seen_from === 'number' && Number.isInteger(x.seen_from) && x.seen_from >= 0) page.seen_from = x.seen_from;
   return page;

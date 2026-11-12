@@ -10,7 +10,7 @@ import { NETWORK_MESSAGE, friendlyHttpError, parseErrorBody, warnRaw } from './e
 import { clampLimit } from '../feed/feedLogic.ts';
 import { takeEarly, type EarlyHolder } from '../feed/earlyFeed.ts';
 import { createSupabaseCompanyApi } from '../companies/companyApi.ts';
-import { isBlurbCard, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
+import { isBlurbCard, textOnlyData, isMacroFact, parseFeedStatus, isValidBriefInput, normalizeBriefEmail, parseAppConfig, parseBriefMarkets, parseBriefSummary, parseCategories, parseFeedPage, parseMacroFacts, parseMyBriefChange, parseMyBriefSubscriptions, parseNumberTrends, parseSubscribeResult, parseTokenResult } from '../shared/types.ts';
 
 export interface SupabaseOptions {
   url: string; // https://<project>.supabase.co, no trailing slash
@@ -128,8 +128,8 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     return {
       generated_at: typeof row.generated_at === 'string' ? row.generated_at : new Date(0).toISOString(),
       window_hours: typeof row.window_hours === 'number' ? row.window_hours : 24,
-      headline_cards: Array.isArray(row.headline_cards) ? row.headline_cards.filter(isBlurbCard) : [],
-      sections: Array.isArray(row.sections) ? row.sections.filter((s): s is { category: string; label: string; cards: BlurbCard[] } => !!s && typeof s === 'object' && typeof (s as any).category === 'string' && typeof (s as any).label === 'string').map((s) => ({ ...s, cards: Array.isArray(s.cards) ? s.cards.filter(isBlurbCard) : [] })) : [],
+      headline_cards: Array.isArray(row.headline_cards) ? row.headline_cards.filter(isBlurbCard).map(textOnlyData) : [],
+      sections: Array.isArray(row.sections) ? row.sections.filter((s): s is { category: string; label: string; cards: BlurbCard[] } => !!s && typeof s === 'object' && typeof (s as any).category === 'string' && typeof (s as any).label === 'string').map((s) => ({ ...s, cards: Array.isArray(s.cards) ? s.cards.filter(isBlurbCard).map(textOnlyData) : [] })) : [],
       numbers: Array.isArray(row.numbers) ? row.numbers.filter(isMacroFact) : [],
       summary: parseBriefSummary(row.summary),
       markets: parseBriefMarkets(row.markets),
@@ -212,7 +212,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     async topStories() {
       try {
         const x = await call(planRequest(opts.url, opts.key, 'top_stories'));
-        return Array.isArray(x) ? x.filter(isBlurbCard).slice(0, 5) : [];
+        return Array.isArray(x) ? x.filter(isBlurbCard).map(textOnlyData).slice(0, 5) : [];
       } catch {
         return [];
       }
@@ -238,7 +238,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
     },
     async relatedCards(cardId, limit = 5) {
       const x = await optional('related_cards', { mode: 'top', limit, cardId });
-      return Array.isArray(x) ? x.filter(isBlurbCard).slice(0, limit) : [];
+      return Array.isArray(x) ? x.filter(isBlurbCard).map(textOnlyData).slice(0, limit) : [];
     },
     async card(cardId) {
       if (!UUID.test(String(cardId))) return null;
@@ -246,7 +246,7 @@ export function createSupabaseApi(opts: SupabaseOptions): Api {
       try {
         // anonymous on purpose: the same answer for everyone, like the Pages Function's preview
         const x = await call({ url: `${opts.url}/rest/v1/rpc/card_by_id`, init: { method: 'POST', headers, body: JSON.stringify({ p_id: cardId }) } });
-        return isBlurbCard(x) && x.id.toLowerCase() === String(cardId).toLowerCase() ? x : null;
+        return isBlurbCard(x) && x.id.toLowerCase() === String(cardId).toLowerCase() ? textOnlyData(x) : null;
       } catch (e) {
         if (e instanceof ApiError && (e.status === 404 || e.status === 400)) return null; // RPC not applied yet / bad id
         throw e;

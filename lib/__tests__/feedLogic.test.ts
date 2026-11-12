@@ -6,12 +6,12 @@ import { card, dataCard } from './helpers.ts';
 test('appendPage dedupes by id and drops invalid cards', () => {
   const a = card({ id: 'a' });
   const b = card({ id: 'b' });
-  const linkOut = card({ id: 'l', kind: 'link_out' });
+  const linkOut = card({ id: 'l', kind: 'link_out' }); // link-out cards render (NewsData.io, rule 7)
   const noSource = card({ id: 'n', sources: [] });
   const out = appendPage([a], { items: [a, b, linkOut, noSource], next_cursor: null });
   assert.deepEqual(
     out.map((c) => c.id),
-    ['a', 'b'],
+    ['a', 'b', 'l'],
   );
 });
 

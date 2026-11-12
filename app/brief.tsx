@@ -33,7 +33,7 @@ import {
 } from '../lib/brief/briefLogic';
 import { userMessage } from '../lib/api/errors';
 import { defaultStore } from '../lib/storage/storage';
-import { isRenderableKind, noticesFor } from '../lib/shared/labels';
+import { isBriefKind, noticesFor } from '../lib/shared/labels';
 import { withoutHiddenSources } from '../lib/sources/sourceKeys';
 import { usePalette, useWide } from '../lib/theme/useTheme';
 import { MOBILE_HEADER_HEIGHT, fonts, space } from '../lib/theme/theme';
@@ -146,8 +146,8 @@ export default function BriefScreen() {
     if (detailCard && signedIn) trackOpenDetail(detailCard);
   }, [detailCard, signedIn, trackOpenDetail]);
 
-  const view = data ? briefView(data, categories, visible, (c) => isRenderableKind(c.kind)) : null;
-  const unfiltered = data ? briefView(data, categories, undefined, (c) => isRenderableKind(c.kind)) : null;
+  const view = data ? briefView(data, categories, visible, (c) => isBriefKind(c.kind)) : null;
+  const unfiltered = data ? briefView(data, categories, undefined, (c) => isBriefKind(c.kind)) : null;
   const refreshing = loading && data !== null;
   const goFeed = () => router.navigate('/' as never);
   const goNumbers = () => router.navigate('/numbers' as never);
