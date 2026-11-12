@@ -370,9 +370,10 @@ test('D-296: summaries off (config) or no AI provider = the source publishes not
 test('D-296: at most aiPerRun page fetches + AI calls per run; the rest are left for the next run (not recorded)', async () => {
   const calls: string[] = [];
   const f = fakeDeps(pageFetch(articleHtml), { ...on, providers: [summaryProvider(calls)] as never });
-  const saved = config.newsdata.aiPerRun;
-  config.newsdata.aiPerRun = 1;
-  try { await runOnce(f.deps, { only: ['newsdata_market'] }); } finally { config.newsdata.aiPerRun = saved; }
+  const nd = config.newsdata as { aiPerRun: number };   // config is readonly in its type; the test changes it temporarily
+  const saved = nd.aiPerRun;
+  nd.aiPerRun = 1;
+  try { await runOnce(f.deps, { only: ['newsdata_market'] }); } finally { nd.aiPerRun = saved; }
   assert.equal(calls.length, 1);
   assert.equal(f.dry.items.length, 1);
 });

@@ -578,7 +578,7 @@ export interface PublishSource {
  * and exactly link_out publisher sources. Returns the errors (empty = ok).
  */
 export function checkLinkOut(
-  card: { ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { key_points?: unknown } | null },
+  card: { ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { paragraphs?: unknown; key_points?: unknown } | null },
   enabled: boolean,
 ): string[] {
   if (!enabled) return ['link_out cards are disabled in this build'];
@@ -599,7 +599,7 @@ export function checkLinkOut(
 
 /** Publish-time checks (same as api.publish_blurb): >= 1 https source, no dev_only, AI cards cite only summarizable text, no link_out. */
 export function validatePublish(
-  card: { kind: string; ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { key_points?: unknown } | null },
+  card: { kind: string; ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { paragraphs?: unknown; key_points?: unknown } | null },
   opts: { linkOutEnabled?: boolean } = {},
 ): Result {
   const errors: string[] = [];
