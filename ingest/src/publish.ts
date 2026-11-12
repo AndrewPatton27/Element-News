@@ -18,6 +18,8 @@ export interface Publisher {
   upsertMacroBatch?(rows: MacroObservation[]): Promise<void>;
   /** --rewrite: published cards whose prompt_version is not in `current` (api.blurbs_to_revise). */
   listToRevise?(current: string[], limit: number): Promise<RevisableCard[]>;
+  /** D-296 fill pass: published AND queued link_out cards with no body (api.link_out_without_summary). */
+  listLinkOutWithoutSummary?(limit: number): Promise<RevisableCard[]>;
   /** --rewrite: update a card in place or hide it (api.revise_blurb). */
   reviseBlurb?(p: RevisePayload): Promise<{ status: 'revised' | 'hidden' | 'not_found'; id: string }>;
   /** End of a run: recompute the Trending boosts from recent interactions (api.refresh_trending). */
@@ -86,6 +88,7 @@ export function createSupabasePublisher(opts: { url: string; key: string; fetchI
     upsertMacro: async ({ move: _move, ...o }) => { await rpc('upsert_macro', { p: o }); },   // move is not stored
     upsertMacroBatch: async (rows) => { if (rows.length) await rpc('upsert_macro_batch', { p: rows.map(({ move: _move, ...o }) => o) }); },
     listToRevise: (current, limit) => rpc('blurbs_to_revise', { p_current: current, p_limit: limit }),
+    listLinkOutWithoutSummary: (limit) => rpc('link_out_without_summary', { p_limit: limit }),
     reviseBlurb: (p) => rpc('revise_blurb', { p }),
     refreshTrending: () => rpc('refresh_trending', {}),
     mlPurge: () => rpc('ml_purge', {}),
@@ -151,6 +154,9 @@ export function createDryRunPublisher(toRevise: RevisableCard[] = []) {
     async upsertMacroBatch(rows) { macroHistory.push(rows); },
     async listToRevise(current, limit) {
       return toRevise.filter((c) => !c.prompt_version || !current.includes(c.prompt_version)).slice(0, limit);
+    },
+    async listLinkOutWithoutSummary(limit) {
+      return toRevise.filter((c) => c.kind === 'link_out' && !c.body).slice(0, limit);
     },
     async reviseBlurb(p) {
       revisions.push(p);

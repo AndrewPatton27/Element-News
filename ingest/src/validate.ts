@@ -20,7 +20,7 @@ export const AI_CATEGORY_SLUGS = [
 export const CATEGORY_SLUGS = [...AI_CATEGORY_SLUGS, 'world', 'science', 'safety'] as const;
 
 /** License classes whose text may be sent to the AI in this build. cc_by_sa = Wikipedia (credit + license link). */
-export const SUMMARIZABLE = ['public_domain', 'company_filing', 'cc_by_sa'] as const;
+export const SUMMARIZABLE = ['public_domain', 'company_filing', 'cc_by_sa', 'link_out_text'] as const;
 
 /** Thrown by assertSummarizable when text of this license class may not reach the AI. */
 export class NotSummarizableError extends Error {
@@ -578,14 +578,17 @@ export interface PublishSource {
  * and exactly link_out publisher sources. Returns the errors (empty = ok).
  */
 export function checkLinkOut(
-  card: { ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null },
+  card: { ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { key_points?: unknown } | null },
   enabled: boolean,
 ): string[] {
   if (!enabled) return ['link_out cards are disabled in this build'];
   const e: string[] = [];
   if (card.origin !== 'newsdata') e.push('link_out cards are only allowed from the newsdata source');
-  if (card.ai_generated) e.push('link_out cards are never AI-generated');
-  if (card.body) e.push('link_out cards carry no body or description (rule 7)');
+  // D-296: a link_out card is an AI summary written from the publisher page: body AND key points, like every other card.
+  if (!card.ai_generated) e.push('link_out cards must carry an AI summary from the publisher page (rule 7, D-296)');
+  if (!card.body) e.push('an AI link_out card needs its summary body');
+  const points = card.detail?.key_points;
+  if (!Array.isArray(points) || points.length < config.detail.minKeyPoints) e.push(`a link_out card needs at least ${config.detail.minKeyPoints} key points`);
   const h = card.headline ?? '';
   if (!h.trim()) e.push('link_out card needs a headline');
   else if (h.length > config.newsdata.headlineMaxChars) e.push(`link_out headline longer than ${config.newsdata.headlineMaxChars} chars`);
@@ -596,7 +599,7 @@ export function checkLinkOut(
 
 /** Publish-time checks (same as api.publish_blurb): >= 1 https source, no dev_only, AI cards cite only summarizable text, no link_out. */
 export function validatePublish(
-  card: { kind: string; ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null },
+  card: { kind: string; ai_generated: boolean; sources: PublishSource[]; origin?: string; headline?: string; body?: string | null; attribution?: string | null; detail?: { key_points?: unknown } | null },
   opts: { linkOutEnabled?: boolean } = {},
 ): Result {
   const errors: string[] = [];
@@ -609,6 +612,7 @@ export function validatePublish(
     }
     if (card.ai_generated) {
       for (const s of card.sources) {
+        if (card.kind === 'link_out' && card.origin === 'newsdata' && s.license_class === 'link_out') continue;   // D-296
         if (!(SUMMARIZABLE as readonly string[]).includes(s.license_class)) {
           errors.push(`AI card cites a source whose text may not be summarized: ${s.license_class}`);
         }

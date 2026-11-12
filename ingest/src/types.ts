@@ -4,7 +4,9 @@
 
 import type { CardDetail, CategorySlug, Exchange, MacroFact, SourceKind } from '../../contract/types.ts';
 
-export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa' | 'link_out';
+// link_out_text: a NewsData link-out item whose publisher page text was fetched so a summary can be written (D-296). The
+// published card's source stays link_out; this class exists only on the RawItem that goes to summarize().
+export type LicenseClass = 'public_domain' | 'company_filing' | 'cc_by_sa' | 'link_out' | 'link_out_text';
 
 /** One collected item, ready for summarizing. */
 export interface RawItem {
