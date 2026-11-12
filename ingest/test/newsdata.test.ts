@@ -267,3 +267,22 @@ test('default on: deps.newsdata.enabled unset follows the code default, but no k
   await runOnce(g.deps, { only: ['newsdata_market'] });
   assert.ok(g.lines.some((l) => /NEWSDATA_API_KEY not set/.test(l)));
 });
+
+test('repairMojibake undoes UTF-8 read as Windows-1252 and leaves clean text alone', async () => {
+  const { repairMojibake } = await import('../src/sources/newsdata.ts');
+  assert.equal(repairMojibake('McDonald\u2019s proposal sparks debate over Seattle\u2019s Chinatown\u00e2\u20ac\u2018International District'), 'McDonald\u2019s proposal sparks debate over Seattle\u2019s Chinatown\u2011International District');
+  assert.equal(repairMojibake('Caf\u00c3\u00a9 chain posts record sales'), 'Caf\u00e9 chain posts record sales');
+  assert.equal(repairMojibake('Fed holds rates; \u201cpatience\u201d urged'), 'Fed holds rates; \u201cpatience\u201d urged');
+  assert.equal(repairMojibake('Plain headline'), 'Plain headline');
+  assert.equal(repairMojibake('Odd \u00e2 letter alone'), 'Odd \u00e2 letter alone');
+});
+
+test('junk headlines (crime, fund-holding spam, head-to-head comparisons, advice explainers) are skipped as off_topic', async () => {
+  const { config } = await import('../src/config.ts');
+  const p = config.newsdata.offTopicPattern2;
+  for (const t of ['Woman arrested for stealing 15 sovereigns of gold jewellery from cousin’s house', '30,112 RB Global, Inc. $RBA Shares Sold by Riverbridge Partners LLC',
+    'iShares Core S&P 500 ETF $IVV Shares Purchased by Silver Grove Financial Group', 'Head to Head Comparison: Bayerische Motoren Werke (OTCMKTS:BAMXF) versus Ford Motor',
+    'How Much Capital Gains Tax Does a 61-Year-Old Owe on $750,000 of Inherited Apple Stock']) assert.ok(p.test(t), t);
+  for (const t of ['Thomson Reuters unveils $500 million share buyback plan', 'EasyJet shareholders approve £5.7 billion Apollo takeover', 'Fed holds rates steady as inflation cools',
+    'Unilever/McCormick merger: UK regulator seeks remedies to allay competition fears']) assert.ok(!p.test(t), t);
+});

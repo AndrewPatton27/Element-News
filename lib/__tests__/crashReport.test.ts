@@ -109,7 +109,7 @@ test('search pages with unexpected shapes never throw and keep only renderable c
     items: [
       good,
       { ...good, id: 'nokind', kind: null },
-      { ...good, id: 'linkout', kind: 'link_out' },
+      { ...good, id: 'unknownkind', kind: 'poll' },
       { ...good, id: 'nomacro', macro: null },
       { ...good, id: 'notickers', tickers: null },
       { ...good, id: 'nosrc', sources: [] },

@@ -7,7 +7,7 @@
 // <script> elements are never touched, so the CSP hashes computed from index.html at build time still match.
 
 import type { BlurbCard } from '../../contract/types.ts';
-import { isBlurbCard } from '../shared/types.ts';
+import { isBlurbCard, textOnlyData } from '../shared/types.ts';
 
 /** Card ids are UUIDs (core.blurbs.id). */
 export const CARD_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -117,7 +117,7 @@ export function inlineScripts(html: string): string[] {
 
 /** A card from api.card_by_id, or null when the answer is not a card. */
 export function parseSharedCard(x: unknown): BlurbCard | null {
-  return isBlurbCard(x) ? x : null;
+  return isBlurbCard(x) ? textOnlyData(x) : null;
 }
 
 /** True for a key that is safe to use from a public page: never a secret / service-role key (rule 10). */

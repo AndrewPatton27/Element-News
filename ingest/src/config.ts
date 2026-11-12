@@ -678,6 +678,8 @@ export const config = {
     microPattern: /\b(recalls?|recalled|penny stocks?|micro-?caps?|otc|pink sheets|nano-?caps?|shell company|press release:|sponsored|giveaway)\b/i,
     // Never sports, celebrity or gossip.
     offTopicPattern: /\b(celebrity|actor|actress|singer|nfl|nba|mlb|nhl|touchdown|playoffs?|horoscope|royal family|kardashian)\b/i,
+    // crime and lifestyle items, and auto-generated fund-holding spam ("Shares Sold by ...", "Head to Head Comparison"): never news for this reader
+    offTopicPattern2: /\b(arrested|stealing|stolen|burglar|murder|shooting)\b|shares? (sold|bought|purchased|acquired|trimmed|lifted|cut) by|head to head (comparison|survey)|\bversus\b.*\(otc|how much .{0,40}\bowe\b/i,
   },
   // CPSC recalls -> safety / recall. JSON API, no key. License PARTLY verified (17 U.S.C. 105;
   // the CPSC policy page could not be read). AI text = Title + Description + Hazards + Remedies.
