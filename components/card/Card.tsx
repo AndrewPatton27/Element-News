@@ -24,7 +24,7 @@ import { ExternalIcon, NumbersIcon, PulseIcon, ShareIcon, SparkleIcon, ThumbDown
 import type { Feedback } from '../../lib/account/accountLogic';
 import { ShareAlikeLine } from './Labels';
 import { CardBar, type BarSize } from './CardBar';
-import { Takeaways } from './Takeaways';
+import { CardBody, CardHeadline, CardMeta, CardMoreDetail, CardPublisher, CardReadButton, CardReason, CardSmallPrint } from './templates/CardTemplate';
 import { useShortDepth } from '../../lib/signals/useShortDepth';
 import { AboutChips } from '../companies/AboutChips';
 import { useFollowedStories } from '../../lib/following/useFollowedStories';
@@ -214,33 +214,29 @@ export function Card(props: Props) {
   };
 
   const moreDetail = (
-    <Pressable
+    <CardMoreDetail
       onPress={openDetailFromPress}
       onPressIn={detailPressIn}
       onTouchStart={detailPressIn}
       {...(Platform.OS === 'web' ? { onMouseDown: detailMouseDown } as any : {})}
-      accessibilityRole="button"
-      accessibilityLabel={`More detail. ${OPEN_DETAIL_HINT}`}
+      label={`More detail. ${OPEN_DETAIL_HINT}`}
+      wide={wide}
       style={pinMore ? styles.morePinnedBtn : styles.more}
-    >
-      <Text style={[styles.moreText, wide && { fontSize: 15 }, { color: p.accentInk }]}>More detail ›</Text>
-    </Pressable>
+    />
   );
 
   const headline = (
-    <Text
-      numberOfLines={linkOut ? 6 : compact || denseData ? 3 : 4}
-      style={[
-        styles.headline,
-        { color: p.ink, fontSize: headlineSize, lineHeight: headlineSize * headlineLead, letterSpacing: -headlineSize * headlineTrack, maxWidth: wide || tablet ? 820 : undefined },
-      ]}
-      accessibilityRole="header"
-      aria-level={2}
+    <CardHeadline
+      card={card}
+      variant="feed"
+      heading
       testID="card-headline"
-    >
-      {/* link-out headlines are shown word for word (200-character cap, rule 7) */}
-      {linkOut ? card.headline.slice(0, 200) : clampHeadline(card.headline)}
-    </Text>
+      lines={linkOut ? 6 : compact || denseData ? 3 : 4}
+      size={{ size: headlineSize, line: headlineSize * headlineLead, track: -headlineSize * headlineTrack }}
+      style={{ maxWidth: wide || tablet ? 820 : undefined }}
+      // link-out headlines are shown word for word (200-character cap, rule 7)
+      text={linkOut ? card.headline.slice(0, 200) : undefined}
+    />
   );
 
   // The bottom bar's buttons: 44 px icon buttons, like / dislike / follow / share
@@ -299,48 +295,30 @@ export function Card(props: Props) {
         }}
         style={[styles.card, wide && styles.cardWide, tight && styles.cardTight, (compact || denseData) && styles.cardCompact, roomy && styles.cardRoomy, tablet && styles.cardHug, { backgroundColor: p.surface, borderColor: p.border }]}
       >
-        <View style={styles.meta}>
-          {badge.text ? (
-            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-              {badge.Icon ? <badge.Icon color={badge.fg} size={14} /> : null}
-              <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.text}</Text>
-            </View>
-          ) : null}
-          {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
-          <Text testID="card-meta" numberOfLines={1} style={[styles.metaText, wide && { fontSize: 14 }, { color: p.accentInk }]}>
-            {metaLine(card, categories)}
-          </Text>
-          {onMore ? (
-            <Pressable onPress={() => onMore(card)} accessibilityRole="button" accessibilityLabel="More options for this card" style={styles.moreBtn}>
-              <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {props.reason ? (
-          <Text testID="card-reason" numberOfLines={1} style={[styles.reasonText, wide && { fontSize: 13 }, { color: p.muted }]}>
-            {props.reason}
-          </Text>
-        ) : null}
+        {/* No "Updated" badge: every rewrite pass sets updated_at, so it said nothing (audit C1). */}
+        <CardMeta
+          layout="feed"
+          wide={wide}
+          pill={badge}
+          testID="card-meta"
+          text={metaLine(card, categories)}
+          right={
+            onMore ? (
+              <Pressable onPress={() => onMore(card)} accessibilityRole="button" accessibilityLabel="More options for this card" style={styles.moreBtn}>
+                <Text style={[styles.moreDots, { color: p.muted }]}>⋯</Text>
+              </Pressable>
+            ) : null
+          }
+        />
+        <CardReason kind="line" wide={wide} text={props.reason} testID="card-reason" />
 
         {linkOut ? (
           <>
-            {src ? <Text style={[styles.publisher, { color: p.inkSoft }]}>{src.name}</Text> : null}
+            <CardPublisher name={src?.name} />
             {headline}
             <View style={styles.spacer} />
-            {src ? (
-              <Pressable
-                {...linkProps(src.url, card.id)}
-                accessibilityRole="link"
-                accessibilityLabel={`Read on the publisher's site, ${src.name}. Opens the original.`}
-                style={({ pressed }) => [styles.readBtn, { backgroundColor: p.accent, opacity: pressed ? 0.85 : 1 }]}
-              >
-                <Text style={[styles.readText, { color: p.onAccent }]}>Read on the publisher&apos;s site</Text>
-                <ExternalIcon color={p.onAccent} />
-              </Pressable>
-            ) : null}
-            <Text style={[styles.linkOutCredit, { color: p.muted }]}>
-              {linkOutCredit(card.attribution)} · Headline and link only; Element adds no summary here.
-            </Text>
+            <CardReadButton src={src} cardId={card.id} />
+            <CardSmallPrint text={`${linkOutCredit(card.attribution)} · Headline and link only; Element adds no summary here.`} />
           </>
         ) : (
           <>
@@ -387,7 +365,7 @@ export function Card(props: Props) {
                   {card.kind === 'data' ? <DataFacts card={card} config={config} compact={compact} dense={denseData} hideNotices chartH={chartH} /> : null}
 
                   {showTakeaways ? (
-                    <Takeaways card={card} fontSize={type.size} lineHeight={type.lead} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />
+                    <CardBody card={card} variant="feed" size={{ size: type.size, line: type.lead }} max={points} bulletLines={compact ? 3 : 5} maxWidth={wide || tablet ? 720 : undefined} />
                   ) : null}
 
                   {/* Which companies the card is about; a chip opens the company page (components/companies/AboutChips). */}
@@ -467,14 +445,8 @@ const styles = StyleSheet.create({
   cardTight: { paddingTop: 26, paddingHorizontal: 36, paddingBottom: 16, gap: 12 },
   cardWide: { paddingTop: 40, paddingHorizontal: 44, paddingBottom: 22, gap: 20 },
   stack: { height: 10, marginHorizontal: 28, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  meta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
   moreBtn: { minWidth: 44, minHeight: 44, marginVertical: -8, marginRight: -10, marginLeft: 'auto', alignItems: 'center', justifyContent: 'center' },
   moreDots: { fontSize: 20, lineHeight: 22 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 10, borderRadius: 14 },
-  badgeText: { fontFamily: fonts.sansSemi, fontSize: 13 },
-  reasonText: { flexShrink: 0, fontFamily: fonts.sans, fontSize: 12, lineHeight: 16, marginTop: -4 },
-  metaText: { fontFamily: fonts.sansSemi, fontSize: 13, letterSpacing: 0.2, flexShrink: 1 },
-  headline: { fontFamily: fonts.serif },
   tickers: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   ticker: { fontFamily: fonts.sansMedium, fontSize: 13, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 },
   // Takes the free space and centres the content in it, so no empty gap is left.
@@ -495,7 +467,6 @@ const styles = StyleSheet.create({
   morePinned: { flexShrink: 0, height: 44, marginVertical: -10 }, // a full 44 px target that takes the same 24 px as the in-scroll button
   morePinnedBtn: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   dimmed: { opacity: 0.55 },
-  moreText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   // Press feedback: a small scale-down on press-in (web: eased by the global CSS transition).
   pressed: { opacity: 0.8, transform: [{ scale: 0.94 }] },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -507,8 +478,4 @@ const styles = StyleSheet.create({
   nextText: { fontFamily: fonts.sansMedium, fontSize: 14 },
   toastDock: { position: 'absolute', left: 0, right: 0, bottom: 72, alignItems: 'center', paddingHorizontal: 24 },
   toast: { fontFamily: fonts.sansMedium, fontSize: 14, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, overflow: 'hidden' },
-  publisher: { fontFamily: fonts.sansSemi, fontSize: 15 },
-  readBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 52, borderRadius: radius.md },
-  readText: { fontFamily: fonts.sansSemi, fontSize: 16 },
-  linkOutCredit: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17 },
 });
