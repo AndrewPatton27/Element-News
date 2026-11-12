@@ -77,7 +77,7 @@ function parsePubDate(s: string): Date | null {
   return d && Number.isFinite(d.getTime()) ? d : null;
 }
 
-// Some publishers' feeds reach NewsData.io as UTF-8 bytes read as Windows-1252 ("Chinatownâ€‘International"). That is a
+// Some publishers' feeds reach NewsData.io as UTF-8 bytes read as Windows-1252 (a hyphen shown as three odd Latin characters). That is a
 // character-encoding fault, not wording, so it is undone before the headline is stored; text that does not round-trip
 // cleanly is left exactly as received.
 const CP1252: Record<number, number> = { 0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89,

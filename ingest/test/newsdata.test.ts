@@ -270,11 +270,11 @@ test('default on: deps.newsdata.enabled unset follows the code default, but no k
 
 test('repairMojibake undoes UTF-8 read as Windows-1252 and leaves clean text alone', async () => {
   const { repairMojibake } = await import('../src/sources/newsdata.ts');
-  assert.equal(repairMojibake('McDonald’s proposal sparks debate over Seattle’s Chinatownâ€‘International District'), 'McDonald’s proposal sparks debate over Seattle’s Chinatown‑International District');
-  assert.equal(repairMojibake('CafÃ© chain posts record sales'), 'Café chain posts record sales');
-  assert.equal(repairMojibake('Fed holds rates; “patience” urged'), 'Fed holds rates; “patience” urged');
+  assert.equal(repairMojibake('McDonald\u2019s proposal sparks debate over Seattle\u2019s Chinatown\u00e2\u20ac\u2018International District'), 'McDonald\u2019s proposal sparks debate over Seattle\u2019s Chinatown\u2011International District');
+  assert.equal(repairMojibake('Caf\u00c3\u00a9 chain posts record sales'), 'Caf\u00e9 chain posts record sales');
+  assert.equal(repairMojibake('Fed holds rates; \u201cpatience\u201d urged'), 'Fed holds rates; \u201cpatience\u201d urged');
   assert.equal(repairMojibake('Plain headline'), 'Plain headline');
-  assert.equal(repairMojibake('Odd â letter alone'), 'Odd â letter alone');
+  assert.equal(repairMojibake('Odd \u00e2 letter alone'), 'Odd \u00e2 letter alone');
 });
 
 test('junk headlines (crime, fund-holding spam, head-to-head comparisons, advice explainers) are skipped as off_topic', async () => {

@@ -1,10 +1,10 @@
--- Repairs link-out headlines whose UTF-8 bytes were read as Windows-1252 by the publisher feed ("Chinatownâ€‘International").
+-- Repairs link-out headlines whose UTF-8 bytes were read as Windows-1252 by the publisher feed (a hyphen shown as three odd Latin characters).
 -- Only link_out rows, only runs that round-trip cleanly (convert_to WIN1252, convert_from UTF8); anything else is left as is.
 -- Idempotent: a repaired headline no longer matches. The ingest code now repairs new headlines (repairMojibake).
 do $$
 declare r record; v_fixed text;
 begin
-  for r in select id, headline from core.blurbs where kind = 'link_out' and headline ~ '[ÂÃâ][€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ¡-¿]' loop
+  for r in select id, headline from core.blurbs where kind = 'link_out' and headline ~ U&'[\00c2\00c3\00e2][\0080-\00bf\20ac\2018-\201d\2122]' loop
     begin
       v_fixed := convert_from(convert_to(r.headline, 'WIN1252'), 'UTF8');
       if length(v_fixed) < length(r.headline) then
