@@ -15,7 +15,7 @@ import { fonts } from '../../lib/theme/theme';
 import { PulseIcon } from '../shell/Icons';
 import { ListSkeleton } from '../shell/States';
 import { CardActionRow } from '../card/CardActionRow';
-import { CardBar } from '../card/CardBar';
+import { CardTemplate } from '../card/templates/CardTemplate';
 import { openUrl } from '../../lib/shared/openUrl';
 import { primarySource } from '../../lib/shared/labels';
 import { isHttpUrl } from '../../lib/shared/types';
@@ -79,17 +79,16 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
           { c: story, fresh: false },
         ];
         return (
-          <View key={story.id} style={[styles.card, wide ? styles.cardWide : styles.cardNarrow, { backgroundColor: p.surface, borderColor: p.border }]}>
-            <View style={styles.top}>
-              <View style={styles.badgeRow}>
-                <View style={[styles.dot, { backgroundColor: has ? p.accent : p.borderStrong }]} />
-                <Text style={[styles.badge, wide && { fontSize: 13 }, { color: has ? p.accent : p.muted }]}>{storyBadge(updates)}</Text>
-              </View>
-              <Text style={[styles.cat, wide && { fontSize: 13 }, { color: p.muted }]}>{categoryName(story.category, categories)}</Text>
-            </View>
-            <Pressable onPress={() => onOpen(latest)} accessibilityRole="link" accessibilityLabel={`Open story: ${story.headline}`}>
-              <Text style={[styles.title, wide && styles.titleWide, { color: p.ink }]}>{story.headline}</Text>
-            </Pressable>
+          <View key={story.id} style={wide ? styles.cardWide : styles.cardNarrow}>
+          <CardTemplate
+            card={latest}
+            wide={wide}
+            meta={{ layout: 'split', dot: has ? p.accent : p.borderStrong, badge: storyBadge(updates), badgeColor: has ? p.accent : p.muted, text: categoryName(story.category, categories) }}
+            onOpen={() => onOpen(latest)}
+            openLabel={`Open story: ${story.headline}`}
+            headlineText={story.headline}
+            headlineRole="link"
+            content={
             <View accessibilityLabel="Updates" style={styles.list}>
               {timeline.map(({ c, fresh }, i) => (
                 <Pressable
@@ -110,6 +109,8 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                 </Pressable>
               ))}
             </View>
+            }
+            footer={
             <View style={[styles.foot, { borderTopColor: p.divider }]}>
               <Pressable onPress={() => onOpen(latest)} accessibilityRole="button" accessibilityLabel={`Open story: ${story.headline}`} style={styles.open}>
                 <Text style={[styles.openText, wide && { fontSize: 15 }, { color: p.accent }]}>Open story ›</Text>
@@ -119,17 +120,16 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
                 <Text style={[styles.openText, wide && { fontSize: 15 }, { color: p.accent }]}>Following</Text>
               </Pressable>
             </View>
-            <CardBar
-              card={latest}
-              link
-              onPress={() => {
+            }
+            bar={{
+              onPress: () => {
                 const url = primarySource(latest)?.url;
                 if (isHttpUrl(url)) openUrl(url, latest.id);
-              }}
-              size={wide ? 'wide' : 'phone'}
-            >
-              <CardActionRow card={latest} />
-            </CardBar>
+              },
+              link: true,
+              actions: <CardActionRow card={latest} />,
+            }}
+          />
           </View>
         );
       })}
@@ -140,16 +140,8 @@ export function FollowedStories({ rows, loading, categories, onOpen, onUnfollow 
 const styles = StyleSheet.create({
   grid: { gap: 14 },
   gridWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' },
-  card: { borderWidth: 1, borderRadius: 20, gap: 10 },
-  cardNarrow: { width: '100%', paddingVertical: 16, paddingHorizontal: 18 },
-  cardWide: { flexBasis: 380, flexGrow: 1, flexShrink: 1, paddingVertical: 22, paddingHorizontal: 24, gap: 12 },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  badge: { fontFamily: fonts.sansSemi, fontSize: 12 },
-  cat: { fontFamily: fonts.sans, fontSize: 12, flexShrink: 1, textAlign: 'right' },
-  title: { fontFamily: fonts.serif, fontSize: 21, lineHeight: 25 },
-  titleWide: { fontSize: 26, lineHeight: 30 },
+  cardNarrow: { width: '100%' },
+  cardWide: { flexBasis: 380, flexGrow: 1, flexShrink: 1 },
   list: { marginTop: 2 },
   li: { flexDirection: 'row', gap: 12, minHeight: 44 },
   rail: { width: 12, alignItems: 'center' },

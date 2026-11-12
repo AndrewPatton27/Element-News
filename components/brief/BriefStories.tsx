@@ -16,7 +16,7 @@ import { fonts } from '../../lib/theme/theme';
 import { badgeLabel } from '../card/Card';
 import { ShareAlikeLine } from '../card/Labels';
 import { CardActionRow } from '../card/CardActionRow';
-import { CardBar } from '../card/CardBar';
+import { CardSmallPrint, CardTemplate } from '../card/templates/CardTemplate';
 
 export function BriefLabel({ text, right, onRight, rightA11y }: { text: string; right?: string; onRight?: () => void; rightA11y?: string }) {
   const p = usePalette();
@@ -69,24 +69,18 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
         const line = ranked && showTeaser ? teaser(c.body, wide ? 150 : 90) : '';
         const meta = [badgeLabel(c), ...(ranked ? [categoryName(c.category, categories)] : [])].filter(Boolean).join(' · ');
         return (
-          <View key={c.id} style={[styles.row, wide && styles.rowWide, { borderTopColor: p.border }]}>
-            {ranked ? <Text style={[styles.rank, wide && styles.rankWide, { color: p.accent }]}>{i + 1}</Text> : null}
-            <View style={styles.text}>
-              <Pressable
-                onPress={() => onOpen(c)}
-                accessibilityRole="button"
-                accessibilityLabel={`${ranked ? `${i + 1}. ` : ''}${clampHeadline(c.headline)}. ${meta ? `${meta}. ` : ''}Opens more detail`}
-                style={({ pressed }) => [styles.open, { opacity: pressed ? 0.7 : 1 }]}
-              >
-                {meta ? <Text style={[styles.meta, wide && styles.metaWide, { color: p.muted }]}>{meta}</Text> : null}
-                <Text style={[ranked ? styles.title : styles.titlePlain, wide && (ranked ? styles.titleWide : styles.titlePlainWide), { color: p.ink }]}>
-                  {clampHeadline(c.headline)}
-                </Text>
-                {line ? <Text style={[styles.line, wide && styles.lineWide, { color: p.inkSoft }]}>{line}</Text> : null}
-              </Pressable>
-              <RowLabels card={c} config={config} wide={wide} />
-            </View>
-          </View>
+          <CardTemplate
+            key={c.id}
+            card={c}
+            variant={ranked ? 'rowRanked' : 'row'}
+            wide={wide}
+            rank={ranked ? i + 1 : undefined}
+            meta={{ layout: 'plain', badge: badgeLabel(c), text: ranked ? categoryName(c.category, categories) : undefined }}
+            onOpen={() => onOpen(c)}
+            openLabel={`${ranked ? `${i + 1}. ` : ''}${clampHeadline(c.headline)}. ${meta ? `${meta}. ` : ''}Opens more detail`}
+            teaser={line}
+            {...rowLabels(c, config)}
+          />
         );
       })}
       {preview !== undefined && all.length > preview ? (
@@ -106,18 +100,23 @@ export function BriefStories({ label, right, cards: all, categories, config, onO
 
 // Rule 5, per row: the bar's source opens the original (https only; briefRowLabels checks it),
 // then the action buttons. Rows from FRED add the FRED notice above the bar.
-function RowLabels({ card, config, wide }: { card: BlurbCard; config: AppConfig | null; wide: boolean }) {
-  const p = usePalette();
+function rowLabels(card: BlurbCard, config: AppConfig | null) {
   const { source, line, credit } = briefRowLabels(card, config);
-  return (
-    <View style={styles.labels}>
-      {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
-      {line ? <Text style={[styles.small, { color: p.muted }]}>{line}</Text> : null}
-      <CardBar card={card} onPress={() => (source ? openUrl(source.url, card.id) : undefined)} link={!!source} linkUrl={source?.url} size={wide ? 'wide' : 'phone'} divider={false}>
-        <CardActionRow card={card} compact />
-      </CardBar>
-    </View>
-  );
+  return {
+    smallPrint: (
+      <>
+        {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
+        <CardSmallPrint text={line} />
+      </>
+    ),
+    bar: {
+      onPress: () => (source ? openUrl(source.url, card.id) : undefined),
+      link: !!source,
+      linkUrl: source?.url,
+      divider: false,
+      actions: <CardActionRow card={card} compact />,
+    },
+  };
 }
 
 const styles = StyleSheet.create({
@@ -130,20 +129,4 @@ const styles = StyleSheet.create({
   seeAllText: { fontFamily: fonts.sansSemi, fontSize: 14 },
   more: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1 },
   moreText: { fontFamily: fonts.sansSemi, fontSize: 15 },
-  row: { flexDirection: 'row', gap: 14, paddingVertical: 14, borderTopWidth: 1 },
-  rowWide: { gap: 20, paddingVertical: 22 },
-  rank: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 26, minWidth: 20 },
-  rankWide: { fontSize: 34, lineHeight: 34, minWidth: 28 },
-  text: { flex: 1, gap: 6 },
-  open: { gap: 4, minHeight: 44 },
-  labels: { gap: 2, alignSelf: 'stretch' },
-  small: { fontFamily: fonts.sans, fontSize: 12, lineHeight: 17 },
-  meta: { fontFamily: fonts.sans, fontSize: 12 },
-  metaWide: { fontSize: 13 },
-  title: { fontFamily: fonts.serif, fontSize: 19, lineHeight: 23 },
-  titleWide: { fontSize: 28, lineHeight: 32, letterSpacing: -0.4 },
-  titlePlain: { fontFamily: fonts.serif, fontSize: 18, lineHeight: 23 },
-  titlePlainWide: { fontSize: 22, lineHeight: 27 },
-  line: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
-  lineWide: { fontSize: 17, lineHeight: 25, maxWidth: 640 },
 });
