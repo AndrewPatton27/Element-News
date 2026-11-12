@@ -65,6 +65,26 @@ class Supa:
                 return rows
         raise SupaError("ml_export_cards: too many pages")
 
+    def export_card_text(self, since_iso: str) -> list[dict]:
+        """Every row {id, headline, body} of api.ml_export_card_text(since): the text the vector features read."""
+        rows, nxt = [], None
+        for _ in range(MAX_PAGES):
+            r = self.rpc("ml_export_card_text", {"p_since": since_iso, "p_next": nxt, "p_limit": 5000})
+            rows += r.get("rows") or []
+            nxt = r.get("next")
+            if not nxt:
+                return rows
+        raise SupaError("ml_export_card_text: too many pages")
+
+    def begin_run(self, kind: str, model_version: str, params: dict | None = None) -> int:
+        return int(self.rpc("ml_begin_run", {"p_kind": kind, "p_model_version": model_version, "p_params": params or {}}))
+
+    def write_shadow(self, rows: list[dict]) -> dict:
+        return self.rpc("ml_write_shadow", {"p_rows": rows})
+
+    def finish_run(self, run: int, status: str, n_users: int | None, n_rows: int | None) -> dict:
+        return self.rpc("ml_finish_run", {"p_run": run, "p_status": status, "p_n_users": n_users, "p_n_rows": n_rows})
+
     def params(self) -> dict:
         return self.rpc("ml_v2_params", {})
 

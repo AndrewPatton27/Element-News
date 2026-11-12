@@ -177,6 +177,15 @@ def cmd_bandit_step(a):
         job.publish(data)
 
 
+def cmd_shadow_run(a):
+    """Shadow replay (serving/shadow_job.py): score the logged For you pages with a saved model and write core.ml_shadow.
+    SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY come from the environment. Readers never see the output."""
+    from pathlib import Path
+    from ..bandit.supa import Supa
+    from ..serving import shadow_job
+    shadow_job.run(Supa(), shadow_job.Model.load(Path(a.model), a.tag), hours=a.hours, history_days=a.history_days, dry_run=a.dry_run)
+
+
 def main(argv=None):
     """Parse the command line and run one command."""
     ap = argparse.ArgumentParser(prog="elementml")
@@ -233,6 +242,11 @@ def main(argv=None):
     sa = sub.add_parser("sim-audit", help="simulator fairness audit")
     sa.add_argument("--worlds", default="normal,stress,wild")
     sa.set_defaults(f=cmd_sim_audit)
+    sr = sub.add_parser("shadow-run", help="score logged For you pages with a saved vector + LightGBM model into core.ml_shadow")
+    sr.add_argument("--model", required=True, help="model folder with embedder.pkl and the head files, e.g. models/real_dev")
+    sr.add_argument("--tag", default="full"); sr.add_argument("--hours", type=float, default=48.0)
+    sr.add_argument("--history-days", type=float, default=30.0); sr.add_argument("--dry-run", action="store_true")
+    sr.set_defaults(f=cmd_shadow_run)
     for name in ("bandit-export", "train-bandit", "bandit-gate", "bandit-publish"):
         st = sub.add_parser(name); st.add_argument("--data", required=True)
         if name == "bandit-gate":
