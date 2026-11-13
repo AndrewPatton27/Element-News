@@ -82,6 +82,12 @@ class Supa:
     def write_shadow(self, rows: list[dict]) -> dict:
         return self.rpc("ml_write_shadow", {"p_rows": rows})
 
+    def write_serve_hours(self, batch_at_iso: str, model_version: str, rows: list[dict]) -> dict:
+        return self.rpc("ml_write_serve_hours", {"p_batch_at": batch_at_iso, "p_model": model_version, "p_rows": rows})
+
+    def serve_status(self) -> dict:
+        return self.rpc("ml_serve_status", {})
+
     def finish_run(self, run: int, status: str, n_users: int | None, n_rows: int | None) -> dict:
         return self.rpc("ml_finish_run", {"p_run": run, "p_status": status, "p_n_users": n_users, "p_n_rows": n_rows})
 
