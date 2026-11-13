@@ -11,7 +11,7 @@ from test_shadow_job import T0, CATS, ISO, model  # noqa: F401  (fixtures: the t
 NOW = T0 + timedelta(hours=1)
 
 
-def _events(uid, cards, n=8, kinds=("view", "like"), last_minutes=30):
+def _events(uid, cards, n=8, kinds=("view", "like"), last_minutes=90):
     ev, k = [], 0
     for i, cid in enumerate(cards[:n]):
         for kind in kinds:
@@ -70,10 +70,20 @@ def test_eligibility(model):
     few = _events("few", _cards_of(model, "markets"), n=3)                      # 3 likes < 5 explicit events
     old = _events("old", _cards_of(model, "markets"), last_minutes=60 * 24 * 10)  # last event 10 days ago > 7
     viewer = _events("viewer", _cards_of(model, "markets"), kinds=("view",))   # views only: no explicit events
-    rows, summary = _compute(model, few + old + viewer)
+    rows, summary = _compute(model, few + old + viewer, min_events=5)
     assert rows == [] and summary["eligible"] == 0
     rows, summary = _compute(model, few, min_events=3)
     assert summary["eligible"] == 1
+
+
+def test_needs_one_hour_of_usage(model):
+    fresh = _events("fresh", _cards_of(model, "markets"), n=6, last_minutes=1)       # first event ~7 min ago
+    rows, summary = _compute(model, fresh)
+    assert rows == [] and summary["eligible"] == 0
+    rows, summary = _compute(model, fresh, min_usage_h=0.0)
+    assert summary["eligible"] == 1
+    seasoned = _events("seasoned", _cards_of(model, "markets"), n=6, last_minutes=90)
+    assert _compute(model, seasoned)[1]["eligible"] == 1
 
 
 def test_future_events_ignored(model):
@@ -85,7 +95,7 @@ def test_future_events_ignored(model):
 
 
 def test_max_readers_keeps_the_most_recent(model):
-    ev = _events("a", _cards_of(model, "markets"), last_minutes=200) + _events("b", _cards_of(model, "policy"), last_minutes=20)
+    ev = _events("a", _cards_of(model, "markets"), last_minutes=300) + _events("b", _cards_of(model, "policy"), last_minutes=90)
     rows, summary = _compute(model, ev, max_readers=1)
     assert {r["user_id"] for r in rows} == {"b"} and summary["eligible"] == 1
 

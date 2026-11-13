@@ -37,7 +37,7 @@ MIN_HOURS = 0.05                                                 # smaller hours
 
 
 def compute_hours(events: list[dict], prefs: list[dict], cards: list[Card], model: Model, now: datetime,
-                  scale: float = 1.5, cap: float = 6.0, min_events: int = 5, active_days: float = 7.0,
+                  scale: float = 1.5, cap: float = 6.0, min_events: int = 1, active_days: float = 7.0, min_usage_h: float = 1.0,
                   top_pos: int = 150, top_neg: int = 50, max_readers: int = 2000) -> tuple[list[dict], dict]:
     """Rows [{user_id, blurb_id, hours}] for every eligible reader, plus a summary. Pure: no network."""
     iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -50,11 +50,13 @@ def compute_hours(events: list[dict], prefs: list[dict], cards: list[Card], mode
         if e["created_at"] < now_iso:
             ev_by[e["user_id"]].append(e)
     recent_cut = iso(now - timedelta(days=active_days))
+    usage_cut = iso(now - timedelta(hours=min_usage_h))
     eligible = []
     for uid, evs in ev_by.items():
         n_explicit = sum(1 for e in evs if e["kind"] in EXPLICIT)
         last = max(e["created_at"] for e in evs)
-        if n_explicit >= min_events and last >= recent_cut:
+        first = min(e["created_at"] for e in evs)
+        if n_explicit >= min_events and last >= recent_cut and first <= usage_cut:   # on the app for at least min_usage_h
             eligible.append((last, uid))
     eligible = [u for _, u in sorted(eligible, reverse=True)[:max_readers]]
     rows, flat, skipped = [], 0, 0
@@ -89,7 +91,7 @@ def compute_hours(events: list[dict], prefs: list[dict], cards: list[Card], mode
                   "cards": cat.n, "skipped": skipped}
 
 
-def run(src: Supa, model: Model, scale: float = 1.5, cap: float = 6.0, min_events: int = 5, history_days: float = 30.0,
+def run(src: Supa, model: Model, scale: float = 1.5, cap: float = 6.0, min_events: int = 1, history_days: float = 30.0,
         dry_run: bool = False, now: Optional[datetime] = None, log=print, **kw) -> dict:
     """Export, compute, write one batch (stamped `now`)."""
     now = now or datetime.now(timezone.utc)
