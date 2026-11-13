@@ -205,7 +205,23 @@ $PY -m pytest tests/test_shadow_job.py -q
 
 Tried on the dev project (simulated readers): 491 For you pages, 16,098 events and 60 readers scored with no page skipped, 491 shadow rows written, one ok run; mean p(like) 0.119, p(dislike) 0.080, p(detail) 0.035; the model's top card equals the served top card on 19% of pages.
 
-Not built, on purpose: the step that lets a model change what a reader sees. Sketch for a later, separately approved migration (rebase it on the current For you function, which other branches have changed): a service-role table of per-reader per-card hours written by this job, a new `foryou_ml_mode` value that adds that term to the formula score, capped in hours, ignored when older than a day or when the reader has under 5 explicit events, with the holdout and kill-switch pattern v3 uses. Until then no reader sees this ranker.
+## Serve job (`serving/serve_job.py`): the model as a capped nudge on the v3 formula (ships OFF)
+
+`python -m elementml.cli serve-run --model models/<folder> [--scale 1.5] [--cap 6] [--dry-run]` (service-role key in the environment). For each reader with at least `ml_serve_min_events` explicit events (like, dislike, open_detail, open_source) and an event in the last 7 days, it replays their history into a `UserState`, scores every recent card with the heads, and converts utility to **hours**: (utility minus the reader's median over unseen cards) / spread x `scale`, clipped to +-`cap`. Cards the reader already met get no row (the formula already handles them). Only the strongest 150 positive and 50 negative cards per reader are kept. One batch per run goes to `api.ml_write_serve_hours` (chunks of 5000); the database keeps the two newest batches per reader and nothing older than two days.
+
+The SQL side (`supabase/migrations/20261211000000_ml_serve_hours.sql`) renames `core.v3_scores` to `core.v3_scores_base` and adds a wrapper of the same name and signature that adds the reader's hours to `o_ps` (the paging key) and `o_v3` (the residual). Nothing else in For you changed: `api.feed_for_you`, the cursor and the logging are untouched. It acts only when `foryou_ml_mode` = 3 (the v3 path is the only caller) and for readers who are in the share (`ml_serve_pct`), outside the control arm (`ml_serve_holdout_pct`), above `ml_serve_min_events`, with a batch no older than `ml_serve_max_age_h` and written at or before the page's frozen as-of time (so a scroll never changes order mid-way). Cap `ml_serve_cap_h` (6) applies again in SQL.
+
+| Switch (`core.rank_params`) | Ships | Meaning |
+|---|---|---|
+| `ml_serve_pct` | 0 | share of readers (0-100) that get the hours. **0 = off for everyone, the kill switch** (one `update`, takes effect on the next page). |
+| `ml_serve_holdout_pct` | 20 | share that never gets them (the control arm to compare against) |
+| `ml_serve_cap_h` | 6 | largest hours per card |
+| `ml_serve_min_events` | 5 | explicit events a reader needs first |
+| `ml_serve_max_age_h` | 24 | older batches are ignored (the reader gets plain v3) |
+
+Arm of a reader: `core.ml_serve_active(user_id)` (a hash of the id), so logged pages can be split into model and control arms in analysis. Known limits: the category step inside `v3_scores` is computed before the hours are added; the hours shift the final order but not that step. A later `create or replace function core.v3_scores` would replace the wrapper and silently turn this off; `ml_serve_hours_check.sql` fails when that happens. The model was trained on simulated readers; **do not raise `ml_serve_pct` above 0 until shadow rows from real readers show the model's top picks earning more likes and fewer dislikes than the formula's**, and widen in steps (5, 20, 50) watching likes, dislikes and dwell against the holdout.
+
+Tests: `ml/tests/test_serve_job.py` (shape, cap, seen cards, eligibility, no future leakage, determinism, chunked write) and `supabase/tests/ml_serve_hours_check.sql`.
 
 ## Rules this prototype keeps
 

@@ -96,7 +96,7 @@ begin
      or (select prosrc from pg_proc where oid = 'core.feed_for_you_v7(text,integer)'::regprocedure) not like '%macro_focus_wrapper%' then
     raise exception 'FAIL: the macro_focus wrappers must stay in place'; end if;
   if (select prosrc from pg_proc where oid = 'core.feed_for_you_v5_base(text,integer)'::regprocedure) not like '%foryou_max_scored%'
-     or (select prosrc from pg_proc where oid = 'core.v3_scores(uuid,timestamp with time zone,bigint)'::regprocedure) not like '%foryou_max_scored%' then
+     or (select prosrc from pg_proc where oid = 'core.v3_scores_base(uuid,timestamp with time zone,bigint)'::regprocedure) not like '%foryou_max_scored%' then
     raise exception 'FAIL: the bounded bodies are not installed'; end if;
   if has_function_privilege('authenticated', 'core.feed_for_you_v5_base(text,integer)', 'execute')
      or has_function_privilege('anon', 'core.v3_scores(uuid,timestamp with time zone,bigint)', 'execute') then

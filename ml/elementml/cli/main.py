@@ -186,6 +186,16 @@ def cmd_shadow_run(a):
     shadow_job.run(Supa(), shadow_job.Model.load(Path(a.model), a.tag), hours=a.hours, history_days=a.history_days, dry_run=a.dry_run)
 
 
+def cmd_serve_run(a):
+    """Serve job (serving/serve_job.py): per-reader hours from a saved model into core.ml_serve_hours. The For you formula reads
+    them only while core.rank_params ml_serve_pct > 0 (ships 0). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY come from the environment."""
+    from pathlib import Path
+    from ..bandit.supa import Supa
+    from ..serving import serve_job, shadow_job
+    serve_job.run(Supa(), shadow_job.Model.load(Path(a.model), a.tag), scale=a.scale, cap=a.cap, min_events=a.min_events,
+                  history_days=a.history_days, dry_run=a.dry_run)
+
+
 def main(argv=None):
     """Parse the command line and run one command."""
     ap = argparse.ArgumentParser(prog="elementml")
@@ -247,6 +257,12 @@ def main(argv=None):
     sr.add_argument("--tag", default="full"); sr.add_argument("--hours", type=float, default=48.0)
     sr.add_argument("--history-days", type=float, default=30.0); sr.add_argument("--dry-run", action="store_true")
     sr.set_defaults(f=cmd_shadow_run)
+    sv = sub.add_parser("serve-run", help="write per-reader hours from a saved vector + LightGBM model into core.ml_serve_hours")
+    sv.add_argument("--model", required=True); sv.add_argument("--tag", default="full")
+    sv.add_argument("--scale", type=float, default=1.5, help="hours per standard deviation of utility")
+    sv.add_argument("--cap", type=float, default=6.0, help="largest hours per card (the SQL cap ml_serve_cap_h applies on top)")
+    sv.add_argument("--min-events", type=int, default=5); sv.add_argument("--history-days", type=float, default=30.0)
+    sv.add_argument("--dry-run", action="store_true"); sv.set_defaults(f=cmd_serve_run)
     for name in ("bandit-export", "train-bandit", "bandit-gate", "bandit-publish"):
         st = sub.add_parser(name); st.add_argument("--data", required=True)
         if name == "bandit-gate":
