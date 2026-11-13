@@ -261,7 +261,7 @@ def main(argv=None):
     sv.add_argument("--model", required=True); sv.add_argument("--tag", default="full")
     sv.add_argument("--scale", type=float, default=1.5, help="hours per standard deviation of utility")
     sv.add_argument("--cap", type=float, default=6.0, help="largest hours per card (the SQL cap ml_serve_cap_h applies on top)")
-    sv.add_argument("--min-events", type=int, default=5); sv.add_argument("--history-days", type=float, default=30.0)
+    sv.add_argument("--min-events", type=int, default=1); sv.add_argument("--history-days", type=float, default=30.0)
     sv.add_argument("--dry-run", action="store_true"); sv.set_defaults(f=cmd_serve_run)
     for name in ("bandit-export", "train-bandit", "bandit-gate", "bandit-publish"):
         st = sub.add_parser(name); st.add_argument("--data", required=True)
