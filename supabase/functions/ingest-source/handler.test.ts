@@ -147,7 +147,7 @@ test('newsdata: no key or switch off = no request, no credit used, no card; the 
   }
 });
 
-test('newsdata on: one database credit per call, link_out cards published, credits are not counted as AI calls, key never in the log', async () => {
+test('newsdata on: one database credit per call, credits are not counted as AI calls, key never in the log; D-296: with no AI summarizer no link_out card is published', async () => {
   const body = readFileSync(new URL('../../../ingest/test/fixtures/newsdata-market.json', import.meta.url), 'utf8');
   const e = { ...env, newsdataApiKey: 'pub_SECRETKEY123456', newsdataEnabled: true };
   const s = setup();
@@ -155,7 +155,8 @@ test('newsdata on: one database credit per call, link_out cards published, credi
   assert.equal(run.ok, true, run.error ?? '');
   assert.equal(s.store.counts.newsdata, 1);
   assert.equal(run.ai_calls, 0);
-  assert.ok(s.dry.cards.length >= 1 && s.dry.cards.every((c) => c.kind === 'link_out' && c.body === null && c.attribution === 'via NewsData.io'));
+  // D-296: a link-out card needs an AI summary from the publisher page; this run has no AI provider, so nothing is published
+  assert.equal(s.dry.cards.length, 0);
   assert.ok(!JSON.stringify([s.logged, run, s.dry.cards]).includes('SECRETKEY'));
 });
 

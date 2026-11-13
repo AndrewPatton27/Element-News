@@ -13,7 +13,8 @@ import { beaItemToItem } from './sources/bea.ts';
 import { cpscToItem, cpscUrl, parseCpscJson, selectRecalls } from './sources/cpsc.ts';
 import { nasaFeedUrl, nasaToItem, parseNasaRss, selectNasaReleases } from './sources/nasa.ts';
 import { parseUsgsGeoJson, usgsDraft, usgsToItem } from './sources/usgs.ts';
-import { isNearDuplicate, newsdataPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, type NewsdataEndpoint } from './sources/newsdata.ts';
+import { fetchPublisherText } from './publisherPage.ts';
+import { isNearDuplicate, newsdataPayload, newsdataSummaryPayload, newsdataToItem, newsdataUrl, parseNewsdata, redactKey, relevanceScore, withPageText, type NewsdataEndpoint } from './sources/newsdata.ts';
 import { parseWikiFeed, wikiFeedUrl, wikiItemToItem } from './sources/wiki.ts';
 import { fedRegDocToItem, isAirworthinessDirective, mergeFedRegDocs, parseFedRegJson, type FrDoc } from './sources/fedreg.ts';
 import { fedItemToItem, fedPageText, mergeFedItems, parseRss } from './sources/fed.ts';
@@ -42,7 +43,7 @@ export const SOURCE_NAMES: readonly SourceName[] = ['macro', 'treasury', 'fed', 
 
 export interface Deps {
   /** GET a URL through the allowlist. `kind` picks the host list; ttl in minutes (0 = no cache). */
-  fetchText(url: string, kind: 'page' | 'api', ttlMinutes: number): Promise<string>;
+  fetchText(url: string, kind: 'page' | 'api' | 'publisher', ttlMinutes: number): Promise<string>;
   publisher: Publisher;
   providers: Summarizer[];
   counter: UsageCounter;
@@ -53,7 +54,7 @@ export interface Deps {
   eiaApiKey?: string | null;
   censusApiKey?: string | null;
   /** NewsData.io link-out source (all optional): the key (NEWSDATA_API_KEY), the env switch (NEWSDATA_ENABLED=1) and the credit counter. No key or switch off = the source skips. */
-  newsdata?: { apiKey?: string | null; enabled?: boolean | null; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
+  newsdata?: { apiKey?: string | null; enabled?: boolean | null; /** D-296: false = this source publishes nothing (default config.newsdata.summarize) */ summarize?: boolean; /** counts one credit; false = the daily cap is reached (default: deps.counter, cap config.newsdata.dailyCreditCap) */ takeCredit?: () => Promise<boolean> };
   now: Date;
   log(line: string): void;
   /** Report-card protocol overrides (tests, env flag): enabled replaces config.reportCard.protocolEnabled; scorer replaces the Groq provider. */
@@ -344,7 +345,7 @@ async function runNasa(deps: Deps, { stats, budget, guard, chain }: RunCtx): Pro
  * (NEWSDATA_API_KEY) and, in the database, app_config.linkout_cards. Each run costs ONE credit, counted before the request
  * against config.newsdata.dailyCreditCap. No AI, no page fetch; only the headline, publisher and link are kept.
  */
-async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: NewsdataEndpoint): Promise<void> {
+async function runNewsdata(deps: Deps, { stats, guard, chain }: RunCtx, endpoint: NewsdataEndpoint): Promise<void> {
   const nd = deps.newsdata;
   const c = config.newsdata;
   const tag = `newsdata ${endpoint}`;
@@ -367,10 +368,13 @@ async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: Newsd
     let recent: string[] | null = null;              // headlines of live cards, loaded once and only if a candidate gets that far
     let fresh = 0;
     let skipped = 0;
+    // D-296: no AI provider (or summaries switched off) = nothing can be published from this source
+    if (!(nd?.summarize ?? c.summarize) || !deps.providers.some((p) => p.usesAi)) { deps.log(`${tag}: no AI summarizer available, nothing published`); return; }
+    let aiLeft = c.aiPerRun;                          // summaries (page fetch + AI call) this run; the rest wait for the next run
     // best relevance first, then newest: with a per-run cap and the release queue, the important headlines go first
     const scored = articles.map((a) => ({ a, s: relevanceScore(a) })).sort((x, y) => y.s - x.s || y.a.pubDate.localeCompare(x.a.pubDate));
     for (const { a } of scored) {
-      if (fresh >= c.maxPerRun) break;
+      if (fresh >= c.maxPerRun || aiLeft <= 0) break;
       const r = newsdataToItem(a, deps.now);
       if (!('item' in r)) { skipped++; continue; }
       const it = r.item;
@@ -392,13 +396,30 @@ async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: Newsd
       if (!row.is_new && row.status !== 'new') { stats.skipped++; continue; }
       fresh++;
       try {
-        const payload = newsdataPayload(it, row.id);
+        // D-296: a link-out card is published only with a full summary (body + key points) written from the publisher page.
+        // No usable page, a rejected or low-relevance draft, or a draft without key points = nothing is published and the item
+        // is closed as skipped (it would only repeat the same result next run).
+        aiLeft--;
+        const text = await fetchPublisherText(it.url, { fetchText: (u) => deps.fetchText(u, 'publisher', 0), log: deps.log });
+        if (!text) { await skipNoSummary(deps, stats, row.id, it.title, 'no_page_text'); continue; }
+        const r = await summarizeWithChain({ item: withPageText(it), text }, deps.providers, deps.counter, {
+          state: chain, minRelevance: config.minEverydayRelevance, requireRelevance: true,
+        });
+        if (!r.ai_generated || r.low_relevance) {
+          await skipNoSummary(deps, stats, row.id, it.title, r.low_relevance ? 'low_relevance' : 'summary_rejected', chainNote(r.log));
+          continue;
+        }
+        const payload = newsdataSummaryPayload(it, r.draft, { itemId: row.id, model: r.model });
+        if (!payload.body || (payload.detail?.key_points.length ?? 0) < config.detail.minKeyPoints) {
+          await skipNoSummary(deps, stats, row.id, it.title, 'no_key_points', chainNote(r.log));   // the key points failed their checks and were dropped
+          continue;
+        }
         const v = validatePublish(payload, { linkOutEnabled: true });
         if (!v.ok) throw new Error(v.errors.join('; '));
         const res = await deps.publisher.publishBlurb(payload);
         stats[res.status === 'published' ? 'published' : res.status]++;
         if (res.status === 'published') { guard.record(cand); seen.push(it.title); }
-        deps.log(`${res.status} [link_out] ${payload.headline}`);
+        deps.log(`${res.status} [link_out+summary] ${payload.headline}`);
       } catch (e) {
         stats.failed++;
         const msg = redactKey((e as Error).message, key);
@@ -411,6 +432,13 @@ async function runNewsdata(deps: Deps, { stats, guard }: RunCtx, endpoint: Newsd
   } catch (e) {
     deps.log(`${tag}: request failed: ${redactKey((e as Error).message, key)}`);
   }
+}
+
+/** A link-out item that cannot get a full summary: logged and closed (status skipped), nothing published. */
+async function skipNoSummary(deps: Deps, stats: RunStats, itemId: string, title: string, reason: string, note = ''): Promise<void> {
+  stats.skipped++;
+  deps.log(`skip ${reason} (link-out needs a full summary): ${title}${note ? `  [${note}]` : ''}`);
+  await deps.publisher.setItemStatus(itemId, 'skipped', reason).catch(() => {});
 }
 
 /** USGS significant earthquakes: template cards only (no AI call, no page fetch). */

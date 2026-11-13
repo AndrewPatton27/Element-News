@@ -131,7 +131,7 @@ function liveFetcher(userAgent: string, supabaseHost: string): Deps['fetchText']
   return async (url, kind, ttl) => {
     const r = await fetchAllowed(url, {
       kind,
-      userAgent: new URL(url).hostname === 'en.wikipedia.org' ? wikiUa : userAgent,
+      userAgent: kind === 'publisher' ? config.publisherPage.userAgent : new URL(url).hostname === 'en.wikipedia.org' ? wikiUa : userAgent,
       extraHosts: [supabaseHost],
       cacheTtlMinutes: kind === 'page' ? ttl : 0,          // API responses (with keys in URLs) are never cached to disk
     });

@@ -21,7 +21,9 @@ const KEY = 'pub_SECRETKEY123456';
 function fakeDeps(fetchText: Deps['fetchText'], over: Partial<Deps> = {}) {
   const dry = createDryRunPublisher();
   const lines: string[] = [];
-  const deps: Deps = { fetchText, publisher: dry.publisher, providers: [], counter: memoryCounter(), fredApiKey: null, now: NOW, log: (l) => lines.push(l), ...over };
+  // D-296: link-out cards need a full summary, so the default deps have an AI provider and a readable publisher page
+  const withPages: Deps['fetchText'] = async (u, kind, ttl) => (kind === 'publisher' ? pageFetch(articleHtml)(u, kind, ttl) : fetchText(u, kind, ttl));
+  const deps: Deps = { fetchText: withPages, publisher: dry.publisher, providers: [summaryProvider([])] as never, counter: memoryCounter(), fredApiKey: null, now: NOW, log: (l) => lines.push(l), ...over };
   return { dry, lines, deps };
 }
 const ok = (text = body) => async () => text;
@@ -87,7 +89,7 @@ test('content rule: finance only; recalls, micro-cap, sports/celebrity, advice, 
   assert.equal(skip('Home Depot recalls ladders; shares slip after earnings'), undefined);
 });
 
-test('payload is link_out: no body, no detail, not AI, one link_out source with the credit', () => {
+test('base payload is link_out: no body or detail yet, one link_out source with the credit (not publishable without a summary)', () => {
   const it = firstItem();
   const p = newsdataPayload(it, 'id1');
   assert.equal(p.kind, 'link_out');
@@ -99,7 +101,7 @@ test('payload is link_out: no body, no detail, not AI, one link_out source with 
   assert.equal(p.sort_at, it.published_at);
   assert.equal(p.sources.length, 1);
   assert.deepEqual([p.sources[0].license_class, p.sources[0].kind, p.sources[0].is_primary], ['link_out', 'news', true]);
-  assert.deepEqual(validatePublish(p, { linkOutEnabled: true }).errors, []);
+  assert.match(validatePublish(p, { linkOutEnabled: true }).errors.join(), /must carry an AI summary/);   // D-296: never headline-only
   assert.ok(!JSON.stringify(p).includes('SECRET'));
   assert.ok(!/image|description/i.test(Object.keys(p).join(',')));
 });
@@ -110,10 +112,11 @@ test('validatePublish: link_out refused when the flag is off, from another origi
   assert.match(validatePublish(p, { linkOutEnabled: false }).errors.join(), /disabled/);
   assert.match(validatePublish({ ...p, origin: 'cpsc' }, { linkOutEnabled: true }).errors.join(), /only allowed from the newsdata source/);
   assert.match(validatePublish({ ...p, origin: undefined }, { linkOutEnabled: true }).errors.join(), /only allowed from the newsdata source/);
-  assert.match(validatePublish({ ...p, body: 'A description.' }, { linkOutEnabled: true }).errors.join(), /no body or description/);
+  assert.match(validatePublish({ ...p, body: 'A description.' }, { linkOutEnabled: true }).errors.join(), /must carry an AI summary/);
   assert.match(validatePublish({ ...p, headline: 'x'.repeat(201) }, { linkOutEnabled: true }).errors.join(), /longer than 200/);
   assert.match(validatePublish({ ...p, attribution: null }, { linkOutEnabled: true }).errors.join(), /via NewsData\.io/);
-  assert.match(validatePublish({ ...p, ai_generated: true }, { linkOutEnabled: true }).errors.join(), /never AI/);
+  assert.match(validatePublish({ ...p, ai_generated: true }, { linkOutEnabled: true }).errors.join(), /needs its summary body/);
+  assert.match(validatePublish({ ...p, ai_generated: true, body: 'S.', detail: { paragraphs: ['a', 'b'], key_points: ['x'] } }, { linkOutEnabled: true }).errors.join(), /at least 3 key points/);
   assert.match(checkLinkOut({ ...p, sources: [{ ...p.sources[0], license_class: 'public_domain' }] }, true).join(), /not link_out/);
   // a summary card is unaffected by the new option
   assert.deepEqual(validatePublish({ kind: 'summary', ai_generated: false, sources: [{ name: 'SEC', kind: 'filing', url: 'https://www.sec.gov/x', license_class: 'company_filing' }] }).errors, []);
@@ -157,7 +160,7 @@ test('on: publishes only filtered, de-duplicated link_out cards; the key is neve
   ]);
   for (const c of f.dry.cards) {
     assert.equal(c.kind, 'link_out');
-    assert.equal(c.body, null);
+    assert.ok(c.body && c.ai_generated && (c.detail?.key_points.length ?? 0) >= 3);   // D-296: full summary
     assert.equal(c.attribution, 'via NewsData.io');
     assert.equal(c.sources[0].license_class, 'link_out');
     assert.deepEqual(validatePublish(c, { linkOutEnabled: true }).errors, []);
@@ -285,4 +288,92 @@ test('junk headlines (crime, fund-holding spam, head-to-head comparisons, advice
     'How Much Capital Gains Tax Does a 61-Year-Old Owe on $750,000 of Inherited Apple Stock']) assert.ok(p.test(t), t);
   for (const t of ['Thomson Reuters unveils $500 million share buyback plan', 'EasyJet shareholders approve £5.7 billion Apollo takeover', 'Fed holds rates steady as inflation cools',
     'Unilever/McCormick merger: UK regulator seeks remedies to allay competition fears']) assert.ok(!p.test(t), t);
+});
+
+// ---- D-296: AI summary from the publisher page --------------------------------------------------------------------
+const articleParas = [
+  'Federal Reserve officials left the benchmark interest rate unchanged on Wednesday, saying inflation has eased toward their target while hiring remains solid across most of the country.',
+  'Chair remarks stressed that policymakers will watch incoming data on prices and wages before deciding whether any further change is warranted at upcoming meetings of the committee.',
+  'Mortgage lenders and car dealers said borrowing costs for households are likely to stay near current levels for now, which keeps monthly payments for new loans roughly where they were.',
+  'Economists surveyed ahead of the decision had expected no change, and bond markets barely moved after the statement was released to the public in the afternoon.',
+];
+const articleHtml = `<html><body><nav>Home</nav><article>${articleParas.map((p) => `<p>${p}</p>`).join('')}</article></body></html>`;
+const DETAIL = {
+  paragraphs: ['Policymakers said they will watch incoming price and wage data before deciding on any further change.', 'Lenders and car dealers expect borrowing costs for households to stay near current levels for now.'],
+  key_points: ['Officials kept the benchmark rate unchanged on Wednesday', 'Inflation has eased toward the target', 'Bond markets barely moved after the statement'],
+};
+const summaryProvider = (calls: string[], over: Partial<{ body: string | null; detail: typeof DETAIL | null }> = {}) => ({
+  name: 'gemini', usesAi: true as const, model: 'test-model',
+  async summarize(i: { item: RawItem; text: string }) {
+    calls.push(`${i.item.license_class}|${i.text.length}`);
+    return {
+      headline: 'Ignored AI headline', body: over.body === undefined ? 'The Federal Reserve left interest rates unchanged and said inflation has eased. Officials will wait for more data before changing course.' : over.body,
+      category: 'economy', event_type: null, tickers: [], everyday_relevance: 4,
+      detail: over.detail === undefined ? DETAIL : over.detail,
+    };
+  },
+});
+const pageFetch = (html: string): Deps['fetchText'] => async (u, kind) => {
+  if (kind === 'api') return body;
+  if (u.endsWith('/robots.txt')) throw new Error('HTTP 404');
+  return html;
+};
+
+test('D-296: a publisher page gives a link_out card a full summary (body + key points); the headline stays verbatim; the source stays link_out', async () => {
+  const calls: string[] = [];
+  const f = fakeDeps(pageFetch(articleHtml), { ...on, providers: [summaryProvider(calls)] as never });
+  f.dry.publisher.recentHeadlines = async () => f.dry.cards.map((c) => c.headline);
+  await runOnce(f.deps, { only: ['newsdata_market'] });
+  const fed = f.dry.cards.find((c) => /Fed holds rates/.test(c.headline))!;
+  assert.ok(fed, f.lines.join(String.fromCharCode(10)));
+  assert.equal(fed.kind, 'link_out');
+  assert.equal(fed.headline, 'Fed holds rates steady as inflation cools to 2.9%');   // not the AI's headline
+  assert.equal(fed.ai_generated, true);
+  assert.match(fed.body ?? '', /interest rates unchanged/);
+  assert.equal(fed.detail?.key_points.length, 3);
+  assert.equal(fed.model, 'test-model');
+  assert.equal(fed.sources[0].license_class, 'link_out');
+  assert.equal(fed.attribution, 'via NewsData.io');
+  assert.deepEqual(validatePublish(fed, { linkOutEnabled: true }).errors, []);
+  assert.ok(calls.every((c) => c.startsWith('link_out_text|')));
+  assert.ok(f.dry.items.every((i) => i.license_class === 'link_out' && i.summary_text === ''), 'page text is never stored');
+});
+
+test('D-296: no usable page, a rejected draft, or a draft without key points = nothing published, item closed as skipped', async () => {
+  const stub = '<html><body><p>Subscribe to read.</p></body></html>';
+  const cases: [string, Partial<{ body: string | null; detail: typeof DETAIL | null }>][] = [
+    [stub, {}], [articleHtml, { body: 'Buy this stock now, it will double.' }], [articleHtml, { detail: null }],
+  ];
+  for (const [html, over] of cases) {
+    const f = fakeDeps(pageFetch(html), { ...on, fetchText: pageFetch(html), providers: [summaryProvider([], over)] as never });
+    const statuses: string[] = [];
+    const set = f.dry.publisher.setItemStatus.bind(f.dry.publisher);
+    f.dry.publisher.setItemStatus = async (i, st, n) => { statuses.push(`${st}:${n}`); return set(i, st, n); };
+    await runOnce(f.deps, { only: ['newsdata_market'] });
+    assert.equal(f.dry.cards.length, 0, JSON.stringify(over));
+    assert.ok(statuses.length >= 1 && statuses.every((x) => x.startsWith('skipped:')), statuses.join());
+  }
+});
+
+test('D-296: summaries off (config) or no AI provider = the source publishes nothing and never fetches a page', async () => {
+  const fetched: string[] = [];
+  const track: Deps['fetchText'] = async (u, kind) => { if (kind === 'publisher') fetched.push(u); return body; };
+  const off = fakeDeps(track, { newsdata: { apiKey: KEY, enabled: true, summarize: false } });
+  await runOnce(off.deps, { only: ['newsdata_market'] });
+  const none = fakeDeps(track, { ...on, providers: [] });
+  await runOnce(none.deps, { only: ['newsdata_market'] });
+  assert.equal(off.dry.cards.length + none.dry.cards.length, 0);
+  assert.equal(fetched.length, 0);
+  assert.ok(none.lines.some((l) => /no AI summarizer available/.test(l)));
+});
+
+test('D-296: at most aiPerRun page fetches + AI calls per run; the rest are left for the next run (not recorded)', async () => {
+  const calls: string[] = [];
+  const f = fakeDeps(pageFetch(articleHtml), { ...on, providers: [summaryProvider(calls)] as never });
+  const nd = config.newsdata as { aiPerRun: number };   // config is readonly in its type; the test changes it temporarily
+  const saved = nd.aiPerRun;
+  nd.aiPerRun = 1;
+  try { await runOnce(f.deps, { only: ['newsdata_market'] }); } finally { nd.aiPerRun = saved; }
+  assert.equal(calls.length, 1);
+  assert.equal(f.dry.items.length, 1);
 });

@@ -18,7 +18,7 @@ export class AllowlistError extends Error {
   }
 }
 
-export type HostKind = 'page' | 'api';
+export type HostKind = 'page' | 'api' | 'publisher';
 
 function parse(url: string): URL {
   let u: URL;
@@ -52,8 +52,23 @@ export function assertAllowedApi(url: string, extraHosts: readonly string[] = []
   return u;
 }
 
-/** Throws unless `url` is allowed for its kind: page hosts for 'page', API hosts (+ extraHosts) for 'api'. */
+/**
+ * 'publisher' kind (D-296): the article page behind a NewsData link-out item. Any public https host, but never an IP
+ * literal, localhost or an internal name (so a crafted link cannot reach our own network). Redirect hops are re-checked.
+ */
+export function assertAllowedPublisher(url: string): URL {
+  const u = parse(url);
+  const h = u.hostname.toLowerCase();
+  const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(':') || h.startsWith('[');
+  if (isIp || h === 'localhost' || !h.includes('.') || /\.(local|localhost|internal|lan|home|corp|test|invalid)$/.test(h)) {
+    throw new AllowlistError(`publisher host not allowed: ${h}`);
+  }
+  return u;
+}
+
+/** Throws unless `url` is allowed for its kind: page hosts for 'page', API hosts (+ extraHosts) for 'api', public hosts for 'publisher'. */
 export function assertAllowed(url: string, kind: HostKind, extraHosts: readonly string[] = []): URL {
+  if (kind === 'publisher') return assertAllowedPublisher(url);
   return kind === 'page' ? assertAllowedPage(url) : assertAllowedApi(url, extraHosts);
 }
 

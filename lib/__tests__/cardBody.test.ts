@@ -33,9 +33,12 @@ test('nothing is invented: blank or malformed points are dropped, an empty card 
   assert.deepEqual(cardTakeaways(card({ body: '   ', detail: null })), { kind: 'none' });
 });
 
-test('link-out cards never get a body (rule 7: no description)', () => {
-  const c = card({ kind: 'link_out', body: 'A description', detail: { paragraphs: [], key_points: points(3) } });
+test('headline-only link-out cards get no body (rule 7); one with an AI summary (D-296) shows its key points or summary', () => {
+  const c = card({ kind: 'link_out', body: null, detail: { paragraphs: [], key_points: points(3) } });
   assert.deepEqual(cardTakeaways(c), { kind: 'none' });
+  const s = card({ kind: 'link_out', body: 'An AI summary.', detail: { paragraphs: [], key_points: points(3) } });
+  assert.equal(cardTakeaways(s).kind, 'points');
+  assert.deepEqual(cardTakeaways(card({ kind: 'link_out', body: 'An AI summary.', detail: null })), { kind: 'summary', text: 'An AI summary.' });
 });
 
 test('bottom bar: primary source name, time, count and a "Sources:" accessible name', () => {
