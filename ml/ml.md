@@ -7,7 +7,7 @@ What it does, in one paragraph: every card gets a 32-number vector from its text
 ## How it connects to the website (shadow mode)
 
 - **Shadow only.** The database logs which cards each signed-in For you and Trending page showed and in which slot, behind two flags in `core.rank_params`: `foryou_ml_mode` and `trending_ml_mode` (0 = off, 1 = shadow; they ship at 0). In shadow mode nothing a reader sees changes.
-- **Hourly laptop job.** Next to the hourly ingest run, a job exports the logged pages and events (service-role RPC), rebuilds each reader's state as of the moment the page was served, runs `rank_for_you` on the same candidates and writes the model's would-have-ranked scores back to Postgres (`api.ml_write_shadow`). The database side is built and switched off; the Python replay job is the next step and is not in this folder yet. Its entry point will be `elementml.serving.rank_for_you`.
+- **Hourly laptop job.** Next to the hourly ingest run, a job exports the logged pages and events (service-role RPC), rebuilds each reader's state as of the moment the page was served, runs `rank_for_you` on the same candidates and writes the model's would-have-ranked scores back to Postgres (`api.ml_write_shadow`). The database side is built and switched off. The Python replay job is `elementml/serving/shadow_job.py` (see "Shadow replay job" below); it scores each logged page with a saved model and writes `core.ml_shadow`. `elementml.serving.rank_for_you` stays the full-pipeline entry point.
 - **Trending** uses the same model averaged across readers ("expected appeal to everyone"), with position and crowd features neutralised so it cannot feed a popularity loop.
 - **Going live later** is one capped term added to the existing SQL score, in hours, so importance and freshness stay the backbone. It needs its own migration and review, and only after these hold: at least 14 days of shadow logs and at least 200 real readers (with about 30,000 impressions), heads retrained on real events, and the shadow evaluation beating the formula without extra dislikes.
 
@@ -166,6 +166,46 @@ $PY -m elementml.evaluation.v3_curves
 $PY -m pytest tests/test_v3.py -q
 PGLITE_PACKAGE_JSON=<repo>/package.json $PY -m pytest tests/test_v3_sql.py -q   # SQL parity, about 2 min
 ```
+
+## Real-impression evaluation (`evaluation/real_eval.py`): does the vector + LightGBM ranker generalise?
+
+Input is a logged impression file (one row per served slot with the outcome, as written by the simulated-reader run; the file and the card records are git-ignored) plus the card records of the same pool. Each reader's history is replayed in time order through `UserState` and `features.build`, so every impression gets exactly the features the ranker could have known then (no future events, no card id, no hidden taste). The heads (like, dislike, open_detail, completion) are trained on viewed impressions only, with the robust (monotone, small-tree) settings.
+
+Splits that expose overfitting to the cards: by card (GroupKFold on card id), by reader (GroupKFold on reader id) and leave one category out. Baselines: the server formula (v5), the v3 formula (Python mirror), a category-mean model, served order, random. Pass line on the by-card split: overfit gap (train AUC minus held-out AUC, like head) <= 0.05, ECE <= 0.05, AUC above the category mean, page NDCG@10 above both formulas. The regularisation is chosen on the by-reader folds only, so the by-card result is not tuned on.
+
+| File | What happens there |
+|---|---|
+| `evaluation/real_eval.py` | `load`, `replay` (feature matrix + labels per impression), `cv` / `evaluate` (the three split types), `sweep` (regularisation on by-reader folds), `verdict`, `train_final` (saves `models/real_dev/`). Writes `results/real_eval.json` and `real_eval.md`. |
+| `tests/test_real_eval.py` | NDCG, AUC, per-card weight cap, regularisation restore, no card-identity feature columns. |
+
+```
+$PY -m elementml.evaluation.real_eval --sweep --save     # about 8 min; add --quick for the full variant only
+$PY -m pytest tests/test_real_eval.py -q
+```
+
+Result on 60 simulated readers and 688 cards (16,605 impressions, 8,013 viewed and train-eligible): by-card like-AUC 0.829 against 0.594 (category mean), 0.621 (v3 formula) and 0.603 (v5 formula); NDCG@10 0.639 against 0.572 (v3), 0.530 (v5) and 0.560 (served order); overfit gap +0.042; ECE 0.015. Without the vector features: dislike-AUC 0.803 -> 0.783, NDCG@10 0.639 -> 0.599. Leaving a whole category out keeps like-AUC at 0.70 to 0.85 (markets 0.67). All five pass-line checks pass.
+
+Limits: the readers are simulated (a few hidden category tastes), so the margin over the formulas will be smaller on real readers; the pool has no tech, insider or personal-finance cards and almost no energy, world or science, so those topics cannot be judged; category-chip and trending pages carry no logged page id. This is evidence for the pipeline and for generalisation across cards, not a go-live gate. There is still no serving path (no replay job, no SQL mode), so no reader sees this ranker.
+
+## Shadow replay job (`serving/shadow_job.py`): what the model would have done, written where readers never look
+
+Reads the logged For you pages, the readers' events and follows (`api.ml_export`), the cards (`api.ml_export_cards` for tags and numbers, `api.ml_export_card_text` for headline and body, added by `20261210000000_ml_export_card_text.sql`) and a saved model folder (`embedder.pkl` + heads). Each reader's earlier events are replayed in time order into a `UserState`, so the state at a page is a pure function of what happened before it (a test checks that a later event never changes a page's row). For every page it writes one `core.ml_shadow` row through `api.ml_write_shadow`: the model's rank, utility and head predictions for the same cards the reader was shown, `conf` = explicit events / (explicit events + 5), and a `why` code per card (0 fresh and important, 1 a followed or engaged topic, 2 similar to liked cards). Position is held at 0 and no crowd tables are used. Runs are recorded in `core.ml_runs` (kind `shadow`, closed ok or failed). It changes no feed.
+
+| File | What happens there |
+|---|---|
+| `serving/shadow_job.py` | `build_cards`, `score_pages` (pure: pages + events + prefs + cards + model -> rows), `run` (export, score, write in chunks of 500, close the run), `Model.load`. |
+| `bandit/supa.py` | The service-role REST client; gained `export_card_text`, `begin_run`, `write_shadow`, `finish_run`. |
+| `tests/test_shadow_job.py` | Row shape, deterministic, no future leakage, earlier events change the state, unknown-card pages skipped, trending ignored, dry run writes nothing, chunked writes close the run, a failure marks the run failed. |
+
+```
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... $PY -m elementml.cli shadow-run --model models/real_dev --dry-run   # counts only
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... $PY -m elementml.cli shadow-run --model models/real_dev --hours 48
+$PY -m pytest tests/test_shadow_job.py -q
+```
+
+Tried on the dev project (simulated readers): 491 For you pages, 16,098 events and 60 readers scored with no page skipped, 491 shadow rows written, one ok run; mean p(like) 0.119, p(dislike) 0.080, p(detail) 0.035; the model's top card equals the served top card on 19% of pages.
+
+Not built, on purpose: the step that lets a model change what a reader sees. Sketch for a later, separately approved migration (rebase it on the current For you function, which other branches have changed): a service-role table of per-reader per-card hours written by this job, a new `foryou_ml_mode` value that adds that term to the formula score, capped in hours, ignored when older than a day or when the reader has under 5 explicit events, with the holdout and kill-switch pattern v3 uses. Until then no reader sees this ranker.
 
 ## Rules this prototype keeps
 
