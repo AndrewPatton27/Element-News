@@ -225,8 +225,15 @@ export function AccountProvider({ account, children }: { account: AccountApi; ch
       },
       async saveSources(hiddenSources) {
         if (!user) return saveLocal(withHiddenSources(readLocal(store), hiddenSources));
-        const before = prefs ?? EMPTY_PREFS;
-        setPrefs(await account.setPrefs(before.followed, before.hidden, hiddenSources));
+        if (!prefs) throw new Error('Your settings are still loading. Try again in a moment.');
+        const before = prefs;
+        setPrefs({ ...before, hiddenSources }); // the switch flips at once
+        try {
+          setPrefs(await account.setPrefs(before.followed, before.hidden, hiddenSources));
+        } catch (e) {
+          setPrefs(before);
+          throw e;
+        }
       },
       async hideSource(key) {
         if (!user) {

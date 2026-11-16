@@ -404,7 +404,7 @@ begin
     raise exception 'FAIL: anon lost the USGS cards';
   end if;
   r := api.sources();
-  if jsonb_array_length(r) <> 9 or not (r @> '[{"key":"usgs"}]'::jsonb) then raise exception 'FAIL: api.sources() returned %', r; end if;
+  if jsonb_array_length(r) <> 11 or not (r @> '[{"key":"usgs"}]'::jsonb) then raise exception 'FAIL: api.sources() returned %', r; end if;
   perform set_config('role', 'none', true);
   if core.source_key_of('data', gen_random_uuid()) <> 'fred' then raise exception 'FAIL: data cards are not mapped to fred'; end if;
   if core.source_key_of('summary', (select id from core.blurbs where dedupe_key = 'br-Q1')) <> 'usgs' then
