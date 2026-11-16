@@ -62,7 +62,7 @@ export function liveFetchText(env: FunctionEnv, fetchImpl?: FetchLike): Deps['fe
   const host = new URL(env.supabaseUrl).hostname;
   return async (url, kind) => {
     const r = await fetchAllowed(url, {
-      kind, userAgent: new URL(url).hostname === 'en.wikipedia.org' ? wikiUa : ua,
+      kind, userAgent: kind === 'publisher' ? config.publisherPage.userAgent : new URL(url).hostname === 'en.wikipedia.org' ? wikiUa : ua,
       extraHosts: [host], cacheTtlMinutes: 0, fetchImpl,
     });
     if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status} from ${new URL(url).hostname}`);

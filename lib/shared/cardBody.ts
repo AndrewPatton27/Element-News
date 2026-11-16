@@ -5,7 +5,7 @@
 //
 // Body rule: the card's own persisted key points as 2-4 short bullets; with fewer than
 // two key points, the card's 2-3 sentence summary instead. Nothing is ever written
-// here: every string comes from the card row. Link-out cards get no body (rule 7).
+// here: every string comes from the card row. Headline-only link-out cards get no body (rule 7); D-296: a link-out card with an AI summary shows it.
 
 import type { BlurbCard } from '../../contract/types.ts';
 import { cardDetail } from './detail.ts';
@@ -23,7 +23,7 @@ export type CardBodyContent =
 // max: how many bullets fit (clamped to 1..4). A card with one key point and no summary
 // shows that one point rather than nothing.
 export function cardTakeaways(card: Pick<BlurbCard, 'kind' | 'detail' | 'body'>, max: number = TAKEAWAYS_MAX): CardBodyContent {
-  if (card.kind === 'link_out') return { kind: 'none' };
+  if (card.kind === 'link_out' && !card.body) return { kind: 'none' };   // headline-only link-out (rule 7); D-296: one with an AI summary shows it
   const limit = Math.max(1, Math.min(TAKEAWAYS_MAX, Math.floor(Number.isFinite(max) ? max : TAKEAWAYS_MAX)));
   const points = cardDetail(card)?.key_points ?? [];
   const body = typeof card.body === 'string' ? card.body.trim() : '';

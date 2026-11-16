@@ -121,7 +121,9 @@ export function Card(props: Props) {
   const credit = shareAlikeCredit(card, config);
   const badge = badgeFor(card, p);
   const reactFn = typeof onReact === 'function' ? onReact : undefined;
-  const linkOut = card.kind === 'link_out';
+  // D-296: a link-out card is headline-only until it gets an AI summary; with a summary it uses the normal body layout plus the read button.
+  const linkOut = card.kind === 'link_out' && !card.body;
+  const linkOutSummary = card.kind === 'link_out' && !!card.body;
 
   const hasDetail = !linkOut && cardDetail(card) !== null;
   const opensDetail = !!onOpenDetail && hasDetail;
@@ -235,7 +237,7 @@ export function Card(props: Props) {
       size={{ size: headlineSize, line: headlineSize * headlineLead, track: -headlineSize * headlineTrack }}
       style={{ maxWidth: wide || tablet ? 820 : undefined }}
       // link-out headlines are shown word for word (200-character cap, rule 7)
-      text={linkOut ? card.headline.slice(0, 200) : undefined}
+      text={card.kind === 'link_out' ? card.headline.slice(0, 200) : undefined}
     />
   );
 
@@ -386,6 +388,12 @@ export function Card(props: Props) {
             {card.kind === 'data' ? <DataNotices card={card} config={config} small /> : null}
             {opensDetail && pinMore ? <View style={styles.morePinned}>{moreDetail}</View> : null}
             {credit ? <ShareAlikeLine credit={credit} cardId={card.id} /> : null}
+            {linkOutSummary ? (
+              <>
+                <CardReadButton src={src} cardId={card.id} />
+                <CardSmallPrint text={`${linkOutCredit(card.attribution)} · Summary written by Element from the publisher's article`} />
+              </>
+            ) : null}
           </>
         )}
 

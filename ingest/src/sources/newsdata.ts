@@ -9,7 +9,7 @@
 // Inputs: /latest or /market JSON. Outputs: RawItems (license_class link_out) and link_out publish payloads.
 
 import { config } from '../config.ts';
-import type { PublishPayload, RawItem, TickerRef } from '../types.ts';
+import type { PublishPayload, RawItem, SummaryDraft, TickerRef } from '../types.ts';
 import { contentWords, findAdvice } from '../validate.ts';
 
 export type NewsdataEndpoint = 'latest' | 'market';
@@ -194,6 +194,31 @@ export function newsdataPayload(item: RawItem, itemId?: string): PublishPayload 
     }],
   };
 }
+
+/**
+ * D-296: link-out card whose body is an AI summary written from the publisher page. The headline stays the publisher's
+ * verbatim wording (the draft's headline is ignored), the source stays link_out, and the credit and 12 h delay are unchanged.
+ */
+export function newsdataSummaryPayload(
+  item: RawItem, draft: SummaryDraft, meta: { itemId?: string; model: string | null },
+): PublishPayload {
+  const base = newsdataPayload(item, meta.itemId);
+  const known = new Map(item.tickers.map((t) => [t.symbol.toUpperCase(), t]));
+  const drafted = draft.tickers.map((s) => known.get(s.toUpperCase())).filter((t): t is TickerRef => !!t);
+  return {
+    ...base,
+    body: draft.body?.trim() || null,
+    ai_generated: true,
+    model: meta.model,
+    prompt_version: config.promptVersion,
+    detail: draft.detail ?? null,
+    everyday_relevance: Number.isInteger(draft.everyday_relevance) ? draft.everyday_relevance as number : null,
+    tickers: drafted.length ? drafted.slice(0, config.maxTickersPerCard) : base.tickers,
+  };
+}
+
+/** The same item, marked so its fetched publisher text may go to the AI (the published card's source stays link_out). */
+export const withPageText = (item: RawItem): RawItem => ({ ...item, license_class: 'link_out_text', summary_text: '' });
 
 /** True when the headline is (nearly) the same story as one already published: >= 60% of the shorter one's key words are shared. */
 export function isNearDuplicate(title: string, existing: readonly string[], min = 0.6): boolean {

@@ -130,3 +130,5 @@ oFab\). \ScreenShell.tsx\ phone header takes \onBack\, \onClose\, \randTitle\, 
 - Sizes: `Card.tsx` passes `chartH` to `DataFacts`: 30 (a thin line, no caption or legend) on compact phone cards, 36 to 52 on normal phone cards, 56 or 84 on desktop. The chart loads lazily when the card is shown and reserves its room while loading; a card with no history (agency cards such as EIA or auctions) shows nothing. `DetailBody` passes `detail` with a 170 px chart and a caption with the low and high (dates included).
 - Data: `lib/history/` (see `lib/lib.md`).
 - Test: `e2e/chart.spec.ts` (screenshots at 360, 390, 820, 1280 in `context/m9c-chart-shots/`).
+
+Link-out cards (D-296): a `link_out` card with no body keeps the headline-only layout (publisher name, headline, read button, small print). With an AI summary (`body` set) `Card.tsx` uses the normal layout (headline, key points or summary, About chips, More detail) and adds the read button and the "via NewsData.io" credit line under it; `lib/shared/cardBody.ts` `cardTakeaways` returns the body only when the card has one.

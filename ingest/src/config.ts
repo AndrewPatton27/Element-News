@@ -150,6 +150,7 @@ export const config = {
     company_filing: 10,
     public_domain: 25,
     cc_by_sa: 10,                               // Wikipedia: treated like filings (PM review 2)
+    link_out_text: 10,                          // publisher page text behind a NewsData link-out card: like filings
   } as Record<string, number>,
 
   // Phrases that read as advice. Matched case-insensitively on word boundaries.
@@ -252,6 +253,16 @@ export const config = {
   maxRequestsPerSecond: 5,                     // SEC allows 10/s; we stay at half
   maxRedirects: 3,
   fetchTimeoutMs: 20_000,
+  // Publisher pages behind NewsData link-out items (D-296, replaces the page-host rule for these items only). Text is
+  // read once to write a summary and is never stored. robots.txt is honored; paywalled or script-only pages yield no text.
+  publisherPage: {
+    enabled: true,
+    timeoutMs: 10_000,
+    maxBytes: 1_500_000,                       // a longer body is cut (the text is only a summary source)
+    maxChars: 6_000,                           // article text handed to the AI
+    minChars: 400,                             // shorter than this = paywall stub or empty shell: keep the headline-only card
+    userAgent: 'ElementNewsBot/1.0 (+https://element-news.pages.dev/about)',
+  },
   cacheDir: 'cache',
   cacheTtlMinutes: 60 * 24,                    // filings never change; feeds use a short TTL below
   feedCacheTtlMinutes: 4,
@@ -653,6 +664,8 @@ export const config = {
     attribution: 'via NewsData.io',
     delayedHours: 12,
     headlineMaxChars: 200,                      // rule 7 safety cap
+    summarize: true as boolean,                 // D-296: link-out cards need a full AI summary from the publisher page (off = the source publishes nothing)
+    aiPerRun: 5,                                // at most this many page fetches + AI summaries per run; the rest wait for the next run (shared 500/day cap)
     dailyCreditCap: 144,                        // a weekday uses 104 (hourly baseline 48 + market-hours /market every 15 min 42 + /latest every 30 min 14); the free plan allows 200
     latestStopFraction: 0.8,                    // at 80% of the cap /latest calls stop (the /market backbone keeps its credits); the cap itself stops everything
     minScore: 2,                                // relevance gate (newsdata.ts relevanceScore): headlines below this are skipped as not_finance

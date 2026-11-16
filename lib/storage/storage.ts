@@ -54,9 +54,17 @@ export function defaultStore(): KeyValueStore {
   return notifying(baseStore());
 }
 
+// Temporary test mode (EXPO_PUBLIC_TEMP_STORAGE=1, off by default): keep everything in sessionStorage,
+// so each browser tab starts clean, nothing survives closing the tab and tabs never share state.
+// Used for the simulated-user runs; server-side signals (api.track) are unaffected.
+function tempStorageOn(): boolean {
+  return process.env.EXPO_PUBLIC_TEMP_STORAGE === '1';
+}
+
 function baseStore(): KeyValueStore {
   try {
-    const ls = (globalThis as { localStorage?: Storage }).localStorage;
+    const g = globalThis as { localStorage?: Storage; sessionStorage?: Storage };
+    const ls = tempStorageOn() ? g.sessionStorage : g.localStorage;
     if (ls) {
       const probe = '__element_probe__';
       ls.setItem(probe, '1');
